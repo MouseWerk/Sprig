@@ -1,41 +1,70 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+const tintColorLight = '#0f172a';
+const tintColorDark = '#f8fafc';
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
+    text: '#0f172a', // slate-900
+    background: '#ffffff',
     tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
+    icon: '#64748b', // slate-500
+    tabIconDefault: '#94a3b8', // slate-400
     tabIconSelected: tintColorLight,
+
+    // Shadcn-like tokens
+    card: '#ffffff',
+    cardForeground: '#0f172a',
+    popover: '#ffffff',
+    popoverForeground: '#0f172a',
+    primary: '#0f172a',
+    primaryForeground: '#ffffff',
+    secondary: '#f1f5f9',
+    secondaryForeground: '#0f172a',
+    muted: '#f1f5f9',
+    mutedForeground: '#64748b',
+    accent: '#f1f5f9',
+    accentForeground: '#0f172a',
+    destructive: '#ef4444',
+    destructiveForeground: '#f8fafc',
+    border: '#e2e8f0',
+    input: '#e2e8f0',
+    ring: '#0f172a',
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
+    text: '#f8fafc', // slate-50
+    background: '#020617', // slate-950
     tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
+    icon: '#94a3b8', // slate-400
+    tabIconDefault: '#475569', // slate-600
     tabIconSelected: tintColorDark,
+
+    // Shadcn-like tokens
+    card: '#020617',
+    cardForeground: '#f8fafc',
+    popover: '#020617',
+    popoverForeground: '#f8fafc',
+    primary: '#f8fafc',
+    primaryForeground: '#0f172a',
+    secondary: '#1e293b',
+    secondaryForeground: '#f8fafc',
+    muted: '#1e293b',
+    mutedForeground: '#94a3b8',
+    accent: '#1e293b',
+    accentForeground: '#f8fafc',
+    destructive: '#7f1d1d',
+    destructiveForeground: '#f8fafc',
+    border: '#1e293b',
+    input: '#1e293b',
+    ring: '#f8fafc',
   },
 };
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
