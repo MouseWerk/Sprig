@@ -23,6 +23,7 @@ interface FlashcardSwipeProps {
     onSwipeTop: () => void;
     highlightMode?: boolean;
     onHighlightChange?: (isFront: boolean, newText: string) => void;
+    onFlip?: (flipped: boolean) => void;
 }
 
 export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
@@ -32,7 +33,8 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
     onSwipeRight,
     onSwipeTop,
     highlightMode = false,
-    onHighlightChange
+    onHighlightChange,
+    onFlip
 }) => {
     const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
     const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
@@ -54,6 +56,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
     const toggleFlip = () => {
         const nextState = !isFlipped;
         setIsFlipped(nextState);
+        onFlip?.(nextState);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         rotateY.value = withSpring(nextState ? 180 : 0, {
             damping: 20,

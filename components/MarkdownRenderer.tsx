@@ -15,9 +15,10 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     fontSize = 18,
     color
 }) => {
-    const textColor = color || useThemeColor({}, 'text');
+    const themeTextColor = useThemeColor({}, 'text');
     const accentColor = useThemeColor({}, 'primary');
     const codeBg = useThemeColor({}, 'secondary');
+    const textColor = color || themeTextColor;
 
     const styles = useMemo(() => ({
         body: {

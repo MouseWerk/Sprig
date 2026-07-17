@@ -1,11 +1,9 @@
-import { useCustomTheme } from '@/components/ThemeProvider';
+import { ThemeContext } from '@/components/ThemeProvider';
+import { useContext } from 'react';
 import { useColorScheme as useDeviceColorScheme } from 'react-native';
 
 export function useColorScheme() {
-    try {
-        const { theme } = useCustomTheme();
-        return theme;
-    } catch (e) {
-        return useDeviceColorScheme();
-    }
+    const themeContext = useContext(ThemeContext);
+    const deviceScheme = useDeviceColorScheme();
+    return themeContext ? themeContext.theme : deviceScheme;
 }

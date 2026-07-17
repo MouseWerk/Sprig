@@ -1,26 +1,31 @@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useFocusEffect, useRouter } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
 import * as Icons from 'lucide-react-native';
-import { BookOpen, ChevronRight, Folder as FolderIcon, Plus, Trash2, X } from 'lucide-react-native';
+import { BookOpen, ChevronRight, FileUp, Flame, Folder as FolderIcon, Plus, Search, Trash2, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { Alert, FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconPicker } from '../../components/IconPicker';
 import { Button } from '../../components/ui/Button';
+import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { useToast } from '../../components/ui/Toast';
-import { createEmptyDeck, Deck, deleteDeck, deleteFolder, Folder, getDecks, getFolders, saveDeck, saveFolder, updateDeck } from '../../utils/Storage';
+import { createEmptyDeck, Deck, deleteDeck, deleteFolder, Folder, getDecks, getFolders, getUserStats, importCsvToDeck, saveFolder, updateDeck, UserStats } from '../../utils/Storage';
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const { t } = useLanguage();
 
   const [decks, setDecks] = useState<Deck[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [stats, setStats] = useState<UserStats | null>(null);
 
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [newFolderModalVisible, setNewFolderModalVisible] = useState(false);
@@ -29,6 +34,7 @@ export default function HomeScreen() {
   const [boxName, setBoxName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('Book');
   const [newFolderName, setNewFolderName] = useState('');
+  const [importing, setImporting] = useState(false);
   
   const [editingDeck, setEditingDeck] = useState<Deck | null>(null);
   const [editDeckName, setEditDeckName] = useState('');
@@ -41,12 +47,12 @@ export default function HomeScreen() {
   const secondaryBg = useThemeColor({}, 'secondary');
   const accentColor = useThemeColor({}, 'primary');
   const primaryForeground = useThemeColor({}, 'primaryForeground');
-  const borderColor = useThemeColor({}, 'border');
 
   const loadData = useCallback(async () => {
-    const [savedDecks, savedFolders] = await Promise.all([getDecks(), getFolders()]);
+    const [savedDecks, savedFolders, savedStats] = await Promise.all([getDecks(), getFolders(), getUserStats()]);
     setDecks(savedDecks.filter(d => d.type === 'csv'));
     setFolders(savedFolders);
+    setStats(savedStats);
   }, []);
 
   useFocusEffect(
@@ -57,21 +63,6 @@ export default function HomeScreen() {
 
 
 
-  const handleSaveDeck = async () => {
-    if (!boxName.trim()) return;
-
-    try {
-      await saveDeck(boxName, '', selectedIcon, 'csv', 0, currentFolderId); // Fallback for old saveDeck if needed, but better use createEmptyDeck
-      setImportModalVisible(false);
-      setBoxName('');
-      setSelectedIcon('Book');
-      loadData();
-    } catch (e) {
-      Alert.alert('Error', 'Failed to create deck');
-    }
-  };
-
-  // Actually let's use the new createEmptyDeck
   const handleCreateDeck = async () => {
     if (!boxName.trim()) return;
 
@@ -83,7 +74,38 @@ export default function HomeScreen() {
       loadData();
       showToast({ message: t('deckCreated').replace('{name}', boxName), type: 'success' });
     } catch (e) {
+      console.error('Error creating deck:', e);
       showToast({ message: t('error'), type: 'error' });
+    }
+  };
+
+  const handleImportFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/vnd.ms-excel', 'text/plain'],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+      const asset = result.assets[0];
+      const fallbackName = asset.name?.replace(/\.[^/.]+$/, '') || 'Imported Deck';
+      const name = boxName.trim() || fallbackName;
+
+      setImporting(true);
+      const newDeck = await createEmptyDeck(name, selectedIcon, currentFolderId);
+      await importCsvToDeck(newDeck.id, asset.uri);
+
+      setImportModalVisible(false);
+      setBoxName('');
+      setSelectedIcon('Book');
+      loadData();
+      showToast({ message: t('deckCreated').replace('{name}', name), type: 'success' });
+    } catch (e) {
+      console.error('Error importing file:', e);
+      showToast({ message: t('error'), type: 'error' });
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -96,46 +118,37 @@ export default function HomeScreen() {
       loadData();
       showToast({ message: t('folderCreated').replace('{name}', newFolderName), type: 'success' });
     } catch (e) {
+      console.error('Error creating folder:', e);
       showToast({ message: t('error'), type: 'error' });
     }
   };
 
-  const handleDelete = (id: string, name: string) => {
-    Alert.alert(
-      t('deleteDeck'),
-      t('deleteDeckMessage').replace('{name}', name),
-      [
-        { text: t('cancel'), style: 'cancel' },
-        {
-          text: t('delete'),
-          style: 'destructive',
-          onPress: async () => {
-            await deleteDeck(id);
-            loadData();
-            showToast({ message: t('deckDeleted').replace('{name}', name), type: 'info' });
-          }
-        }
-      ]
-    );
+  const handleDelete = async (id: string, name: string) => {
+    const ok = await confirm({
+      title: t('deleteDeck'),
+      message: t('deleteDeckMessage').replace('{name}', name),
+      confirmText: t('delete'),
+      cancelText: t('cancel'),
+      destructive: true,
+    });
+    if (!ok) return;
+    await deleteDeck(id);
+    loadData();
+    showToast({ message: t('deckDeleted').replace('{name}', name), type: 'info' });
   };
 
-  const handleDeleteFolder = (id: string, name: string) => {
-    Alert.alert(
-      t('deleteFolder'),
-      t('deleteFolderMessage').replace('{name}', name),
-      [
-        { text: t('cancel'), style: 'cancel' },
-        {
-          text: t('delete'),
-          style: 'destructive',
-          onPress: async () => {
-            await deleteFolder(id);
-            loadData();
-            showToast({ message: t('folderDeleted').replace('{name}', name), type: 'info' });
-          }
-        }
-      ]
-    );
+  const handleDeleteFolder = async (id: string, name: string) => {
+    const ok = await confirm({
+      title: t('deleteFolder'),
+      message: t('deleteFolderMessage').replace('{name}', name),
+      confirmText: t('delete'),
+      cancelText: t('cancel'),
+      destructive: true,
+    });
+    if (!ok) return;
+    await deleteFolder(id);
+    loadData();
+    showToast({ message: t('folderDeleted').replace('{name}', name), type: 'info' });
   };
 
   const handleEditDeck = (deck: Deck) => {
@@ -265,9 +278,27 @@ export default function HomeScreen() {
     </TouchableOpacity>
   );
 
-  const currentFolders = folders.filter(f => (f.parentId || null) === currentFolderId);
-  const currentDecks = decks.filter(d => (d.folderId || null) === currentFolderId);
+  // With an active search, look across all folders; otherwise browse the current folder
+  const query = searchQuery.trim().toLowerCase();
+  const searching = query.length > 0;
+  const currentFolders = searching
+    ? folders.filter(f => f.name.toLowerCase().includes(query))
+    : folders.filter(f => (f.parentId || null) === currentFolderId);
+  const currentDecks = searching
+    ? decks.filter(d => d.name.toLowerCase().includes(query))
+    : decks.filter(d => (d.folderId || null) === currentFolderId);
   const combinedData = [...currentFolders.map(f => ({ ...f, isFolder: true })), ...currentDecks.map(d => ({ ...d, isFolder: false }))];
+
+  // A streak only counts if the last study day was today or yesterday
+  const displayStreak = (() => {
+    if (!stats?.lastStudyDate) return 0;
+    const last = stats.lastStudyDate.split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    const yesterday = y.toISOString().split('T')[0];
+    return (last === today || last === yesterday) ? stats.currentStreak : 0;
+  })();
 
   const folderPath = [];
   let tempId = currentFolderId;
@@ -305,7 +336,25 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {folderPath.length > 0 && (
+      <View style={[styles.searchBar, { backgroundColor: secondaryBg }]}>
+        <Search size={18} color={mutedForeground} />
+        <TextInput
+          style={[styles.searchInput, { color: textColor }]}
+          placeholder="Search decks and folders..."
+          placeholderTextColor={mutedForeground}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+          autoCorrect={false}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8}>
+            <X size={18} color={mutedForeground} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {!searching && folderPath.length > 0 && (
         <View style={styles.breadcrumb}>
           <TouchableOpacity onPress={() => setCurrentFolderId(null)}>
             <Text style={[styles.breadcrumbText, { color: mutedForeground }]}>{t('root')}</Text>
@@ -334,21 +383,62 @@ export default function HomeScreen() {
         numColumns={2}
         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <View style={[styles.emptyIcon, { backgroundColor: secondaryBg }]}>
-              <BookOpen size={48} color={accentColor} strokeWidth={2.5} />
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews={true}
+        ListHeaderComponent={
+          !searching && !currentFolderId && stats && stats.totalCardsReviewed > 0 ? (
+            <View style={[styles.statsBanner, { backgroundColor: secondaryBg }]}>
+              <View style={styles.statsBannerItem}>
+                <View style={[styles.statsBannerIcon, { backgroundColor: '#f9731620' }]}>
+                  <Flame size={20} color="#f97316" strokeWidth={2.5} fill={displayStreak > 0 ? '#f97316' : 'none'} />
+                </View>
+                <View>
+                  <Text style={[styles.statsBannerValue, { color: textColor }]}>{displayStreak}</Text>
+                  <Text style={[styles.statsBannerLabel, { color: mutedForeground }]}>Day Streak</Text>
+                </View>
+              </View>
+              <View style={[styles.statsBannerDivider, { backgroundColor: mutedForeground + '30' }]} />
+              <View style={styles.statsBannerItem}>
+                <View style={[styles.statsBannerIcon, { backgroundColor: accentColor + '15' }]}>
+                  <BookOpen size={20} color={accentColor} strokeWidth={2.5} />
+                </View>
+                <View>
+                  <Text style={[styles.statsBannerValue, { color: textColor }]}>{stats.totalCardsReviewed}</Text>
+                  <Text style={[styles.statsBannerLabel, { color: mutedForeground }]}>Cards Reviewed</Text>
+                </View>
+              </View>
             </View>
-            <Text style={[styles.emptyTitle, { color: textColor }]}>{currentFolderId ? 'Folder is empty' : 'No flashcards yet'}</Text>
-            <Text style={[styles.emptyText, { color: mutedForeground }]}>
-              {currentFolderId ? 'Create a subfolder or import a CSV deck here.' : 'Import a CSV file to create your first study deck.'}
-            </Text>
-            <Button
-              title="Create New Deck"
-              onPress={() => setImportModalVisible(true)}
-              style={styles.emptyButton}
-            />
-          </View>
+          ) : null
+        }
+        ListEmptyComponent={
+          searching ? (
+            <View style={styles.emptyContainer}>
+              <View style={[styles.emptyIcon, { backgroundColor: secondaryBg }]}>
+                <Search size={48} color={accentColor} strokeWidth={2.5} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: textColor }]}>No results</Text>
+              <Text style={[styles.emptyText, { color: mutedForeground }]}>
+                Nothing matches {'"'}{searchQuery.trim()}{'"'}. Try a different search.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <View style={[styles.emptyIcon, { backgroundColor: secondaryBg }]}>
+                <BookOpen size={48} color={accentColor} strokeWidth={2.5} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: textColor }]}>{currentFolderId ? 'Folder is empty' : 'No flashcards yet'}</Text>
+              <Text style={[styles.emptyText, { color: mutedForeground }]}>
+                {currentFolderId ? 'Create a subfolder or import a CSV deck here.' : 'Import a CSV file to create your first study deck.'}
+              </Text>
+              <Button
+                title="Create New Deck"
+                onPress={() => setImportModalVisible(true)}
+                style={styles.emptyButton}
+              />
+            </View>
+          )
         }
       />
 
@@ -433,11 +523,26 @@ export default function HomeScreen() {
                   <Text style={[styles.sectionLabel, { color: textColor }]}>Pick an Icon</Text>
                   <IconPicker selectedIcon={selectedIcon} onSelect={setSelectedIcon} />
 
-                  <View style={[styles.pickedFileBadge, { backgroundColor: secondaryBg }]}>
-                    <Text style={[styles.pickedFileName, { color: mutedForeground, fontSize: 12, marginLeft: 0 }]}>
-                      You can import a CSV file later inside the deck settings.
-                    </Text>
-                  </View>
+                  <TouchableOpacity
+                    style={[styles.importZone, { borderColor: accentColor, backgroundColor: secondaryBg }]}
+                    onPress={handleImportFile}
+                    activeOpacity={0.8}
+                    disabled={importing}
+                  >
+                    {importing ? (
+                      <ActivityIndicator color={accentColor} />
+                    ) : (
+                      <FileUp size={22} color={accentColor} strokeWidth={2.5} />
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.pickText, { color: textColor, fontSize: 15 }]}>
+                        {importing ? 'Importing...' : 'Import from CSV / Text File'}
+                      </Text>
+                      <Text style={[styles.pickSub, { color: mutedForeground }]}>
+                        Comma, tab or line-separated question/answer pairs
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
 
                   <Button
                     title="Start Building"
@@ -796,6 +901,66 @@ const styles = StyleSheet.create({
   pickSub: {
     fontSize: 13,
     opacity: 0.6,
+  },
+  importZone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 24,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    height: 46,
+    borderRadius: 16,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    height: '100%',
+  },
+  statsBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 10,
+    marginBottom: 8,
+    padding: 16,
+    borderRadius: 20,
+    justifyContent: 'space-evenly',
+  },
+  statsBannerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  statsBannerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsBannerValue: {
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  statsBannerLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statsBannerDivider: {
+    width: 1,
+    height: 32,
   },
   formScroll: {
     paddingBottom: 20,

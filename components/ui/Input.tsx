@@ -15,11 +15,11 @@ export const Input: React.FC<InputProps> = ({
     ...props
 }) => {
     const textColor = useThemeColor({}, 'text');
-    const backgroundColor = useThemeColor({}, 'background');
     const borderColor = useThemeColor({}, 'input');
     const labelColor = useThemeColor({}, 'text');
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
+    const selectionColor = useThemeColor({}, 'primary');
 
     return (
         <View style={[styles.container, containerStyle]}>
@@ -38,7 +38,7 @@ export const Input: React.FC<InputProps> = ({
                     inputStyle
                 ]}
                 placeholderTextColor={mutedForeground}
-                selectionColor={useThemeColor({}, 'primary')}
+                selectionColor={selectionColor}
                 {...props}
             />
         </View>

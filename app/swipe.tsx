@@ -1,32 +1,44 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { CheckCircle2, Edit3, FileWarning, HelpCircle, XCircle } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import * as Speech from 'expo-speech';
+import { CheckCircle2, Edit3, FileWarning, HelpCircle, Trophy, Undo2, Volume2, XCircle } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashcardSwipe } from '../components/FlashcardSwipe';
 import { Button } from '../components/ui/Button';
-import { useToast } from '../components/ui/Toast';
 import { FlashcardData, parseFlashcardsCsv } from '../utils/CsvParser';
-import { getCachedData, getDecks, setCachedData, SRSCardData, updateCardInDeck, updateCardSRS, updateDeckProgress } from '../utils/Storage';
+import { applySwipeResult, getCachedData, getDecks, restoreCardSRS, setCachedData, SRSCardData, updateCardInDeck, updateDeckProgress, updateUserStats } from '../utils/Storage';
+
+interface UndoEntry {
+    originalIndex: number;
+    grade: number;
+    prevSrs?: SRSCardData;
+    prevLearned: number[];
+    prevUnsure: number[];
+}
 
 interface FlashcardWithIndex extends FlashcardData {
     originalIndex: number;
+    reversed?: boolean; // show the answer side first (per-deck study direction)
 }
 
 export default function SwipeScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { width: SCREEN_WIDTH } = useWindowDimensions();
     const { id, uri, name, mode: initialMode } = useLocalSearchParams<{ id: string, uri: string, name?: string, mode?: string }>();
-    const { showToast } = useToast();
 
     const [cards, setCards] = useState<FlashcardWithIndex[]>([]);
     const [shuffledCards, setShuffledCards] = useState<FlashcardWithIndex[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [score, setScore] = useState(0);
     const [sessionReviewed, setSessionReviewed] = useState(0);
+    const [sessionCorrect, setSessionCorrect] = useState(0);
+    const [sessionHard, setSessionHard] = useState(0);
+    const [sessionAgain, setSessionAgain] = useState(0);
+    const [sessionComplete, setSessionComplete] = useState(false);
+    const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
+    const [isFlipped, setIsFlipped] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [learnedIndices, setLearnedIndices] = useState<number[]>([]);
@@ -34,6 +46,14 @@ export default function SwipeScreen() {
     const [srsData, setSrsData] = useState<Record<number, SRSCardData>>({});
     const [isHighlightMode, setIsHighlightMode] = useState(false);
     const [studyMode, setStudyMode] = useState<'all' | 'due'>(initialMode === 'all' ? 'all' : 'due');
+
+    // Live SRS mirror (ref, not state) so undo and repeat passes stay
+    // accurate without re-filtering the session queue mid-session.
+    const liveSrsRef = useRef<Record<number, SRSCardData>>({});
+    const lastActionRef = useRef(Date.now());
+    // Serialized background persistence chain - swipes advance the UI
+    // immediately while writes complete in order behind the scenes.
+    const pendingPersistRef = useRef<Promise<void>>(Promise.resolve());
 
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
@@ -57,6 +77,7 @@ export default function SwipeScreen() {
                     setLearnedIndices(currentDeck.learnedIndices || []);
                     setUnsureIndices(currentDeck.unsureIndices || []);
                     setSrsData(currentDeck.srsData || {});
+                    liveSrsRef.current = { ...(currentDeck.srsData || {}) };
                 }
 
                 // Try cache first for speed
@@ -71,8 +92,13 @@ export default function SwipeScreen() {
                 if (parsedCards && parsedCards.length === 0) {
                     setError('This CSV file seems to be empty or formatted incorrectly. Expected: Question, Answer.');
                 } else if (parsedCards) {
-                    // Enrich with original index
-                    const enrichedCards: FlashcardWithIndex[] = parsedCards.map((c, i) => ({ ...c, originalIndex: i }));
+                    // Enrich with original index + per-deck study direction
+                    const direction = currentDeck?.studyDirection || 'normal';
+                    const enrichedCards: FlashcardWithIndex[] = parsedCards.map((c, i) => ({
+                        ...c,
+                        originalIndex: i,
+                        reversed: direction === 'reversed' || (direction === 'mixed' && Math.random() < 0.5),
+                    }));
                     setCards(enrichedCards);
                     setShuffledCards(shuffleArray(enrichedCards));
                 } else {
@@ -100,7 +126,10 @@ export default function SwipeScreen() {
 
 
 
-    // Filter cards based on study mode
+    // Filter cards based on study mode. srsData is only loaded once on mount
+    // and never refreshed mid-session, so this list stays stable while
+    // swiping - otherwise graded cards would drop out of the due list and
+    // shift the queue under the advancing index, skipping cards.
     const filteredCards = studyMode === 'due'
         ? shuffledCards.filter(c => {
             const data = srsData[c.originalIndex];
@@ -109,14 +138,23 @@ export default function SwipeScreen() {
         })
         : shuffledCards;
 
+    const currentCard = filteredCards[currentIndex];
+    const accuracy = sessionReviewed > 0 ? Math.round((sessionCorrect / sessionReviewed) * 100) : 0;
+
+    // What the user actually sees: reversed cards swap the two sides
+    const displayQuestion = currentCard ? (currentCard.reversed ? currentCard.answer : currentCard.question) : '';
+    const displayAnswer = currentCard ? (currentCard.reversed ? currentCard.question : currentCard.answer) : '';
+
     const handleHighlightChange = async (isFront: boolean, newText: string) => {
         if (!currentCard || !id) return;
 
         const originalIndex = currentCard.originalIndex;
 
-        // 1. Update local state
+        // 1. Update local state - map the displayed side back to the
+        // stored orientation for reversed cards
+        const editsQuestion = currentCard.reversed ? !isFront : isFront;
         const updatedCard = { ...currentCard };
-        if (isFront) updatedCard.question = newText;
+        if (editsQuestion) updatedCard.question = newText;
         else updatedCard.answer = newText;
 
         // Update shuffled list (the one being viewed)
@@ -127,23 +165,29 @@ export default function SwipeScreen() {
             setShuffledCards(newShuffled);
         }
 
-        // 2. Persist to disk
-        await updateCardInDeck(id, originalIndex, updatedCard);
+        // 2. Persist to disk (only the card fields, not session metadata)
+        await updateCardInDeck(id, originalIndex, { question: updatedCard.question, answer: updatedCard.answer });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
 
-    const handleSwipe = async (grade: number) => {
+    const handleSwipe = (grade: number) => {
+        if (!currentCard || !id) return;
         const originalIndex = currentCard.originalIndex;
 
-        // 1. Update SRS metadata
-        await updateCardSRS(id!, originalIndex, grade);
+        // Snapshot state for undo before mutating anything
+        setUndoStack(stack => [...stack, {
+            originalIndex,
+            grade,
+            prevSrs: liveSrsRef.current[originalIndex],
+            prevLearned: [...learnedIndices],
+            prevUnsure: [...unsureIndices],
+        }]);
 
-        // 2. Local state updates for visual feedback (Mastery legacy)
+        // Mastery updates (legacy learned/unsure lists)
         let updatedLearned = [...learnedIndices];
         let updatedUnsure = [...unsureIndices];
 
         if (grade >= 4) {
-            setScore(s => s + 1);
             if (!updatedLearned.includes(originalIndex)) {
                 updatedLearned.push(originalIndex);
                 updatedUnsure = updatedUnsure.filter(i => i !== originalIndex);
@@ -161,28 +205,100 @@ export default function SwipeScreen() {
         setLearnedIndices(updatedLearned);
         setUnsureIndices(updatedUnsure);
 
-        // PERSIST BOTH SRS AND MASTERY
-        await updateDeckProgress(id!, updatedLearned, updatedUnsure);
-
-        // Update local SRS snapshot for UI
-        const decks = await getDecks();
-        const currentDeck = decks.find(d => d.id === id);
-        if (currentDeck) setSrsData(currentDeck.srsData || {});
-
+        // Session + lifetime stats
+        if (grade >= 4) setSessionCorrect(c => c + 1);
+        else if (grade === 3) setSessionHard(c => c + 1);
+        else setSessionAgain(c => c + 1);
         setSessionReviewed(s => s + 1);
 
+        const now = Date.now();
+        const deltaSeconds = Math.min(Math.round((now - lastActionRef.current) / 1000), 60);
+        lastActionRef.current = now;
+
+        Speech.stop();
+        setIsFlipped(false);
+
+        // Advance the UI immediately - persistence happens in the background
         if (currentIndex + 1 < filteredCards.length) {
             setCurrentIndex(i => i + 1);
         } else {
-            if (studyMode === 'due') {
-                showToast({ message: 'Review session finished! 🎉', type: 'success' });
-                router.back();
-            } else {
-                setShuffledCards(shuffleArray(cards));
-                setCurrentIndex(0);
-            }
+            setSessionComplete(true);
         }
+
+        // One read + one write per swipe, serialized so writes never race
+        pendingPersistRef.current = pendingPersistRef.current
+            .then(() => applySwipeResult(id, originalIndex, grade, updatedLearned, updatedUnsure))
+            .then(srs => { liveSrsRef.current = srs; })
+            .catch(e => console.error('Error persisting swipe:', e));
+        updateUserStats(1, deltaSeconds).catch(() => { });
     };
+
+    const handleUndo = async () => {
+        if (undoStack.length === 0 || !id) return;
+        const last = undoStack[undoStack.length - 1];
+
+        // Wait for in-flight swipe writes so the restore isn't overwritten
+        await pendingPersistRef.current;
+
+        // Restore SRS + mastery to their pre-swipe values
+        await restoreCardSRS(id, last.originalIndex, last.prevSrs);
+        if (last.prevSrs) {
+            liveSrsRef.current = { ...liveSrsRef.current, [last.originalIndex]: last.prevSrs };
+        } else {
+            const copy = { ...liveSrsRef.current };
+            delete copy[last.originalIndex];
+            liveSrsRef.current = copy;
+        }
+        await updateDeckProgress(id, last.prevLearned, last.prevUnsure);
+        setLearnedIndices(last.prevLearned);
+        setUnsureIndices(last.prevUnsure);
+
+        // Roll back session counters and position
+        if (last.grade >= 4) setSessionCorrect(c => Math.max(0, c - 1));
+        else if (last.grade === 3) setSessionHard(c => Math.max(0, c - 1));
+        else setSessionAgain(c => Math.max(0, c - 1));
+        setSessionReviewed(s => Math.max(0, s - 1));
+
+        setUndoStack(stack => stack.slice(0, -1));
+        setSessionComplete(false);
+        setCurrentIndex(i => Math.max(0, i - 1));
+        setIsFlipped(false);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    };
+
+    const handleRestartSession = () => {
+        setShuffledCards(shuffleArray(cards));
+        setCurrentIndex(0);
+        setSessionReviewed(0);
+        setSessionCorrect(0);
+        setSessionHard(0);
+        setSessionAgain(0);
+        setUndoStack([]);
+        setSessionComplete(false);
+        setIsFlipped(false);
+        lastActionRef.current = Date.now();
+    };
+
+    const speakCurrentCard = () => {
+        if (!currentCard) return;
+        const raw = isFlipped ? displayAnswer : displayQuestion;
+        // Strip markdown/highlight syntax so TTS reads clean text
+        const text = raw
+            .replace(/==([^=]+)==/g, '$1')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/[*_~#`$]/g, '')
+            .trim();
+        if (!text) return;
+        Speech.stop();
+        Speech.speak(text);
+    };
+
+    // Stop any speech when leaving the screen
+    useEffect(() => {
+        return () => {
+            Speech.stop();
+        };
+    }, []);
 
     if (loading) {
         return (
@@ -211,7 +327,48 @@ export default function SwipeScreen() {
         );
     }
 
-    const currentCard = filteredCards[currentIndex];
+    if (sessionComplete) {
+        return (
+            <View style={[styles.container, { backgroundColor, paddingBottom: insets.bottom }]}>
+                <Stack.Screen options={{ title: name || 'Flashcards' }} />
+                <View style={styles.resultsContent}>
+                    <View style={[styles.trophyContainer, { backgroundColor: '#facc1520', padding: 24, borderRadius: 100 }]}>
+                        <Trophy size={64} color="#eab308" strokeWidth={1.5} />
+                    </View>
+                    <Text style={[styles.resultTitle, { color: textColor }]}>Session Complete!</Text>
+                    <View style={[styles.scoreSummary, { backgroundColor: secondaryBg }]}>
+                        <Text style={[styles.resultScore, { color: primaryColor }]}>{accuracy}</Text>
+                        <Text style={[styles.scoreDivider, { color: mutedForeground }]}>%</Text>
+                        <Text style={[styles.resultTotal, { color: mutedForeground }]}>correct</Text>
+                    </View>
+                    <View style={styles.resultBreakdown}>
+                        <View style={styles.breakdownItem}>
+                            <CheckCircle2 size={20} color="#22c55e" strokeWidth={2.5} />
+                            <Text style={[styles.breakdownValue, { color: textColor }]}>{sessionCorrect}</Text>
+                            <Text style={[styles.breakdownLabel, { color: mutedForeground }]}>Good</Text>
+                        </View>
+                        <View style={styles.breakdownItem}>
+                            <HelpCircle size={20} color="#eab308" strokeWidth={2.5} />
+                            <Text style={[styles.breakdownValue, { color: textColor }]}>{sessionHard}</Text>
+                            <Text style={[styles.breakdownLabel, { color: mutedForeground }]}>Hard</Text>
+                        </View>
+                        <View style={styles.breakdownItem}>
+                            <XCircle size={20} color="#ef4444" strokeWidth={2.5} />
+                            <Text style={[styles.breakdownValue, { color: textColor }]}>{sessionAgain}</Text>
+                            <Text style={[styles.breakdownLabel, { color: mutedForeground }]}>Again</Text>
+                        </View>
+                    </View>
+                    <Text style={[styles.resultSub, { color: mutedForeground }]}>
+                        You reviewed {sessionReviewed} card{sessionReviewed === 1 ? '' : 's'} this session. Keep it up!
+                    </Text>
+                    <View style={[styles.buttonGroup, { gap: 12 }]}>
+                        <Button title="Study Again" onPress={handleRestartSession} style={styles.actionButton} />
+                        <Button title="Done" variant="secondary" onPress={() => router.back()} style={styles.actionButton} />
+                    </View>
+                </View>
+            </View>
+        );
+    }
 
     return (
         <View style={[styles.container, { backgroundColor, paddingBottom: insets.bottom }]}>
@@ -219,7 +376,21 @@ export default function SwipeScreen() {
                 options={{
                     title: name || 'Flashcards',
                     headerRight: () => (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginRight: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 }}>
+                            <TouchableOpacity
+                                onPress={speakCurrentCard}
+                                style={styles.iconBtn}
+                                disabled={!currentCard}
+                            >
+                                <Volume2 size={20} color={currentCard ? textColor : mutedForeground} strokeWidth={2} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={handleUndo}
+                                style={styles.iconBtn}
+                                disabled={undoStack.length === 0}
+                            >
+                                <Undo2 size={20} color={undoStack.length > 0 ? textColor : mutedForeground} strokeWidth={2} />
+                            </TouchableOpacity>
                             <TouchableOpacity
                                 onPress={() => setIsHighlightMode(!isHighlightMode)}
                                 style={[
@@ -241,20 +412,21 @@ export default function SwipeScreen() {
                 {filteredCards.length === 0 ? (
                     <View style={styles.emptySession}>
                         <CheckCircle2 size={64} color="#22c55e" strokeWidth={1.5} />
-                        <Text style={[styles.emptyTitle, { color: textColor }]}>You're all caught up!</Text>
+                        <Text style={[styles.emptyTitle, { color: textColor }]}>{"You're all caught up!"}</Text>
                         <Text style={[styles.emptySub, { color: mutedForeground }]}>No cards due for review. Come back later or study all cards.</Text>
                         <Button title="Study All Cards" onPress={() => setStudyMode('all')} style={{ marginTop: 20 }} />
                     </View>
                 ) : currentCard && (
                     <FlashcardSwipe
                         key={`${currentIndex}-${studyMode}`}
-                        question={currentCard.question}
-                        answer={currentCard.answer}
+                        question={displayQuestion}
+                        answer={displayAnswer}
                         onSwipeLeft={() => handleSwipe(0)}
                         onSwipeRight={() => handleSwipe(5)}
                         onSwipeTop={() => handleSwipe(3)}
                         highlightMode={isHighlightMode}
                         onHighlightChange={handleHighlightChange}
+                        onFlip={setIsFlipped}
                     />
                 )}
             </View>
@@ -431,6 +603,25 @@ const styles = StyleSheet.create({
     buttonGroup: {
         width: '100%',
         maxWidth: 280,
+    },
+    resultBreakdown: {
+        flexDirection: 'row',
+        gap: 40,
+        marginBottom: 8,
+    },
+    breakdownItem: {
+        alignItems: 'center',
+        gap: 4,
+    },
+    breakdownValue: {
+        fontSize: 22,
+        fontWeight: '900',
+    },
+    breakdownLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     actionButton: {
         height: 52,

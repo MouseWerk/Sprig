@@ -1,9 +1,10 @@
+import { useToast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { ChevronLeft, ChevronRight, Share2 } from 'lucide-react-native';
 import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Pdf from 'react-native-pdf';
 
 const PDFViewScreen = () => {
@@ -12,6 +13,7 @@ const PDFViewScreen = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const pdfRef = useRef<any>(null);
+    const { showToast } = useToast();
 
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
@@ -31,7 +33,8 @@ const PDFViewScreen = () => {
         try {
             await Sharing.shareAsync(uri);
         } catch (e) {
-            Alert.alert('Error', 'Failed to open document in external app.');
+            console.error('Error sharing document:', e);
+            showToast({ message: 'Failed to open document in external app', type: 'error' });
         }
     };
 
@@ -65,7 +68,7 @@ const PDFViewScreen = () => {
                     onError={(error) => {
                         console.error('PDF Error:', error);
                         setLoading(false);
-                        Alert.alert('Error', 'Failed to load PDF. Try opening in external viewer.');
+                        showToast({ message: 'Failed to load PDF. Try opening in an external viewer.', type: 'error' });
                     }}
                     enablePaging={true}
                     horizontal={true}

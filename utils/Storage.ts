@@ -1,12 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
-import MongoDBClient from './MongoDBClient';
+import { parseFlashcardsCsv } from './CsvParser';
 
 const DECKS_STORAGE_KEY = 'csvtudyapp_decks';
 const CACHE_STORAGE_KEY = 'csvtudyapp_cache_';
 const FOLDERS_STORAGE_KEY = 'csvtudyapp_folders';
 
 export type DeckType = 'csv' | 'pdf';
+export type StudyDirection = 'normal' | 'reversed' | 'mixed';
 
 export interface SRSCardData {
     interval: number;    // days
@@ -26,6 +27,7 @@ export interface Deck {
     totalCards?: number;
     folderId: string | null;
     srsData?: Record<number, SRSCardData>; // index -> SRS metadata
+    studyDirection?: StudyDirection; // which side of the card is shown first
 }
 
 export interface AudioFile {
@@ -48,6 +50,7 @@ export interface UserStats {
     currentStreak: number; // days
     longestStreak: number; // days
     achievements: string[];
+    dailyReviews?: Record<string, number>; // "YYYY-MM-DD" -> cards reviewed that day
 }
 
 export async function getDecks(): Promise<Deck[]> {
@@ -88,9 +91,6 @@ export async function saveDeck(name: string, sourceUri: string, icon: string, ty
     const updatedDecks = [newDeck, ...decks];
     await AsyncStorage.setItem(DECKS_STORAGE_KEY, JSON.stringify(updatedDecks));
 
-    // Sync to MongoDB
-    await MongoDBClient.insertOne('decks', newDeck);
-
     return newDeck;
 }
 
@@ -122,9 +122,6 @@ export async function createEmptyDeck(name: string, icon: string, folderId: stri
     const updatedDecks = [newDeck, ...decks];
     await AsyncStorage.setItem(DECKS_STORAGE_KEY, JSON.stringify(updatedDecks));
 
-    // Sync to MongoDB
-    await MongoDBClient.insertOne('decks', newDeck);
-
     return newDeck;
 }
 
@@ -133,12 +130,16 @@ export async function importCsvToDeck(deckId: string, sourceUri: string): Promis
     const deck = decks.find(d => d.id === deckId);
     if (!deck) throw new Error('Deck not found');
 
-    const { parseFlashcardsCsv } = require('./CsvParser');
     const newCards = await parseFlashcardsCsv(sourceUri);
     if (!newCards || newCards.length === 0) return;
 
     // 1. Update CSV on disk (Rewrite entirely to be safe and clean)
-    const existingCards = (await getCachedData<any[]>(deckId)) || [];
+    // On a cache miss, fall back to parsing the deck file itself so
+    // existing cards are never lost when the cache has been cleared.
+    let existingCards = await getCachedData<any[]>(deckId);
+    if (!existingCards) {
+        existingCards = await parseFlashcardsCsv(deck.uri);
+    }
     const combinedCards = [...existingCards, ...newCards];
 
     const escape = (text: string) => `"${text.replace(/"/g, '""')}"`;
@@ -186,7 +187,7 @@ export async function getCachedData<T>(id: string): Promise<T | null> {
     try {
         const json = await AsyncStorage.getItem(CACHE_STORAGE_KEY + id);
         return json ? JSON.parse(json) : null;
-    } catch (e) {
+    } catch {
         return null;
     }
 }
@@ -228,6 +229,16 @@ export async function updateUserStats(cardsReviewed: number, studyTime: number):
 
     stats.totalCardsReviewed += cardsReviewed;
     stats.totalStudyTime += studyTime;
+
+    // Per-day counts for the activity heatmap, pruned to roughly a year
+    if (!stats.dailyReviews) stats.dailyReviews = {};
+    stats.dailyReviews[today] = (stats.dailyReviews[today] || 0) + cardsReviewed;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 370);
+    const cutoffKey = cutoff.toISOString().split('T')[0];
+    for (const key of Object.keys(stats.dailyReviews)) {
+        if (key < cutoffKey) delete stats.dailyReviews[key];
+    }
 
     // Calculate streak
     if (lastStudy !== today) {
@@ -285,33 +296,29 @@ export async function saveFolder(name: string, parentId: string | null = null): 
     const folders = await getFolders();
     const updatedFolders = [...folders, newFolder];
     await AsyncStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(updatedFolders));
-    
-    // Sync to MongoDB
-    await MongoDBClient.insertOne('folders', newFolder);
-    
+
     return newFolder;
 }
 
 export async function deleteFolder(id: string): Promise<void> {
     const folders = await getFolders();
     const updatedFolders = folders.filter(f => f.id !== id);
+
+    // Move child folders to root before persisting
+    updatedFolders.forEach(folder => {
+        if (folder.parentId === id) {
+            folder.parentId = null;
+        }
+    });
     await AsyncStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(updatedFolders));
 
-    // Optional: Move decks in this folder to root or delete them. 
-    // For safety, we'll just move them to root (folderId = null)
+    // Move decks in this folder to root (folderId = null)
     const decks = await getDecks();
     let decksModified = false;
     decks.forEach(deck => {
         if (deck.folderId === id) {
             deck.folderId = null;
             decksModified = true;
-        }
-    });
-
-    // Also move child folders to root
-    updatedFolders.forEach(folder => {
-        if (folder.parentId === id) {
-            folder.parentId = null;
         }
     });
 
@@ -335,8 +342,8 @@ export async function updateDeck(deckId: string, name?: string, icon?: string, f
     if (index !== -1) {
         if (name !== undefined) decks[index].name = name;
         if (icon !== undefined) decks[index].icon = icon;
-        // Use hasOwnProperty check for folderId since null is a valid value
-        if (arguments.length >= 4) decks[index].folderId = folderId ?? null;
+        // folderId: undefined = leave unchanged, null = move to root
+        if (folderId !== undefined) decks[index].folderId = folderId;
         await AsyncStorage.setItem(DECKS_STORAGE_KEY, JSON.stringify(decks));
     }
 }
@@ -426,7 +433,7 @@ export async function deleteCardFromDeck(deckId: string, cardIndex: number): Pro
 
     deck.learnedIndices = shiftIndices(deck.learnedIndices || []);
     deck.unsureIndices = shiftIndices(deck.unsureIndices || []);
-    deck.totalCards = (deck.totalCards || 0) - 1;
+    deck.totalCards = Math.max(0, (deck.totalCards || 0) - 1);
 
     // 4. Update SRS data (shift keys)
     if (deck.srsData) {
@@ -477,6 +484,72 @@ export function calculateSM2(grade: number, prevInterval: number, prevRepetition
     };
 }
 
+// Persist one swipe (SRS grade + mastery lists) in a single read/write pass.
+// Returns the deck's updated SRS map so callers can mirror it locally.
+export async function applySwipeResult(
+    deckId: string,
+    cardIndex: number,
+    grade: number,
+    learnedIndices: number[],
+    unsureIndices: number[]
+): Promise<Record<number, SRSCardData>> {
+    const decks = await getDecks();
+    const deck = decks.find(d => d.id === deckId);
+    if (!deck) return {};
+
+    if (!deck.srsData) deck.srsData = {};
+    const prevData = deck.srsData[cardIndex] || {
+        interval: 0,
+        repetition: 0,
+        easeFactor: 2.5,
+        nextReview: new Date().toISOString()
+    };
+    deck.srsData[cardIndex] = calculateSM2(grade, prevData.interval, prevData.repetition, prevData.easeFactor);
+    deck.learnedIndices = learnedIndices;
+    deck.unsureIndices = unsureIndices;
+
+    await AsyncStorage.setItem(DECKS_STORAGE_KEY, JSON.stringify(decks));
+    return { ...deck.srsData };
+}
+
+// Restore (or clear) SRS data for a single card - used by session undo
+export async function restoreCardSRS(deckId: string, cardIndex: number, data?: SRSCardData): Promise<void> {
+    const decks = await getDecks();
+    const deck = decks.find(d => d.id === deckId);
+    if (!deck) return;
+
+    if (!deck.srsData) deck.srsData = {};
+    if (data) {
+        deck.srsData[cardIndex] = data;
+    } else {
+        delete deck.srsData[cardIndex];
+    }
+
+    await AsyncStorage.setItem(DECKS_STORAGE_KEY, JSON.stringify(decks));
+}
+
+export async function updateDeckStudyDirection(deckId: string, direction: StudyDirection): Promise<void> {
+    const decks = await getDecks();
+    const deck = decks.find(d => d.id === deckId);
+    if (!deck) return;
+
+    deck.studyDirection = direction;
+    await AsyncStorage.setItem(DECKS_STORAGE_KEY, JSON.stringify(decks));
+}
+
+// Wipe all mastery + SRS progress for a deck, keeping its cards
+export async function resetDeckProgress(deckId: string): Promise<void> {
+    const decks = await getDecks();
+    const deck = decks.find(d => d.id === deckId);
+    if (!deck) return;
+
+    deck.learnedIndices = [];
+    deck.unsureIndices = [];
+    deck.srsData = {};
+
+    await AsyncStorage.setItem(DECKS_STORAGE_KEY, JSON.stringify(decks));
+}
+
 export async function updateCardSRS(deckId: string, cardIndex: number, grade: number): Promise<void> {
     const decks = await getDecks();
     const deck = decks.find(d => d.id === deckId);
@@ -504,7 +577,7 @@ export async function getAudioFiles(): Promise<AudioFile[]> {
     try {
         const json = await AsyncStorage.getItem(AUDIO_STORAGE_KEY);
         return json ? JSON.parse(json) : [];
-    } catch (e) {
+    } catch {
         return [];
     }
 }
@@ -524,9 +597,6 @@ export async function saveAudioFile(sourceUri: string, name: string): Promise<Au
     const audios = await getAudioFiles();
     const updated = [newAudio, ...audios];
     await AsyncStorage.setItem(AUDIO_STORAGE_KEY, JSON.stringify(updated));
-
-    // Sync to MongoDB
-    await MongoDBClient.insertOne('audio', newAudio);
 
     return newAudio;
 }

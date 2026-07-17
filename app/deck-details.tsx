@@ -1,26 +1,27 @@
 import { useToast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
-import { Deck, addCardToDeck, deleteCardFromDeck, getCachedData, getDecks, importCsvToDeck, setCachedData, updateCardInDeck, updateDeckProgress } from '@/utils/Storage';
+import { Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getDecks, importCsvToDeck, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { CheckCircle2, Circle, Edit2, FileUp, FileWarning, HelpCircle, Play, Plus, RotateCcw, Trash2, X } from 'lucide-react-native';
+import * as Sharing from 'expo-sharing';
+import { CheckCircle2, Circle, Edit2, FileUp, FileWarning, HelpCircle, Play, Plus, RotateCcw, Search, Share2, Trash2, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { Button } from '../components/ui/Button';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import { Input } from '../components/ui/Input';
-
-type StudyMode = 'all' | 'due' | 'notLearned';
 
 export default function DeckDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { showToast } = useToast();
+    const confirm = useConfirm();
 
     const [deck, setDeck] = useState<Deck | null>(null);
     const [cards, setCards] = useState<FlashcardData[]>([]);
@@ -37,6 +38,9 @@ export default function DeckDetailsScreen() {
     const [editAnswer, setEditAnswer] = useState('');
     const [isEditHighlightMode, setIsEditHighlightMode] = useState(false);
     const [editFlipped, setEditFlipped] = useState(false);
+
+    const [cardSearch, setCardSearch] = useState('');
+    const [filterMode, setFilterMode] = useState<'all' | 'learned' | 'unsure' | 'new'>('all');
 
     const backgroundColor = useThemeColor({}, 'background');
     const cardColor = useThemeColor({}, 'card');
@@ -73,6 +77,7 @@ export default function DeckDetailsScreen() {
 
                     setCards(parsedCards || []);
                 } catch (e) {
+                    console.error('Error loading deck data:', e);
                     setError('Failed to load cards');
                 } finally {
                     setLoading(false);
@@ -99,6 +104,7 @@ export default function DeckDetailsScreen() {
             if (currentDeck) setDeck(currentDeck);
             showToast({ message: 'Card added to deck!', type: 'success' });
         } catch (e) {
+            console.error('Error adding card:', e);
             showToast({ message: 'Failed to add card', type: 'error' });
         }
     };
@@ -106,12 +112,13 @@ export default function DeckDetailsScreen() {
     const handleImportCsv = async () => {
         try {
             const result = await DocumentPicker.getDocumentAsync({
-                type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel', 'text/plain'],
+                type: ['text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/vnd.ms-excel', 'text/plain'],
                 copyToCacheDirectory: true,
             });
 
             if (!result.canceled && result.assets && result.assets.length > 0 && id) {
                 const asset = result.assets[0];
+                const beforeCount = cards.length;
                 await importCsvToDeck(id, asset.uri);
 
                 // Reload data
@@ -122,11 +129,16 @@ export default function DeckDetailsScreen() {
                 const currentDeck = decks.find(d => d.id === id);
                 if (currentDeck) setDeck(currentDeck);
 
-                Alert.alert('Success', 'Flashcards imported successfully');
+                const importedCount = (updatedCards?.length || 0) - beforeCount;
+                if (importedCount > 0) {
+                    showToast({ message: `Imported ${importedCount} card${importedCount === 1 ? '' : 's'}!`, type: 'success' });
+                } else {
+                    showToast({ message: 'No question/answer pairs found in that file', type: 'warning' });
+                }
             }
         } catch (e) {
             console.error(e);
-            Alert.alert('Error', 'Failed to import CSV');
+            showToast({ message: 'Failed to import file', type: 'error' });
         }
     };
 
@@ -141,33 +153,82 @@ export default function DeckDetailsScreen() {
             if (updatedCards) setCards(updatedCards);
             showToast({ message: 'Card updated', type: 'success' });
         } catch (e) {
+            console.error('Error updating card:', e);
             showToast({ message: 'Failed to update card', type: 'error' });
         }
     };
 
     const handleDeleteCard = async (index: number) => {
-        Alert.alert(
-            'Delete Flashcard',
-            'Are you sure you want to remove this card permanently?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        if (!id) return;
-                        await deleteCardFromDeck(id, index);
-                        const updatedCards = await getCachedData<FlashcardData[]>(id);
-                        if (updatedCards) setCards(updatedCards);
+        const ok = await confirm({
+            title: 'Delete Flashcard',
+            message: 'Are you sure you want to remove this card permanently?',
+            confirmText: 'Delete',
+            destructive: true,
+        });
+        if (!ok || !id) return;
+        await deleteCardFromDeck(id, index);
+        const updatedCards = await getCachedData<FlashcardData[]>(id);
+        if (updatedCards) setCards(updatedCards);
 
-                        const decks = await getDecks();
-                        const currentDeck = decks.find(d => d.id === id);
-                        if (currentDeck) setDeck(currentDeck);
-                        showToast({ message: 'Flashcard deleted', type: 'info' });
-                    }
-                }
-            ]
-        );
+        const decks = await getDecks();
+        const currentDeck = decks.find(d => d.id === id);
+        if (currentDeck) setDeck(currentDeck);
+        showToast({ message: 'Flashcard deleted', type: 'info' });
+    };
+
+    const cardQuery = cardSearch.trim().toLowerCase();
+    const visibleCards = React.useMemo(() => {
+        const cardsWithIndices = (cards || []).map((card, index) => ({ card, originalIndex: index }));
+        return cardsWithIndices.filter(({ card, originalIndex }) => {
+            if (cardQuery &&
+                !card.question.toLowerCase().includes(cardQuery) &&
+                !card.answer.toLowerCase().includes(cardQuery)) {
+                return false;
+            }
+            const isLearned = deck?.learnedIndices?.includes(originalIndex);
+            const isUnsure = deck?.unsureIndices?.includes(originalIndex);
+            switch (filterMode) {
+                case 'learned': return !!isLearned;
+                case 'unsure': return !!isUnsure;
+                case 'new': return !isLearned && !isUnsure;
+                default: return true;
+            }
+        });
+    }, [cards, cardQuery, filterMode, deck]);
+
+    const handleSetDirection = async (direction: StudyDirection) => {
+        if (!id) return;
+        await updateDeckStudyDirection(id, direction);
+        setDeck(d => (d ? { ...d, studyDirection: direction } : d));
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    };
+
+    const handleExportDeck = async () => {
+        if (!deck?.uri) return;
+        try {
+            await Sharing.shareAsync(deck.uri, {
+                mimeType: 'text/csv',
+                dialogTitle: `Export "${deck.name}"`,
+            });
+        } catch (e) {
+            console.error('Error exporting deck:', e);
+            showToast({ message: 'Failed to export deck', type: 'error' });
+        }
+    };
+
+    const handleResetProgress = async () => {
+        const ok = await confirm({
+            title: 'Reset Progress',
+            message: 'This clears all mastery and spaced-repetition data for this deck. Your cards are kept. Continue?',
+            confirmText: 'Reset',
+            destructive: true,
+        });
+        if (!ok || !id) return;
+        await resetDeckProgress(id);
+        const decks = await getDecks();
+        const currentDeck = decks.find(d => d.id === id);
+        if (currentDeck) setDeck(currentDeck);
+        showToast({ message: 'Progress reset', type: 'info' });
     };
 
     const openEditMenu = (index: number, card: FlashcardData) => {
@@ -281,7 +342,6 @@ export default function DeckDetailsScreen() {
     }
 
     const learnedCount = deck.learnedIndices?.length || 0;
-    const unsureCount = deck.unsureIndices?.length || 0;
     const progress = (cards?.length || 0) > 0 ? (learnedCount / cards.length) * 100 : 0;
     
     const progressColor = progress === 0 ? '#ef4444' : 
@@ -290,7 +350,18 @@ export default function DeckDetailsScreen() {
                          progress < 100 ? accentColor : 
                          '#22c55e';
 
-    const cardsWithIndices = (cards || []).map((card, index) => ({ card, originalIndex: index }));
+    const filterOptions: { key: typeof filterMode; label: string }[] = [
+        { key: 'all', label: 'All' },
+        { key: 'learned', label: 'Learned' },
+        { key: 'unsure', label: 'Unsure' },
+        { key: 'new', label: 'New' },
+    ];
+
+    const directionOptions: { key: StudyDirection; label: string }[] = [
+        { key: 'normal', label: 'Q → A' },
+        { key: 'reversed', label: 'A → Q' },
+        { key: 'mixed', label: 'Mixed' },
+    ];
 
     return (
         <View style={[styles.container, { backgroundColor }]}>
@@ -302,7 +373,7 @@ export default function DeckDetailsScreen() {
             }} />
 
             <FlatList
-                data={cardsWithIndices}
+                data={visibleCards}
                 keyExtractor={(item) => item.originalIndex.toString()}
                 renderItem={({ item }) => {
                     const { card, originalIndex } = item;
@@ -310,16 +381,13 @@ export default function DeckDetailsScreen() {
                     const isUnsure = deck?.unsureIndices?.includes(originalIndex);
 
                     let statusColor = '#ef4444';
-                    let statusBg = 'rgba(239, 68, 68, 0.05)';
                     let statusBorder = 'rgba(239, 68, 68, 0.2)';
 
                     if (isLearned) {
                         statusColor = '#22c55e';
-                        statusBg = 'rgba(34, 197, 94, 0.05)';
                         statusBorder = 'rgba(34, 197, 94, 0.2)';
                     } else if (isUnsure) {
                         statusColor = '#eab308';
-                        statusBg = 'rgba(234, 179, 8, 0.08)';
                         statusBorder = 'rgba(234, 179, 8, 0.3)';
                     }
 
@@ -371,7 +439,13 @@ export default function DeckDetailsScreen() {
                                     {cards.length} cards collected
                                 </Text>
                             </View>
-                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: 80, justifyContent: 'flex-end' }}>
+                                <TouchableOpacity
+                                    style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
+                                    onPress={handleExportDeck}
+                                >
+                                    <Share2 size={20} color={accentColor} strokeWidth={3} />
+                                </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
                                     onPress={handleImportCsv}
@@ -393,7 +467,7 @@ export default function DeckDetailsScreen() {
                                 <Text style={[styles.statLabel, { color: mutedForeground }]}>Total</Text>
                             </View>
                             <View style={[styles.statCard, { backgroundColor: cardColor }]}>
-                                <Text style={[styles.statValue, { color: deck?.learnedIndices?.length || 0 === cards.length ? '#22c55e' : textColor }]}>
+                                <Text style={[styles.statValue, { color: cards.length > 0 && (deck?.learnedIndices?.length || 0) === cards.length ? '#22c55e' : textColor }]}>
                                     {deck?.learnedIndices?.length || 0}
                                 </Text>
                                 <Text style={[styles.statLabel, { color: mutedForeground }]}>Learned</Text>
@@ -451,6 +525,80 @@ export default function DeckDetailsScreen() {
                                 icon={<RotateCcw size={20} color={accentColor} />}
                             />
                         </View>
+
+                        <View style={styles.directionRow}>
+                            <Text style={[styles.directionLabel, { color: mutedForeground }]}>Study Direction</Text>
+                            <View style={styles.directionChips}>
+                                {directionOptions.map(opt => {
+                                    const active = (deck.studyDirection || 'normal') === opt.key;
+                                    return (
+                                        <TouchableOpacity
+                                            key={opt.key}
+                                            style={[
+                                                styles.filterChip,
+                                                { backgroundColor: active ? accentColor : cardColor }
+                                            ]}
+                                            onPress={() => handleSetDirection(opt.key)}
+                                        >
+                                            <Text style={[
+                                                styles.filterChipText,
+                                                { color: active ? primaryForeground : mutedForeground }
+                                            ]}>
+                                                {opt.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        </View>
+
+                        <View style={[styles.cardSearchBar, { backgroundColor: cardColor }]}>
+                            <Search size={16} color={mutedForeground} />
+                            <TextInput
+                                style={[styles.cardSearchInput, { color: textColor }]}
+                                placeholder="Search cards..."
+                                placeholderTextColor={mutedForeground}
+                                value={cardSearch}
+                                onChangeText={setCardSearch}
+                                returnKeyType="search"
+                                autoCorrect={false}
+                            />
+                            {cardSearch.length > 0 && (
+                                <TouchableOpacity onPress={() => setCardSearch('')} hitSlop={8}>
+                                    <X size={16} color={mutedForeground} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        <View style={styles.filterRow}>
+                            {filterOptions.map(opt => (
+                                <TouchableOpacity
+                                    key={opt.key}
+                                    style={[
+                                        styles.filterChip,
+                                        { backgroundColor: filterMode === opt.key ? accentColor : cardColor }
+                                    ]}
+                                    onPress={() => setFilterMode(opt.key)}
+                                >
+                                    <Text style={[
+                                        styles.filterChipText,
+                                        { color: filterMode === opt.key ? primaryForeground : mutedForeground }
+                                    ]}>
+                                        {opt.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                            <View style={{ flex: 1 }} />
+                            <TouchableOpacity onPress={handleResetProgress} hitSlop={8}>
+                                <Text style={[styles.resetLink, { color: mutedForeground }]}>Reset Progress</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {(cardQuery.length > 0 || filterMode !== 'all') && (
+                            <Text style={[styles.filterResultText, { color: mutedForeground }]}>
+                                {visibleCards.length} of {cards.length} cards shown
+                            </Text>
+                        )}
                     </View>
                 }
                 contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 110 }]}
@@ -645,19 +793,67 @@ const styles = StyleSheet.create({
         borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
-        position: 'absolute',
-        top: 16,
-        right: 16,
     },
-    miniImportBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+    cardSearchBar: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        position: 'absolute',
-        top: 16,
-        right: 60,
+        gap: 10,
+        marginTop: 16,
+        paddingHorizontal: 14,
+        height: 44,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.05)',
+    },
+    cardSearchInput: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: '500',
+        height: '100%',
+    },
+    filterRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 12,
+    },
+    filterChip: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 16,
+    },
+    filterChipText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    resetLink: {
+        fontSize: 11,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+        textDecorationLine: 'underline',
+    },
+    filterResultText: {
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 10,
+        marginLeft: 4,
+    },
+    directionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 16,
+    },
+    directionLabel: {
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    directionChips: {
+        flexDirection: 'row',
+        gap: 6,
     },
     progressStatsRight: {
         flex: 1,

@@ -26,7 +26,6 @@ export const Button: React.FC<ButtonProps> = ({
     const secondaryBg = useThemeColor({}, 'secondary');
     const secondaryFg = useThemeColor({}, 'secondaryForeground');
     const border = useThemeColor({}, 'border');
-    const mutedFg = useThemeColor({}, 'mutedForeground');
 
     let buttonStyle: ViewStyle = {};
     let labelStyle: TextStyle = {};

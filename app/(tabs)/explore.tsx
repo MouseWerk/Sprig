@@ -5,17 +5,21 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Icons from 'lucide-react-native';
 import { ChevronRight, FileText, FileUp, Folder as FolderIcon, Library, Plus, Trash2, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { Alert, FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconPicker } from '../../components/IconPicker';
 import { Button } from '../../components/ui/Button';
+import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
+import { useToast } from '../../components/ui/Toast';
 import { Deck, deleteDeck, deleteFolder, Folder, getDecks, getFolders, saveDeck, saveFolder } from '../../utils/Storage';
 
 export default function LibraryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
+  const { showToast } = useToast();
+  const confirm = useConfirm();
 
   const [pdfs, setPdfs] = useState<Deck[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -63,7 +67,7 @@ export default function LibraryScreen() {
       }
     } catch (err) {
       console.error('Error picking PDF:', err);
-      Alert.alert('Error', 'Failed to pick PDF');
+      showToast({ message: 'Failed to pick PDF', type: 'error' });
     }
   };
 
@@ -71,14 +75,16 @@ export default function LibraryScreen() {
     if (!pickedFile) return;
 
     try {
-      await saveDeck(docName, pickedFile.uri, selectedIcon, 'pdf', 0, currentFolderId);
+      const name = docName.trim() || pickedFile.name.replace(/\.pdf$/i, '') || 'Document';
+      await saveDeck(name, pickedFile.uri, selectedIcon, 'pdf', 0, currentFolderId);
       setImportModalVisible(false);
       setPickedFile(null);
       setDocName('');
       setSelectedIcon('FileText');
       loadData();
     } catch (e) {
-      Alert.alert('Error', 'Failed to save document');
+      console.error('Error saving document:', e);
+      showToast({ message: 'Failed to save document', type: 'error' });
     }
   };
 
@@ -90,44 +96,35 @@ export default function LibraryScreen() {
       setNewFolderModalVisible(false);
       loadData();
     } catch (e) {
-      Alert.alert('Error', 'Failed to create folder');
+      console.error('Error creating folder:', e);
+      showToast({ message: 'Failed to create folder', type: 'error' });
     }
   };
 
-  const handleDelete = (id: string, name: string) => {
-    Alert.alert(
-      'Delete Document',
-      `This will permanently remove "${name}" from your library.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteDeck(id);
-            loadData();
-          }
-        }
-      ]
-    );
+  const handleDelete = async (id: string, name: string) => {
+    const ok = await confirm({
+      title: 'Delete Document',
+      message: `This will permanently remove "${name}" from your library.`,
+      confirmText: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    await deleteDeck(id);
+    loadData();
+    showToast({ message: `"${name}" deleted`, type: 'info' });
   };
 
-  const handleDeleteFolder = (id: string, name: string) => {
-    Alert.alert(
-      'Delete Folder',
-      `Delete "${name}"? Documents inside will be moved to root.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteFolder(id);
-            loadData();
-          }
-        }
-      ]
-    );
+  const handleDeleteFolder = async (id: string, name: string) => {
+    const ok = await confirm({
+      title: 'Delete Folder',
+      message: `Delete "${name}"? Documents inside will be moved to root.`,
+      confirmText: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    await deleteFolder(id);
+    loadData();
+    showToast({ message: `"${name}" deleted`, type: 'info' });
   };
 
   const renderDocItem = (item: Deck) => {
@@ -255,6 +252,10 @@ export default function LibraryScreen() {
         renderItem={({ item }) => item.isFolder ? renderFolderItem(item as any) : renderDocItem(item as any)}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 24 }]}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+        removeClippedSubviews={true}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>

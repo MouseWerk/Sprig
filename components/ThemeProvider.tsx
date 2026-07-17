@@ -10,7 +10,7 @@ interface ThemeContextType {
     setThemeMode: (mode: ThemeMode) => Promise<void>;
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+export const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const THEME_STORAGE_KEY = 'csvtudyapp_theme_mode';
 

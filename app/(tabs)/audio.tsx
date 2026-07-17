@@ -16,7 +16,6 @@ import {
 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
     FlatList,
     StyleSheet,
     Text,
@@ -24,14 +23,15 @@ import {
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 export default function AudioPlayerScreen() {
     const insets = useSafeAreaInsets();
     const { showToast } = useToast();
+    const confirm = useConfirm();
     const { t } = useLanguage();
 
     const [audios, setAudios] = useState<AudioFile[]>([]);
-    const [loading, setLoading] = useState(true);
     const [sound, setSound] = useState<Audio.Sound | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentAudio, setCurrentAudio] = useState<AudioFile | null>(null);
@@ -46,17 +46,19 @@ export default function AudioPlayerScreen() {
 
     useEffect(() => {
         loadAudios();
-        return () => {
-            if (sound) {
-                sound.unloadAsync();
-            }
-        };
     }, []);
+
+    // Unload the active sound whenever it is replaced or the screen unmounts.
+    useEffect(() => {
+        if (!sound) return;
+        return () => {
+            sound.unloadAsync().catch(() => { });
+        };
+    }, [sound]);
 
     const loadAudios = async () => {
         const files = await getAudioFiles();
         setAudios(files);
-        setLoading(false);
     };
 
     const handlePickAudio = async () => {
@@ -73,26 +75,25 @@ export default function AudioPlayerScreen() {
                 showToast({ message: t('audioFileAdded'), type: 'success' });
             }
         } catch (e) {
+            console.error('Error picking audio:', e);
             showToast({ message: t('failedPickAudio'), type: 'error' });
         }
     };
 
     const playAudio = async (item: AudioFile) => {
         try {
-            if (sound) {
-                await sound.unloadAsync();
-            }
-
             const { sound: newSound } = await Audio.Sound.createAsync(
                 { uri: item.uri },
                 { shouldPlay: true },
                 onPlaybackStatusUpdate
             );
 
+            // The [sound] effect unloads the previous instance on replace
             setSound(newSound);
             setCurrentAudio(item);
             setIsPlaying(true);
         } catch (e) {
+            console.error('Error playing audio:', e);
             showToast({ message: t('failedPlayAudio'), type: 'error' });
         }
     };
@@ -115,24 +116,24 @@ export default function AudioPlayerScreen() {
         }
     };
 
-    const handleDelete = (id: string) => {
-        Alert.alert(t('deleteAudio'), t('areYouSure'), [
-            { text: t('cancel'), style: 'cancel' },
-            {
-                text: t('delete'),
-                style: 'destructive',
-                onPress: async () => {
-                    if (currentAudio?.id === id && sound) {
-                        await sound.stopAsync();
-                        setSound(null);
-                        setCurrentAudio(null);
-                    }
-                    await deleteAudioFile(id);
-                    loadAudios();
-                    showToast({ message: t('deleted'), type: 'info' });
-                }
-            }
-        ]);
+    const handleDelete = async (id: string) => {
+        const ok = await confirm({
+            title: t('deleteAudio'),
+            message: t('areYouSure'),
+            confirmText: t('delete'),
+            cancelText: t('cancel'),
+            destructive: true,
+        });
+        if (!ok) return;
+        if (currentAudio?.id === id && sound) {
+            // The [sound] effect unloads the instance once it's replaced
+            setSound(null);
+            setCurrentAudio(null);
+            setIsPlaying(false);
+        }
+        await deleteAudioFile(id);
+        loadAudios();
+        showToast({ message: t('deleted'), type: 'info' });
     };
 
     const formatTime = (millis: number) => {
@@ -207,6 +208,10 @@ export default function AudioPlayerScreen() {
                 keyExtractor={(item) => item.id}
                 numColumns={2}
                 contentContainerStyle={[styles.listContent, { paddingBottom: currentAudio ? 200 : insets.bottom + 24 }]}
+                initialNumToRender={8}
+                maxToRenderPerBatch={8}
+                windowSize={7}
+                removeClippedSubviews={true}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <View style={[styles.emptyIcon, { backgroundColor: secondaryBg }]}>

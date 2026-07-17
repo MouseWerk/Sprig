@@ -1,7 +1,7 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { AlertCircle, CheckCircle2, Info, X, XCircle } from 'lucide-react-native';
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
-import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -23,12 +23,39 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const insets = useSafeAreaInsets();
     const opacity = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(-100)).current;
+    const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const bgColor = useThemeColor({}, 'card');
     const textColor = useThemeColor({}, 'text');
     const accentColor = useThemeColor({}, 'primary');
 
+    const hideToast = useCallback(() => {
+        if (hideTimer.current) {
+            clearTimeout(hideTimer.current);
+            hideTimer.current = null;
+        }
+        Animated.parallel([
+            Animated.timing(opacity, {
+                toValue: 0,
+                duration: 250,
+                useNativeDriver: true,
+            }),
+            Animated.timing(translateY, {
+                toValue: -100,
+                duration: 250,
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            setToast(null);
+        });
+    }, [opacity, translateY]);
+
     const showToast = useCallback(({ message, type = 'success', duration = 3000 }: ToastOptions) => {
+        // A newer toast replaces the old one along with its hide timer,
+        // so an earlier timer can't dismiss this toast prematurely.
+        if (hideTimer.current) {
+            clearTimeout(hideTimer.current);
+        }
         setToast({ message, type, duration });
 
         // Show
@@ -47,27 +74,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ]).start();
 
         // Hide
-        setTimeout(() => {
+        hideTimer.current = setTimeout(() => {
             hideToast();
         }, duration);
-    }, [insets.top, opacity, translateY]);
-
-    const hideToast = useCallback(() => {
-        Animated.parallel([
-            Animated.timing(opacity, {
-                toValue: 0,
-                duration: 250,
-                useNativeDriver: true,
-            }),
-            Animated.timing(translateY, {
-                toValue: -100,
-                duration: 250,
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            setToast(null);
-        });
-    }, [opacity, translateY]);
+    }, [insets.top, opacity, translateY, hideToast]);
 
     const getIcon = () => {
         switch (toast?.type) {
@@ -117,8 +127,6 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         </ToastContext.Provider>
     );
 };
-
-import { TouchableOpacity } from 'react-native';
 
 export const useToast = () => {
     const context = useContext(ToastContext);
