@@ -36,6 +36,9 @@ export const IconPicker: React.FC<IconPickerProps> = ({ selectedIcon, onSelect }
                                 styles.iconButton,
                                 { backgroundColor: isSelected ? primaryColor : secondaryBg }
                             ]}
+                            accessibilityLabel={`${name} icon`}
+                            accessibilityRole="radio"
+                            accessibilityState={{ selected: isSelected }}
                         >
                             <IconComponent
                                 size={20}

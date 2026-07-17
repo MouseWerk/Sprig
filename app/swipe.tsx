@@ -1,14 +1,19 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
-import { CheckCircle2, Edit3, FileWarning, HelpCircle, Trophy, Undo2, Volume2, XCircle } from 'lucide-react-native';
+import { CheckCircle2, Edit3, FileWarning, HelpCircle, Sprout, Trophy, Undo2, Volume2, XCircle, Zap } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashcardSwipe } from '../components/FlashcardSwipe';
+import { FocusPlant } from '../components/FocusPlant';
 import { Button } from '../components/ui/Button';
+import { useToast } from '../components/ui/Toast';
 import { FlashcardData, parseFlashcardsCsv } from '../utils/CsvParser';
+import { xpForGrade } from '../utils/Levels';
+import { scheduleStreakReminder } from '../utils/Notifications';
 import { applySwipeResult, getCachedData, getDecks, restoreCardSRS, setCachedData, SRSCardData, updateCardInDeck, updateDeckProgress, updateUserStats } from '../utils/Storage';
 
 interface UndoEntry {
@@ -27,6 +32,7 @@ interface FlashcardWithIndex extends FlashcardData {
 export default function SwipeScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { showToast } = useToast();
     const { id, uri, name, mode: initialMode } = useLocalSearchParams<{ id: string, uri: string, name?: string, mode?: string }>();
 
     const [cards, setCards] = useState<FlashcardWithIndex[]>([]);
@@ -36,6 +42,7 @@ export default function SwipeScreen() {
     const [sessionCorrect, setSessionCorrect] = useState(0);
     const [sessionHard, setSessionHard] = useState(0);
     const [sessionAgain, setSessionAgain] = useState(0);
+    const [sessionXp, setSessionXp] = useState(0);
     const [sessionComplete, setSessionComplete] = useState(false);
     const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
     const [isFlipped, setIsFlipped] = useState(false);
@@ -46,11 +53,14 @@ export default function SwipeScreen() {
     const [srsData, setSrsData] = useState<Record<number, SRSCardData>>({});
     const [isHighlightMode, setIsHighlightMode] = useState(false);
     const [studyMode, setStudyMode] = useState<'all' | 'due'>(initialMode === 'all' ? 'all' : 'due');
+    const [focusMode, setFocusMode] = useState(true);
 
     // Live SRS mirror (ref, not state) so undo and repeat passes stay
     // accurate without re-filtering the session queue mid-session.
     const liveSrsRef = useRef<Record<number, SRSCardData>>({});
     const lastActionRef = useRef(Date.now());
+    // Ensures we (re)schedule the streak reminder only once per study session
+    const reminderScheduledRef = useRef(false);
     // Serialized background persistence chain - swipes advance the UI
     // immediately while writes complete in order behind the scenes.
     const pendingPersistRef = useRef<Promise<void>>(Promise.resolve());
@@ -210,6 +220,7 @@ export default function SwipeScreen() {
         else if (grade === 3) setSessionHard(c => c + 1);
         else setSessionAgain(c => c + 1);
         setSessionReviewed(s => s + 1);
+        setSessionXp(x => x + xpForGrade(grade));
 
         const now = Date.now();
         const deltaSeconds = Math.min(Math.round((now - lastActionRef.current) / 1000), 60);
@@ -230,7 +241,43 @@ export default function SwipeScreen() {
             .then(() => applySwipeResult(id, originalIndex, grade, updatedLearned, updatedUnsure))
             .then(srs => { liveSrsRef.current = srs; })
             .catch(e => console.error('Error persisting swipe:', e));
-        updateUserStats(1, deltaSeconds).catch(() => { });
+        if (!reminderScheduledRef.current) {
+            reminderScheduledRef.current = true;
+            scheduleStreakReminder();
+        }
+
+        updateUserStats(1, deltaSeconds, grade)
+            .then(result => {
+                let delay = 0;
+                if (result.freezeUsed) {
+                    setTimeout(() => {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        showToast({ message: '🧊 Streak freeze used — your streak is safe!', type: 'info' });
+                    }, delay);
+                    delay += 600;
+                }
+                if (result.freezeEarned) {
+                    setTimeout(() => {
+                        showToast({ message: '🧊 You earned a streak freeze!', type: 'success' });
+                    }, delay);
+                    delay += 600;
+                }
+                if (result.leveledUp) {
+                    setTimeout(() => {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        showToast({ message: `⭐ Level ${result.newLevel}! You're now a ${result.newRank}`, type: 'success' });
+                    }, delay);
+                    delay += 600;
+                }
+                result.newAchievements.forEach(a => {
+                    setTimeout(() => {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        showToast({ message: `🏆 Achievement unlocked: ${a.title}`, type: 'success' });
+                    }, delay);
+                    delay += 600;
+                });
+            })
+            .catch(() => { });
     };
 
     const handleUndo = async () => {
@@ -258,6 +305,7 @@ export default function SwipeScreen() {
         else if (last.grade === 3) setSessionHard(c => Math.max(0, c - 1));
         else setSessionAgain(c => Math.max(0, c - 1));
         setSessionReviewed(s => Math.max(0, s - 1));
+        setSessionXp(x => Math.max(0, x - xpForGrade(last.grade)));
 
         setUndoStack(stack => stack.slice(0, -1));
         setSessionComplete(false);
@@ -273,6 +321,7 @@ export default function SwipeScreen() {
         setSessionCorrect(0);
         setSessionHard(0);
         setSessionAgain(0);
+        setSessionXp(0);
         setUndoStack([]);
         setSessionComplete(false);
         setIsFlipped(false);
@@ -299,6 +348,21 @@ export default function SwipeScreen() {
             Speech.stop();
         };
     }, []);
+
+    // Remember the focus-mode preference between sessions
+    useEffect(() => {
+        AsyncStorage.getItem('csvtudyapp_focus_mode').then(v => {
+            if (v === 'off') setFocusMode(false);
+        });
+    }, []);
+
+    const toggleFocusMode = () => {
+        setFocusMode(prev => {
+            const next = !prev;
+            AsyncStorage.setItem('csvtudyapp_focus_mode', next ? 'on' : 'off').catch(() => { });
+            return next;
+        });
+    };
 
     if (loading) {
         return (
@@ -341,6 +405,12 @@ export default function SwipeScreen() {
                         <Text style={[styles.scoreDivider, { color: mutedForeground }]}>%</Text>
                         <Text style={[styles.resultTotal, { color: mutedForeground }]}>correct</Text>
                     </View>
+                    {sessionXp > 0 && (
+                        <View style={[styles.xpBadge, { backgroundColor: primaryColor + '18' }]}>
+                            <Zap size={18} color={primaryColor} strokeWidth={2.5} fill={primaryColor} />
+                            <Text style={[styles.xpBadgeText, { color: primaryColor }]}>+{sessionXp} XP earned</Text>
+                        </View>
+                    )}
                     <View style={styles.resultBreakdown}>
                         <View style={styles.breakdownItem}>
                             <CheckCircle2 size={20} color="#22c55e" strokeWidth={2.5} />
@@ -378,9 +448,22 @@ export default function SwipeScreen() {
                     headerRight: () => (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 }}>
                             <TouchableOpacity
+                                onPress={toggleFocusMode}
+                                style={[
+                                    styles.iconBtn,
+                                    focusMode && { backgroundColor: primaryColor + '20' }
+                                ]}
+                                accessibilityLabel={focusMode ? 'Disable focus mode' : 'Enable focus mode'}
+                                accessibilityRole="button"
+                            >
+                                <Sprout size={20} color={focusMode ? primaryColor : textColor} strokeWidth={focusMode ? 2.5 : 2} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
                                 onPress={speakCurrentCard}
                                 style={styles.iconBtn}
                                 disabled={!currentCard}
+                                accessibilityLabel="Read card aloud"
+                                accessibilityRole="button"
                             >
                                 <Volume2 size={20} color={currentCard ? textColor : mutedForeground} strokeWidth={2} />
                             </TouchableOpacity>
@@ -388,6 +471,8 @@ export default function SwipeScreen() {
                                 onPress={handleUndo}
                                 style={styles.iconBtn}
                                 disabled={undoStack.length === 0}
+                                accessibilityLabel="Undo last swipe"
+                                accessibilityRole="button"
                             >
                                 <Undo2 size={20} color={undoStack.length > 0 ? textColor : mutedForeground} strokeWidth={2} />
                             </TouchableOpacity>
@@ -397,6 +482,8 @@ export default function SwipeScreen() {
                                     styles.iconBtn,
                                     isHighlightMode && { backgroundColor: primaryColor + '20' }
                                 ]}
+                                accessibilityLabel={isHighlightMode ? 'Exit highlight mode' : 'Enter highlight mode'}
+                                accessibilityRole="button"
                             >
                                 <Edit3 size={20} color={isHighlightMode ? primaryColor : textColor} strokeWidth={isHighlightMode ? 3 : 2} />
                             </TouchableOpacity>
@@ -407,6 +494,8 @@ export default function SwipeScreen() {
                     )
                 }}
             />
+
+            {focusMode && <FocusPlant active={filteredCards.length > 0} />}
 
             <View style={styles.swipeContainer}>
                 {filteredCards.length === 0 ? (
@@ -421,6 +510,8 @@ export default function SwipeScreen() {
                         key={`${currentIndex}-${studyMode}`}
                         question={displayQuestion}
                         answer={displayAnswer}
+                        frontLabel={currentCard.reversed ? 'Answer' : 'Question'}
+                        backLabel={currentCard.reversed ? 'Question' : 'Answer'}
                         onSwipeLeft={() => handleSwipe(0)}
                         onSwipeRight={() => handleSwipe(5)}
                         onSwipeTop={() => handleSwipe(3)}
@@ -578,7 +669,22 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 24,
-        marginVertical: 32,
+        marginTop: 32,
+        marginBottom: 16,
+    },
+    xpBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 18,
+        paddingVertical: 10,
+        borderRadius: 16,
+        marginBottom: 24,
+    },
+    xpBadgeText: {
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: -0.2,
     },
     resultScore: {
         fontSize: 64,

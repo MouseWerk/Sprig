@@ -1,300 +1,305 @@
-import ReviewHeatmap from '@/components/ReviewHeatmap';
 import { useCustomTheme } from '@/components/ThemeProvider';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/components/ui/Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { getDecks, getUserStats, UserStats } from '@/utils/Storage';
+import { SprigLogo } from '@/components/SprigLogo';
+import { createBackup, importBackup } from '@/utils/Backup';
+import { clearCardCache } from '@/utils/Storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import { Stack, useFocusEffect } from 'expo-router';
-import {
-    Award,
-    BookOpen,
-    ChevronRight,
-    Clock,
-    Database,
-    Flame,
-    Github,
-    Info,
-    Monitor,
-    Moon,
-    ShieldCheck,
-    Smartphone,
-    Sun,
-    TrendingUp
-} from 'lucide-react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
+import { ChevronRight, Database, DownloadCloud, Github, Info, Monitor, Moon, ShieldCheck, Smartphone, Sun, UploadCloud } from 'lucide-react-native';
 import React, { useState } from 'react';
-import {
-    ScrollView,
-    Share,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View
-} from 'react-native';
+import { Linking, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 export default function SettingsScreen() {
-    const insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
 
-    // UI Colors
-    const backgroundColor = useThemeColor({}, 'background');
-    const cardColor = useThemeColor({}, 'card');
-    const textColor = useThemeColor({}, 'text');
-    const mutedForeground = useThemeColor({}, 'mutedForeground');
-    const accentColor = useThemeColor({}, 'primary');
-    const secondaryBg = useThemeColor({}, 'secondary');
+  // UI Colors
+  const backgroundColor = useThemeColor({}, 'background');
+  const cardColor = useThemeColor({}, 'card');
+  const textColor = useThemeColor({}, 'text');
+  const mutedForeground = useThemeColor({}, 'mutedForeground');
+  const accentColor = useThemeColor({}, 'primary');
+  const secondaryBg = useThemeColor({}, 'secondary');
 
-    const { mode, setThemeMode, theme } = useCustomTheme();
-    const { showToast } = useToast();
-    const confirm = useConfirm();
-    const { t } = useLanguage();
-    const [deckCount, setDeckCount] = useState(0);
-    const [stats, setStats] = useState<UserStats | null>(null);
+  const { mode, setThemeMode, theme } = useCustomTheme();
+  const { showToast } = useToast();
+  const confirm = useConfirm();
+  const { t } = useLanguage();
+  const [busy, setBusy] = useState(false);
 
-    const isDarkMode = theme === 'dark';
+  const isDarkMode = theme === 'dark';
 
-    // Refresh stats whenever the tab regains focus (e.g. after a study session)
-    useFocusEffect(
-        React.useCallback(() => {
-            async function fetchStats() {
-                try {
-                    const [decks, userStats] = await Promise.all([getDecks(), getUserStats()]);
-                    setDeckCount(decks.length);
-                    setStats(userStats);
-                } catch (error) {
-                    console.log('Settings error:', error);
-                }
-            }
-            fetchStats();
-        }, [])
-    );
+  const toggleTheme = async () => {
+    const nextMode = isDarkMode ? 'light' : 'dark';
+    await setThemeMode(nextMode);
+  };
 
-    const formatStudyTime = (seconds: number) => {
-        if (seconds < 60) return `${seconds}s`;
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-    };
+  const handleClearCache = async () => {
+    const ok = await confirm({
+      title: 'Clear Cache',
+      message: 'This will clear all temporary data but keep your flashcards. Continue?',
+      confirmText: 'Clear',
+      destructive: true,
+    });
+    if (!ok) return;
+    await clearCardCache();
+    // Also sweep any parsed-card blobs left over from the pre-SQLite era
+    const keys = await AsyncStorage.getAllKeys();
+    const cacheKeys = keys.filter((k) => k.startsWith('csvtudyapp_cache_'));
+    if (cacheKeys.length > 0) await AsyncStorage.multiRemove(cacheKeys);
+    showToast({ message: 'Cache cleared successfully!', type: 'success' });
+  };
 
-    const toggleTheme = async () => {
-        const nextMode = isDarkMode ? 'light' : 'dark';
-        await setThemeMode(nextMode);
-    };
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: 'Check out Sprig 🌱 — a calm study companion for flashcards, PDFs and focus sessions!',
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
-    const handleClearCache = async () => {
-        const ok = await confirm({
-            title: 'Clear Cache',
-            message: 'This will clear all temporary data but keep your flashcards. Continue?',
-            confirmText: 'Clear',
-            destructive: true,
-        });
-        if (!ok) return;
-        const keys = await AsyncStorage.getAllKeys();
-        const cacheKeys = keys.filter(k => k.startsWith('csvtudyapp_cache_'));
-        await AsyncStorage.multiRemove(cacheKeys);
-        showToast({ message: 'Cache cleared successfully!', type: 'success' });
-    };
+  const handlePrivacy = async () => {
+    await confirm({
+      title: 'Your data stays on your device',
+      message:
+        'Sprig keeps everything local — your decks, PDFs, audio, and study stats are stored only on this phone and are never uploaded to any server. Notifications and reminders are scheduled on-device.',
+      confirmText: 'Got it',
+      cancelText: 'Close',
+    });
+  };
 
-    const handleShare = async () => {
-        try {
-            await Share.share({
-                message: 'Check out FlashMaster - The ultimate flashcard app for CSV and PDF study! 🚀🎓',
-            });
-        } catch (error) {
-            console.error(error);
-        }
-    };
+  const openUrl = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (e) {
+      console.error('Could not open URL:', e);
+      showToast({ message: 'Could not open link', type: 'error' });
+    }
+  };
 
-    const SettingItem = ({ icon: Icon, label, value, onPress, toggle, rightElement }: any) => (
-        <TouchableOpacity
-            style={[styles.item, { backgroundColor: cardColor }]}
-            onPress={onPress}
-            activeOpacity={onPress ? 0.7 : 1}
-        >
-            <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
-                <Icon size={20} color={accentColor} strokeWidth={2.5} />
-            </View>
-            <Text style={[styles.itemLabel, { color: textColor }]}>{label}</Text>
-            {value && <Text style={[styles.itemValue, { color: mutedForeground }]}>{value}</Text>}
-            {toggle !== undefined && (
-                <Switch
-                    value={toggle}
-                    onValueChange={onPress}
-                    trackColor={{ false: '#767577', true: accentColor }}
-                    thumbColor="#f4f3f4"
-                />
-            )}
-            {rightElement}
-            {onPress && !toggle && !rightElement && <ChevronRight size={18} color={mutedForeground} />}
-        </TouchableOpacity>
-    );
+  const handleBackup = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      showToast({ message: 'Preparing backup…', type: 'info' });
+      const uri = await createBackup();
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Save Sprig backup' });
+      } else {
+        showToast({ message: 'Sharing is not available on this device', type: 'error' });
+      }
+    } catch (e) {
+      console.error('Backup failed:', e);
+      showToast({ message: 'Backup failed', type: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  };
 
-    const SectionHeader = ({ title }: { title: string }) => (
-        <Text style={[styles.sectionHeader, { color: mutedForeground }]}>{title}</Text>
-    );
+  const handleRestore = async () => {
+    if (busy) return;
+    try {
+      const res = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain'], copyToCacheDirectory: true });
+      if (res.canceled || !res.assets?.length) return;
+      const ok = await confirm({
+        title: 'Restore from backup?',
+        message: 'This adds decks, folders and audio from the backup and merges your stats. Items you already have are kept — nothing is deleted.',
+        confirmText: 'Restore',
+      });
+      if (!ok) return;
+      setBusy(true);
+      const summary = await importBackup(res.assets[0].uri);
+      showToast({
+        message: `Restored ${summary.decksAdded} deck${summary.decksAdded === 1 ? '' : 's'}, ${summary.audioAdded} audio`,
+        type: 'success',
+      });
+    } catch (e) {
+      console.error('Restore failed:', e);
+      showToast({ message: 'Could not read that backup file', type: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  };
 
-    return (
-        <View style={[styles.container, { backgroundColor }]}>
-            <Stack.Screen options={{
-                headerShown: true,
-                title: t('settings_title'),
-                headerLargeTitle: true,
-                headerShadowVisible: false,
-                headerStyle: { backgroundColor },
-                headerTintColor: textColor,
-            }} />
+  const SettingItem = ({ icon: Icon, label, value, onPress, toggle, rightElement }: any) => (
+    <TouchableOpacity
+      style={[styles.item, { backgroundColor: cardColor }]}
+      onPress={onPress}
+      activeOpacity={onPress ? 0.7 : 1}
+    >
+      <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
+        <Icon size={20} color={accentColor} strokeWidth={2.5} />
+      </View>
+      <Text style={[styles.itemLabel, { color: textColor }]}>{label}</Text>
+      {value && <Text style={[styles.itemValue, { color: mutedForeground }]}>{value}</Text>}
+      {toggle !== undefined && (
+        <Switch
+          value={toggle}
+          onValueChange={onPress}
+          trackColor={{ false: '#767577', true: accentColor }}
+          thumbColor="#f4f3f4"
+        />
+      )}
+      {rightElement}
+      {onPress && !toggle && !rightElement && <ChevronRight size={18} color={mutedForeground} />}
+    </TouchableOpacity>
+  );
 
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ padding: 20, paddingTop: 10, paddingBottom: insets.bottom + 40 }}
-            >
-                <SectionHeader title="ACTIVITY" />
-                <View style={[styles.heatmapCard, { backgroundColor: cardColor }]}>
-                    <ReviewHeatmap data={stats?.dailyReviews} />
-                </View>
+  const SectionHeader = ({ title }: { title: string }) => (
+    <Text style={[styles.sectionHeader, { color: mutedForeground }]}>{title}</Text>
+  );
 
-                <SectionHeader title="YOUR PROGRESS" />
-                <View style={styles.group}>
-                    <SettingItem
-                        icon={BookOpen}
-                        label="Cards Reviewed"
-                        value={`${stats?.totalCardsReviewed ?? 0}`}
-                    />
-                    <SettingItem
-                        icon={Clock}
-                        label="Study Time"
-                        value={formatStudyTime(stats?.totalStudyTime ?? 0)}
-                    />
-                    <SettingItem
-                        icon={Flame}
-                        label="Current Streak"
-                        value={`${stats?.currentStreak ?? 0} day${(stats?.currentStreak ?? 0) === 1 ? '' : 's'}`}
-                    />
-                    <SettingItem
-                        icon={TrendingUp}
-                        label="Longest Streak"
-                        value={`${stats?.longestStreak ?? 0} day${(stats?.longestStreak ?? 0) === 1 ? '' : 's'}`}
-                    />
-                    <SettingItem
-                        icon={Award}
-                        label="Achievements"
-                        value={`${stats?.achievements?.length ?? 0} / 3`}
-                    />
-                    <SettingItem
-                        icon={Database}
-                        label="Decks"
-                        value={`${deckCount}`}
-                    />
-                </View>
+  return (
+    <View style={[styles.container, { backgroundColor }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+        <Text style={[styles.title, { color: textColor }]}>{t('settings_title')}</Text>
+      </View>
 
-                <SectionHeader title={t('theme').toUpperCase()} />
-                <View style={styles.group}>
-                    <SettingItem
-                        icon={isDarkMode ? Moon : Sun}
-                        label={t('dark') + ' Mode'}
-                        toggle={isDarkMode}
-                        onPress={toggleTheme}
-                    />
-                    <SettingItem
-                        icon={Monitor}
-                        label={'Use ' + t('system') + ' Theme'}
-                        toggle={mode === 'system'}
-                        onPress={() => setThemeMode(mode === 'system' ? (theme || 'light') : 'system')}
-                    />
-                </View>
-
-                <SectionHeader title="STORAGE & DATA" />
-                <View style={styles.group}>
-                    <SettingItem
-                        icon={Database}
-                        label="Clear Cache"
-                        onPress={handleClearCache}
-                    />
-                    <SettingItem icon={ShieldCheck} label="Privacy Policy" onPress={() => { }} />
-                </View>
-
-                <SectionHeader title="COMMUNITY" />
-                <View style={styles.group}>
-                    <SettingItem icon={Github} label="Github Repository" onPress={() => { }} />
-                    <SettingItem icon={Smartphone} label="Share with Friends" onPress={handleShare} />
-                </View>
-
-                <SectionHeader title="ABOUT" />
-                <View style={styles.group}>
-                    <SettingItem icon={Info} label="Version" value={Constants.expoConfig?.version ?? '1.0.0'} />
-                </View>
-
-                <View style={styles.footer}>
-                    <Text style={[styles.footerText, { color: mutedForeground }]}>Made with ❤️ for Learners</Text>
-                    <Text style={[styles.footerVersion, { color: mutedForeground }]}>FlashMaster © 2026</Text>
-                </View>
-            </ScrollView>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingBottom: insets.bottom + 40,
+        }}
+      >
+        <View style={styles.brandHeader}>
+          <SprigLogo size={56} />
+          <Text style={[styles.brandVersion, { color: mutedForeground }]}>
+            Version {Constants.expoConfig?.version ?? '1.0.0'}
+          </Text>
         </View>
-    );
+
+        <SectionHeader title={t('theme').toUpperCase()} />
+        <View style={styles.group}>
+          <SettingItem
+            icon={isDarkMode ? Moon : Sun}
+            label={t('dark') + ' Mode'}
+            toggle={isDarkMode}
+            onPress={toggleTheme}
+          />
+          <SettingItem
+            icon={Monitor}
+            label={'Use ' + t('system') + ' Theme'}
+            toggle={mode === 'system'}
+            onPress={() => setThemeMode(mode === 'system' ? theme || 'light' : 'system')}
+          />
+        </View>
+
+        <SectionHeader title="BACKUP & RESTORE" />
+        <View style={styles.group}>
+          <SettingItem icon={DownloadCloud} label={busy ? 'Working…' : 'Back Up Everything'} onPress={handleBackup} />
+          <SettingItem icon={UploadCloud} label="Restore from Backup" onPress={handleRestore} />
+        </View>
+
+        <SectionHeader title="STORAGE & DATA" />
+        <View style={styles.group}>
+          <SettingItem icon={Database} label="Clear Cache" onPress={handleClearCache} />
+          <SettingItem icon={ShieldCheck} label="Privacy" onPress={handlePrivacy} />
+        </View>
+
+        <SectionHeader title="COMMUNITY" />
+        <View style={styles.group}>
+          <SettingItem icon={Github} label="Github Repository" onPress={() => openUrl('https://github.com/mauricekleindienst/csvtudyapp')} />
+          <SettingItem icon={Smartphone} label="Share with Friends" onPress={handleShare} />
+        </View>
+
+        <SectionHeader title="ABOUT" />
+        <View style={styles.group}>
+          <SettingItem icon={Info} label="Version" value={Constants.expoConfig?.version ?? '1.0.0'} />
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={[styles.footerText, { color: mutedForeground }]}>Made by Mousewerk</Text>
+          <Text style={[styles.footerVersion, { color: mutedForeground }]}>Sprig © 2026</Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    sectionHeader: {
-        fontSize: 12,
-        fontWeight: '800',
-        letterSpacing: 1.2,
-        marginBottom: 12,
-        marginLeft: 4,
-        textTransform: 'uppercase',
-    },
-    heatmapCard: {
-        borderRadius: 24,
-        padding: 16,
-        marginBottom: 28,
-        alignItems: 'center',
-    },
-    group: {
-        borderRadius: 24,
-        overflow: 'hidden',
-        marginBottom: 28,
-    },
-    item: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        paddingVertical: 14,
-    },
-    iconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 16,
-    },
-    itemLabel: {
-        flex: 1,
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    itemValue: {
-        fontSize: 14,
-        fontWeight: '500',
-        marginRight: 8,
-    },
-    footer: {
-        alignItems: 'center',
-        marginTop: 20,
-        gap: 4,
-    },
-    footerText: {
-        fontSize: 13,
-        fontWeight: '600',
-    },
-    footerVersion: {
-        fontSize: 11,
-        fontWeight: '500',
-        opacity: 0.6,
-    },
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '900',
+    letterSpacing: -1,
+  },
+  brandHeader: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 28,
+  },
+  brandVersion: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sectionHeader: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 12,
+    marginLeft: 4,
+    textTransform: 'uppercase',
+  },
+  group: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginBottom: 28,
+  },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    paddingVertical: 14,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  itemLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  itemValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginRight: 8,
+  },
+  footer: {
+    alignItems: 'center',
+    marginTop: 20,
+    gap: 4,
+  },
+  footerText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  footerVersion: {
+    fontSize: 11,
+    fontWeight: '500',
+    opacity: 0.6,
+  },
 });

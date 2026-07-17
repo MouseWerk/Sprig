@@ -3,11 +3,14 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Icons from 'lucide-react-native';
-import { BookOpen, ChevronRight, FileUp, Flame, Folder as FolderIcon, Plus, Search, Trash2, X } from 'lucide-react-native';
+import { ChevronRight, FileUp, Folder as FolderIcon, Leaf, Plus, Search, Trash2, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconPicker } from '../../components/IconPicker';
+import { BottomSheet } from '../../components/ui/BottomSheet';
+import { LevelCard } from '../../components/LevelCard';
+import { SprigLogo } from '../../components/SprigLogo';
 import { Button } from '../../components/ui/Button';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
@@ -200,6 +203,8 @@ export default function HomeScreen() {
             style={styles.deleteButtonContainer}
             onPress={() => handleDelete(item.id, item.name)}
             activeOpacity={0.5}
+            accessibilityLabel={`Delete ${item.name}`}
+            accessibilityRole="button"
           >
             <Trash2 size={16} color={mutedForeground} />
           </TouchableOpacity>
@@ -267,6 +272,8 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={styles.deleteButtonContainer}
           onPress={() => handleDeleteFolder(item.id, item.name)}
+          accessibilityLabel={`Delete folder ${item.name}`}
+          accessibilityRole="button"
         >
           <Trash2 size={16} color={mutedForeground} />
         </TouchableOpacity>
@@ -323,6 +330,8 @@ export default function HomeScreen() {
             style={[styles.addButton, { backgroundColor: secondaryBg }]}
             onPress={() => setNewFolderModalVisible(true)}
             activeOpacity={0.9}
+            accessibilityLabel="New folder"
+            accessibilityRole="button"
           >
             <FolderIcon size={24} color={accentColor} strokeWidth={3} />
           </TouchableOpacity>
@@ -330,6 +339,8 @@ export default function HomeScreen() {
             style={[styles.addButton, { backgroundColor: accentColor }]}
             onPress={() => setImportModalVisible(true)}
             activeOpacity={0.9}
+            accessibilityLabel="Create new deck"
+            accessibilityRole="button"
           >
             <Plus size={24} color={primaryForeground} strokeWidth={3} />
           </TouchableOpacity>
@@ -348,7 +359,7 @@ export default function HomeScreen() {
           autoCorrect={false}
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8}>
+          <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8} accessibilityLabel="Clear search" accessibilityRole="button">
             <X size={18} color={mutedForeground} />
           </TouchableOpacity>
         )}
@@ -388,27 +399,23 @@ export default function HomeScreen() {
         windowSize={7}
         removeClippedSubviews={true}
         ListHeaderComponent={
-          !searching && !currentFolderId && stats && stats.totalCardsReviewed > 0 ? (
-            <View style={[styles.statsBanner, { backgroundColor: secondaryBg }]}>
-              <View style={styles.statsBannerItem}>
-                <View style={[styles.statsBannerIcon, { backgroundColor: '#f9731620' }]}>
-                  <Flame size={20} color="#f97316" strokeWidth={2.5} fill={displayStreak > 0 ? '#f97316' : 'none'} />
+          !searching && !currentFolderId ? (
+            <View>
+              {stats && <LevelCard stats={stats} displayStreak={displayStreak} />}
+              <TouchableOpacity
+                style={[styles.focusCard, { backgroundColor: accentColor }]}
+                onPress={() => router.push('/focus')}
+                activeOpacity={0.9}
+              >
+                <View style={[styles.focusIcon, { backgroundColor: primaryForeground }]}>
+                  <Leaf size={22} color={accentColor} strokeWidth={2.5} />
                 </View>
-                <View>
-                  <Text style={[styles.statsBannerValue, { color: textColor }]}>{displayStreak}</Text>
-                  <Text style={[styles.statsBannerLabel, { color: mutedForeground }]}>Day Streak</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.focusTitle, { color: primaryForeground }]}>Focus Session</Text>
+                  <Text style={[styles.focusSub, { color: primaryForeground }]}>Grow a plant while you study</Text>
                 </View>
-              </View>
-              <View style={[styles.statsBannerDivider, { backgroundColor: mutedForeground + '30' }]} />
-              <View style={styles.statsBannerItem}>
-                <View style={[styles.statsBannerIcon, { backgroundColor: accentColor + '15' }]}>
-                  <BookOpen size={20} color={accentColor} strokeWidth={2.5} />
-                </View>
-                <View>
-                  <Text style={[styles.statsBannerValue, { color: textColor }]}>{stats.totalCardsReviewed}</Text>
-                  <Text style={[styles.statsBannerLabel, { color: mutedForeground }]}>Cards Reviewed</Text>
-                </View>
-              </View>
+                <ChevronRight size={20} color={primaryForeground} />
+              </TouchableOpacity>
             </View>
           ) : null
         }
@@ -425,10 +432,10 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View style={styles.emptyContainer}>
-              <View style={[styles.emptyIcon, { backgroundColor: secondaryBg }]}>
-                <BookOpen size={48} color={accentColor} strokeWidth={2.5} />
+              <View style={{ marginBottom: 24 }}>
+                <SprigLogo size={108} />
               </View>
-              <Text style={[styles.emptyTitle, { color: textColor }]}>{currentFolderId ? 'Folder is empty' : 'No flashcards yet'}</Text>
+              <Text style={[styles.emptyTitle, { color: textColor }]}>{currentFolderId ? 'Folder is empty' : 'Plant your first deck'}</Text>
               <Text style={[styles.emptyText, { color: mutedForeground }]}>
                 {currentFolderId ? 'Create a subfolder or import a CSV deck here.' : 'Import a CSV file to create your first study deck.'}
               </Text>
@@ -443,22 +450,14 @@ export default function HomeScreen() {
       />
 
       {/* New Folder Modal */}
-      <Modal
+      <BottomSheet
         visible={newFolderModalVisible}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setNewFolderModalVisible(false)}
+        onClose={() => setNewFolderModalVisible(false)}
+        sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
-          <View style={styles.modalOverlay}>
-            <TouchableOpacity style={styles.modalDismiss} onPress={() => setNewFolderModalVisible(false)} />
-            <View style={[styles.modalContent, { backgroundColor }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: textColor }]}>New Folder</Text>
-                <TouchableOpacity onPress={() => setNewFolderModalVisible(false)}>
+                <TouchableOpacity onPress={() => setNewFolderModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>
@@ -473,40 +472,21 @@ export default function HomeScreen() {
                 onPress={handleCreateFolder}
                 style={{ marginTop: 24 }}
               />
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      </BottomSheet>
 
       {/* Import Deck Modal */}
-      <Modal
+      <BottomSheet
         visible={importModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => {
-          setImportModalVisible(false);
-        }}
+        onClose={() => setImportModalVisible(false)}
+        sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
-          <View style={styles.modalOverlay}>
-            <TouchableOpacity
-              style={styles.modalDismiss}
-              activeOpacity={1}
-              onPress={() => {
-                setImportModalVisible(false);
-              }}
-            />
-            <View style={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: textColor }]}>
                   Create New Deck
                 </Text>
                 <TouchableOpacity onPress={() => {
                   setImportModalVisible(false);
-                }}>
+                }} accessibilityLabel="Close" accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>
@@ -551,34 +531,19 @@ export default function HomeScreen() {
                   />
                 </View>
               </ScrollView>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      </BottomSheet>
 
       {/* Edit Deck Modal */}
-      <Modal
+      <BottomSheet
         visible={editDeckModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setEditDeckModalVisible(false)}
+        onClose={() => setEditDeckModalVisible(false)}
+        sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
-          <View style={styles.modalOverlay}>
-            <TouchableOpacity
-              style={styles.modalDismiss}
-              activeOpacity={1}
-              onPress={() => setEditDeckModalVisible(false)}
-            />
-            <View style={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: textColor }]}>
                   Edit Deck
                 </Text>
-                <TouchableOpacity onPress={() => setEditDeckModalVisible(false)}>
+                <TouchableOpacity onPress={() => setEditDeckModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>
@@ -638,10 +603,7 @@ export default function HomeScreen() {
                   />
                 </View>
               </ScrollView>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      </BottomSheet>
     </View>
   );
 }
@@ -926,6 +888,33 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     height: '100%',
+  },
+  focusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginHorizontal: 10,
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 20,
+  },
+  focusIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  focusTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  focusSub: {
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.85,
+    marginTop: 2,
   },
   statsBanner: {
     flexDirection: 'row',

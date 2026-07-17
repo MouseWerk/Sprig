@@ -1,3 +1,4 @@
+import { Onboarding } from '@/components/Onboarding';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
 import { ToastProvider } from '@/components/ui/Toast';
@@ -32,7 +33,32 @@ function RootLayoutNav() {
           headerStyle: { backgroundColor },
           headerTitleStyle: { fontWeight: '600' }
         }} />
+        <Stack.Screen name="achievements" options={{
+          headerBackTitle: 'Back',
+          headerTintColor: textColor,
+          headerStyle: { backgroundColor },
+          headerTitleStyle: { fontWeight: '600' }
+        }} />
+        <Stack.Screen name="focus" options={{
+          headerBackTitle: 'Back',
+          headerTintColor: textColor,
+          headerStyle: { backgroundColor },
+          headerTitleStyle: { fontWeight: '600' }
+        }} />
+        <Stack.Screen name="quiz" options={{
+          headerBackTitle: 'Back',
+          headerTintColor: textColor,
+          headerStyle: { backgroundColor },
+          headerTitleStyle: { fontWeight: '600' }
+        }} />
+        <Stack.Screen name="feed" options={{
+          headerBackTitle: 'Back',
+          headerTintColor: textColor,
+          headerStyle: { backgroundColor },
+          headerTitleStyle: { fontWeight: '600' }
+        }} />
       </Stack>
+      <Onboarding />
     </GestureHandlerRootView>
   );
 }

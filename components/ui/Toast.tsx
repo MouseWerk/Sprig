@@ -118,7 +118,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                             {getIcon()}
                         </View>
                         <Text style={[styles.message, { color: textColor }]}>{toast.message}</Text>
-                        <TouchableOpacity onPress={hideToast} style={styles.closeBtn}>
+                        <TouchableOpacity onPress={hideToast} style={styles.closeBtn} accessibilityLabel="Dismiss notification" accessibilityRole="button">
                             <X size={16} color={textColor} opacity={0.5} />
                         </TouchableOpacity>
                     </View>

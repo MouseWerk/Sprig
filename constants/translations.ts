@@ -4,6 +4,7 @@ export const translations = {
     home: 'Home',
     audio: 'Audio',
     explore: 'Library',
+    stats: 'Stats',
     settings: 'Settings',
     
     // Home Screen
@@ -57,6 +58,11 @@ export const translations = {
     pickPdf: 'Pick a PDF file to upload',
     selectIcon: 'Select Icon',
     root: 'Root',
+    sortBy: 'Sort by',
+    sortNameAsc: 'Name (A–Z)',
+    sortNameDesc: 'Name (Z–A)',
+    sortNewest: 'Newest first',
+    sortOldest: 'Oldest first',
     
     // Settings Screen
     settings_title: 'Settings',

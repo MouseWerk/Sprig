@@ -1,18 +1,55 @@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Icons from 'lucide-react-native';
-import { ChevronRight, FileText, FileUp, Folder as FolderIcon, Library, Plus, Trash2, X } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ArrowUpDown, Check, ChevronRight, FileText, FileUp, Folder as FolderIcon, Library, Plus, Trash2, X } from 'lucide-react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconPicker } from '../../components/IconPicker';
+import { BottomSheet } from '../../components/ui/BottomSheet';
 import { Button } from '../../components/ui/Button';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { useToast } from '../../components/ui/Toast';
 import { Deck, deleteDeck, deleteFolder, Folder, getDecks, getFolders, saveDeck, saveFolder } from '../../utils/Storage';
+
+type SortMode = 'nameAsc' | 'nameDesc' | 'newest' | 'oldest';
+
+const SORT_STORAGE_KEY = 'csvtudyapp_library_sort';
+
+const SORT_OPTIONS: { mode: SortMode; labelKey: 'sortNameAsc' | 'sortNameDesc' | 'sortNewest' | 'sortOldest' }[] = [
+  { mode: 'nameAsc', labelKey: 'sortNameAsc' },
+  { mode: 'nameDesc', labelKey: 'sortNameDesc' },
+  { mode: 'newest', labelKey: 'sortNewest' },
+  { mode: 'oldest', labelKey: 'sortOldest' },
+];
+
+// Legacy items have no createdAt, but their ids are Date.now() strings
+function getCreatedAt(item: { id: string; createdAt?: number }): number {
+  return item.createdAt ?? (parseInt(item.id, 10) || 0);
+}
+
+function sortItems<T extends { id: string; name: string; createdAt?: number }>(items: T[], mode: SortMode): T[] {
+  const sorted = [...items];
+  switch (mode) {
+    case 'nameAsc':
+      sorted.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }));
+      break;
+    case 'nameDesc':
+      sorted.sort((a, b) => b.name.localeCompare(a.name, undefined, { sensitivity: 'base', numeric: true }));
+      break;
+    case 'newest':
+      sorted.sort((a, b) => getCreatedAt(b) - getCreatedAt(a));
+      break;
+    case 'oldest':
+      sorted.sort((a, b) => getCreatedAt(a) - getCreatedAt(b));
+      break;
+  }
+  return sorted;
+}
 
 export default function LibraryScreen() {
   const router = useRouter();
@@ -27,6 +64,8 @@ export default function LibraryScreen() {
 
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [newFolderModalVisible, setNewFolderModalVisible] = useState(false);
+  const [sortModalVisible, setSortModalVisible] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('newest');
 
   const [pickedFile, setPickedFile] = useState<{ uri: string, name: string } | null>(null);
   const [docName, setDocName] = useState('');
@@ -53,18 +92,57 @@ export default function LibraryScreen() {
     }, [loadData])
   );
 
+  useEffect(() => {
+    AsyncStorage.getItem(SORT_STORAGE_KEY).then(saved => {
+      if (saved === 'nameAsc' || saved === 'nameDesc' || saved === 'newest' || saved === 'oldest') {
+        setSortMode(saved);
+      }
+    });
+  }, []);
+
+  const handleSelectSort = (mode: SortMode) => {
+    setSortMode(mode);
+    setSortModalVisible(false);
+    AsyncStorage.setItem(SORT_STORAGE_KEY, mode).catch(() => { });
+  };
+
   const handlePickPDF = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: 'application/pdf',
         copyToCacheDirectory: true,
+        multiple: true,
       });
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+      if (result.assets.length === 1) {
+        // Single file: let the user name it and pick an icon
         const asset = result.assets[0];
         setPickedFile({ uri: asset.uri, name: asset.name });
         setDocName(asset.name.replace(/\.pdf$/i, ''));
+        return;
       }
+
+      // Multiple files: import directly with the file name and default icon
+      let imported = 0;
+      for (const asset of result.assets) {
+        try {
+          const name = asset.name.replace(/\.pdf$/i, '') || 'Document';
+          await saveDeck(name, asset.uri, 'FileText', 'pdf', 0, currentFolderId);
+          imported++;
+        } catch (e) {
+          console.error('Error importing PDF:', asset.name, e);
+        }
+      }
+      setImportModalVisible(false);
+      loadData();
+      showToast({
+        message: imported === result.assets.length
+          ? `${imported} PDFs imported`
+          : `${imported} of ${result.assets.length} PDFs imported`,
+        type: imported > 0 ? 'success' : 'error',
+      });
     } catch (err) {
       console.error('Error picking PDF:', err);
       showToast({ message: 'Failed to pick PDF', type: 'error' });
@@ -135,7 +213,7 @@ export default function LibraryScreen() {
         <TouchableOpacity
           style={styles.docContent}
           activeOpacity={0.7}
-          onPress={() => router.push({ pathname: '/pdf-view', params: { uri: item.uri, name: item.name } })}
+          onPress={() => router.push({ pathname: '/pdf-view', params: { id: item.id, uri: item.uri, name: item.name } })}
         >
           <View style={[styles.docIconContainer, { backgroundColor: accentColor + '10' }]}>
             <IconComponent size={24} color={accentColor} strokeWidth={2.5} />
@@ -149,6 +227,8 @@ export default function LibraryScreen() {
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={() => handleDelete(item.id, item.name)}
+          accessibilityLabel={`Delete ${item.name}`}
+          accessibilityRole="button"
         >
           <Trash2 size={18} color="#ef4444" />
         </TouchableOpacity>
@@ -174,15 +254,19 @@ export default function LibraryScreen() {
       <TouchableOpacity
         style={styles.deleteButton}
         onPress={() => handleDeleteFolder(item.id, item.name)}
+        accessibilityLabel={`Delete folder ${item.name}`}
+        accessibilityRole="button"
       >
         <Trash2 size={18} color="#ef4444" />
       </TouchableOpacity>
     </View>
   );
 
-  const currentFolders = folders.filter(f => (f.parentId || null) === currentFolderId);
-  const currentPdfs = pdfs.filter(d => (d.folderId || null) === currentFolderId);
+  const currentFolders = sortItems(folders.filter(f => (f.parentId || null) === currentFolderId), sortMode);
+  const currentPdfs = sortItems(pdfs.filter(d => (d.folderId || null) === currentFolderId), sortMode);
   const combinedData = [...currentFolders.map(f => ({ ...f, isFolder: true })), ...currentPdfs.map(d => ({ ...d, isFolder: false }))];
+
+  const activeSortLabel = SORT_OPTIONS.find(o => o.mode === sortMode);
 
   const folderPath = [];
   let tempId = currentFolderId;
@@ -212,18 +296,37 @@ export default function LibraryScreen() {
             style={[styles.addButton, { backgroundColor: secondaryBg }]}
             onPress={() => setNewFolderModalVisible(true)}
             activeOpacity={0.9}
+            accessibilityLabel="New folder"
+            accessibilityRole="button"
           >
             <FolderIcon size={24} color={accentColor} strokeWidth={3} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: accentColor }]}
             onPress={() => setImportModalVisible(true)}
+            accessibilityLabel="Add PDF document"
+            accessibilityRole="button"
             activeOpacity={0.9}
           >
             <Plus size={24} color={primaryForeground} strokeWidth={3} />
           </TouchableOpacity>
         </View>
       </View>
+
+      {combinedData.length > 1 && (
+        <View style={styles.sortRow}>
+          <TouchableOpacity
+            style={[styles.sortButton, { backgroundColor: secondaryBg }]}
+            onPress={() => setSortModalVisible(true)}
+            activeOpacity={0.7}
+          >
+            <ArrowUpDown size={14} color={accentColor} strokeWidth={2.5} />
+            <Text style={[styles.sortButtonText, { color: textColor }]}>
+              {activeSortLabel ? t(activeSortLabel.labelKey) : t('sortBy')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {folderPath.length > 0 && (
         <View style={styles.breadcrumb}>
@@ -275,23 +378,46 @@ export default function LibraryScreen() {
         }
       />
 
-      {/* New Folder Modal */}
-      <Modal
-        visible={newFolderModalVisible}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setNewFolderModalVisible(false)}
+      {/* Sort Modal */}
+      <BottomSheet
+        visible={sortModalVisible}
+        onClose={() => setSortModalVisible(false)}
+        sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
-          <View style={styles.modalOverlay}>
-            <TouchableOpacity style={styles.modalDismiss} onPress={() => setNewFolderModalVisible(false)} />
-            <View style={[styles.modalContent, { backgroundColor }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: textColor }]}>{t('sortBy')}</Text>
+              <TouchableOpacity onPress={() => setSortModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+                <X size={20} color={textColor} />
+              </TouchableOpacity>
+            </View>
+            {SORT_OPTIONS.map(option => (
+              <TouchableOpacity
+                key={option.mode}
+                style={[
+                  styles.sortOption,
+                  { backgroundColor: sortMode === option.mode ? accentColor + '15' : secondaryBg },
+                ]}
+                onPress={() => handleSelectSort(option.mode)}
+                activeOpacity={0.7}
+              >
+                <Text style={[
+                  styles.sortOptionText,
+                  { color: sortMode === option.mode ? accentColor : textColor },
+                ]}>{t(option.labelKey)}</Text>
+                {sortMode === option.mode && <Check size={18} color={accentColor} strokeWidth={3} />}
+              </TouchableOpacity>
+            ))}
+      </BottomSheet>
+
+      {/* New Folder Modal */}
+      <BottomSheet
+        visible={newFolderModalVisible}
+        onClose={() => setNewFolderModalVisible(false)}
+        sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
+      >
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: textColor }]}>{t('newFolder')}</Text>
-                <TouchableOpacity onPress={() => setNewFolderModalVisible(false)}>
+                <TouchableOpacity onPress={() => setNewFolderModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>
@@ -306,35 +432,17 @@ export default function LibraryScreen() {
                 onPress={handleCreateFolder}
                 style={{ marginTop: 24 }}
               />
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      </BottomSheet>
 
       {/* Import PDF Modal */}
-      <Modal
+      <BottomSheet
         visible={importModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => {
+        onClose={() => {
           setImportModalVisible(false);
           setPickedFile(null);
         }}
+        sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
-          <View style={styles.modalOverlay}>
-            <TouchableOpacity
-              style={styles.modalDismiss}
-              activeOpacity={1}
-              onPress={() => {
-                setImportModalVisible(false);
-                setPickedFile(null);
-              }}
-            />
-            <View style={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: textColor }]}>
                   {pickedFile ? 'Document Info' : 'Add to Library'}
@@ -342,7 +450,7 @@ export default function LibraryScreen() {
                 <TouchableOpacity onPress={() => {
                   setImportModalVisible(false);
                   setPickedFile(null);
-                }}>
+                }} accessibilityLabel="Close" accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>
@@ -390,10 +498,7 @@ export default function LibraryScreen() {
                   </View>
                 </ScrollView>
               )}
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      </BottomSheet>
     </View>
   );
 }
@@ -494,6 +599,36 @@ const styles = StyleSheet.create({
     padding: 16,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  sortRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingBottom: 12,
+  },
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 14,
+  },
+  sortButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  sortOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderRadius: 16,
+    marginBottom: 10,
+  },
+  sortOptionText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   breadcrumb: {
     flexDirection: 'row',

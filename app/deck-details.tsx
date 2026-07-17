@@ -1,18 +1,19 @@
 import { useToast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
-import { Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getDecks, importCsvToDeck, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
+import { ConfusionPair, Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getConfusionPairs, getDecks, getExamPlan, importCsvToDeck, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckExamDate, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { CheckCircle2, Circle, Edit2, FileUp, FileWarning, HelpCircle, Play, Plus, RotateCcw, Search, Share2, Trash2, X } from 'lucide-react-native';
+import { ArrowLeftRight, CalendarDays, CheckCircle2, Circle, Edit2, FileUp, FileWarning, GalleryVerticalEnd, HelpCircle, ListChecks, Play, Plus, RotateCcw, Search, Share2, Trash2, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { Button } from '../components/ui/Button';
+import { BottomSheet } from '../components/ui/BottomSheet';
 import { useConfirm } from '../components/ui/ConfirmDialog';
 import { Input } from '../components/ui/Input';
 
@@ -41,6 +42,7 @@ export default function DeckDetailsScreen() {
 
     const [cardSearch, setCardSearch] = useState('');
     const [filterMode, setFilterMode] = useState<'all' | 'learned' | 'unsure' | 'new'>('all');
+    const [confusions, setConfusions] = useState<ConfusionPair[]>([]);
 
     const backgroundColor = useThemeColor({}, 'background');
     const cardColor = useThemeColor({}, 'card');
@@ -76,6 +78,7 @@ export default function DeckDetailsScreen() {
                     }
 
                     setCards(parsedCards || []);
+                    setConfusions(await getConfusionPairs(id));
                 } catch (e) {
                     console.error('Error loading deck data:', e);
                     setError('Failed to load cards');
@@ -201,6 +204,32 @@ export default function DeckDetailsScreen() {
         await updateDeckStudyDirection(id, direction);
         setDeck(d => (d ? { ...d, studyDirection: direction } : d));
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    };
+
+    // Exam countdown: set the date N days from today, shift it, or clear it
+    const setExamInDays = async (days: number | null) => {
+        if (!id) return;
+        let dateKey: string | null = null;
+        if (days !== null) {
+            const d = new Date();
+            d.setDate(d.getDate() + days);
+            dateKey = d.toISOString().split('T')[0];
+        }
+        await updateDeckExamDate(id, dateKey);
+        setDeck(d => (d ? { ...d, examDate: dateKey ?? undefined } : d));
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    };
+
+    const shiftExamDate = async (deltaDays: number) => {
+        if (!id || !deck?.examDate) return;
+        const d = new Date(deck.examDate + 'T00:00:00');
+        d.setDate(d.getDate() + deltaDays);
+        // Don't shift the exam into the past
+        const dateKey = d.toISOString().split('T')[0];
+        if (dateKey < new Date().toISOString().split('T')[0]) return;
+        await updateDeckExamDate(id, dateKey);
+        setDeck(prev => (prev ? { ...prev, examDate: dateKey } : prev));
+        Haptics.selectionAsync();
     };
 
     const handleExportDeck = async () => {
@@ -443,18 +472,24 @@ export default function DeckDetailsScreen() {
                                 <TouchableOpacity
                                     style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
                                     onPress={handleExportDeck}
+                                    accessibilityLabel="Export deck"
+                                    accessibilityRole="button"
                                 >
                                     <Share2 size={20} color={accentColor} strokeWidth={3} />
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
                                     onPress={handleImportCsv}
+                                    accessibilityLabel="Import cards from CSV"
+                                    accessibilityRole="button"
                                 >
                                     <FileUp size={20} color={accentColor} strokeWidth={3} />
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
                                     onPress={() => setAddCardModalVisible(true)}
+                                    accessibilityLabel="Add flashcard"
+                                    accessibilityRole="button"
                                 >
                                     <Plus size={20} color={accentColor} strokeWidth={3} />
                                 </TouchableOpacity>
@@ -526,6 +561,40 @@ export default function DeckDetailsScreen() {
                             />
                         </View>
 
+                        <TouchableOpacity
+                            style={[styles.quizBtn, { backgroundColor: secondaryBg }]}
+                            onPress={() => {
+                                if (!deck?.uri) {
+                                    showToast({ message: 'This deck has no cards to study', type: 'error' });
+                                    return;
+                                }
+                                if (cards.length < 4) {
+                                    showToast({ message: 'Quiz mode needs at least 4 cards', type: 'warning' });
+                                    return;
+                                }
+                                router.push({ pathname: '/quiz', params: { id, uri: deck.uri, name: deck?.name } });
+                            }}
+                            activeOpacity={0.85}
+                        >
+                            <ListChecks size={20} color={accentColor} strokeWidth={2.5} />
+                            <Text style={[styles.quizBtnText, { color: accentColor }]}>Quiz Me (Multiple Choice)</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.quizBtn, styles.feedBtn, { backgroundColor: secondaryBg }]}
+                            onPress={() => {
+                                if (!deck?.uri || cards.length === 0) {
+                                    showToast({ message: 'This deck has no cards to study', type: 'error' });
+                                    return;
+                                }
+                                router.push({ pathname: '/feed', params: { id, uri: deck.uri, name: deck?.name } });
+                            }}
+                            activeOpacity={0.85}
+                        >
+                            <GalleryVerticalEnd size={20} color={accentColor} strokeWidth={2.5} />
+                            <Text style={[styles.quizBtnText, { color: accentColor }]}>Scroll & Learn (Feed)</Text>
+                        </TouchableOpacity>
+
                         <View style={styles.directionRow}>
                             <Text style={[styles.directionLabel, { color: mutedForeground }]}>Study Direction</Text>
                             <View style={styles.directionChips}>
@@ -552,6 +621,103 @@ export default function DeckDetailsScreen() {
                             </View>
                         </View>
 
+                        {(() => {
+                            const plan = deck ? getExamPlan(deck) : null;
+                            const examSet = !!deck?.examDate;
+                            const presets: { label: string; days: number }[] = [
+                                { label: '1 week', days: 7 },
+                                { label: '2 weeks', days: 14 },
+                                { label: '1 month', days: 30 },
+                            ];
+                            return (
+                                <View style={styles.examSection}>
+                                    <View style={styles.directionRow}>
+                                        <Text style={[styles.directionLabel, { color: mutedForeground }]}>Exam Countdown</Text>
+                                        <View style={styles.directionChips}>
+                                            <TouchableOpacity
+                                                style={[styles.filterChip, { backgroundColor: examSet ? cardColor : accentColor }]}
+                                                onPress={() => setExamInDays(null)}
+                                            >
+                                                <Text style={[styles.filterChipText, { color: examSet ? mutedForeground : primaryForeground }]}>Off</Text>
+                                            </TouchableOpacity>
+                                            {presets.map(p => (
+                                                <TouchableOpacity
+                                                    key={p.days}
+                                                    style={[styles.filterChip, { backgroundColor: cardColor }]}
+                                                    onPress={() => setExamInDays(p.days)}
+                                                >
+                                                    <Text style={[styles.filterChipText, { color: mutedForeground }]}>{p.label}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    </View>
+
+                                    {plan && (
+                                        <View style={[styles.examBanner, { backgroundColor: cardColor }]}>
+                                            <CalendarDays size={22} color={plan.daysLeft < 0 ? mutedForeground : accentColor} strokeWidth={2.5} />
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={[styles.examTitle, { color: textColor }]}>
+                                                    {plan.daysLeft < 0
+                                                        ? 'Exam date has passed'
+                                                        : plan.daysLeft === 0
+                                                            ? 'Exam is today!'
+                                                            : `Exam in ${plan.daysLeft} day${plan.daysLeft === 1 ? '' : 's'}`}
+                                                    {'  ·  '}
+                                                    {new Date(deck!.examDate! + 'T00:00:00').toLocaleDateString()}
+                                                </Text>
+                                                <Text style={[styles.examSubtitle, { color: plan.onTrack ? '#22c55e' : mutedForeground }]}>
+                                                    {plan.onTrack
+                                                        ? 'All cards learned — you\'re ready! 🎉'
+                                                        : plan.daysLeft > 0
+                                                            ? `Study ${plan.cardsPerDay} card${plan.cardsPerDay === 1 ? '' : 's'}/day to cover the remaining ${plan.remainingCards}`
+                                                            : `${plan.remainingCards} card${plan.remainingCards === 1 ? '' : 's'} still unlearned`}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.examAdjust}>
+                                                <TouchableOpacity onPress={() => shiftExamDate(-1)} hitSlop={8} accessibilityLabel="Exam one day earlier" accessibilityRole="button">
+                                                    <Text style={[styles.examAdjustBtn, { color: accentColor }]}>−1d</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity onPress={() => shiftExamDate(1)} hitSlop={8} accessibilityLabel="Exam one day later" accessibilityRole="button">
+                                                    <Text style={[styles.examAdjustBtn, { color: accentColor }]}>+1d</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    )}
+                                </View>
+                            );
+                        })()}
+
+                        {confusions.length > 0 && (
+                            <View style={styles.confusionSection}>
+                                <View style={styles.confusionHeader}>
+                                    <ArrowLeftRight size={16} color="#f59e0b" strokeWidth={2.5} />
+                                    <Text style={[styles.confusionTitle, { color: textColor }]}>Often Confused</Text>
+                                </View>
+                                {confusions.map(pair => {
+                                    const a = cards[pair.cardA];
+                                    const b = cards[pair.cardB];
+                                    if (!a || !b) return null;
+                                    return (
+                                        <View key={`${pair.cardA}-${pair.cardB}`} style={[styles.confusionCard, { backgroundColor: cardColor }]}>
+                                            <View style={{ flex: 1, gap: 8 }}>
+                                                <View>
+                                                    <Text style={[styles.confusionQ, { color: textColor }]} numberOfLines={2}>{a.question}</Text>
+                                                    <Text style={[styles.confusionA, { color: mutedForeground }]} numberOfLines={1}>→ {a.answer}</Text>
+                                                </View>
+                                                <View>
+                                                    <Text style={[styles.confusionQ, { color: textColor }]} numberOfLines={2}>{b.question}</Text>
+                                                    <Text style={[styles.confusionA, { color: mutedForeground }]} numberOfLines={1}>→ {b.answer}</Text>
+                                                </View>
+                                            </View>
+                                            <View style={[styles.confusionBadge, { backgroundColor: '#f59e0b20' }]}>
+                                                <Text style={styles.confusionBadgeText}>{pair.count}×</Text>
+                                            </View>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        )}
+
                         <View style={[styles.cardSearchBar, { backgroundColor: cardColor }]}>
                             <Search size={16} color={mutedForeground} />
                             <TextInput
@@ -564,7 +730,7 @@ export default function DeckDetailsScreen() {
                                 autoCorrect={false}
                             />
                             {cardSearch.length > 0 && (
-                                <TouchableOpacity onPress={() => setCardSearch('')} hitSlop={8}>
+                                <TouchableOpacity onPress={() => setCardSearch('')} hitSlop={8} accessibilityLabel="Clear search" accessibilityRole="button">
                                     <X size={16} color={mutedForeground} />
                                 </TouchableOpacity>
                             )}
@@ -612,18 +778,14 @@ export default function DeckDetailsScreen() {
             <View />
 
             {/* Add Card Modal */}
-            <Modal
+            <BottomSheet
                 visible={addCardModalVisible}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setAddCardModalVisible(false)}
+                onClose={() => setAddCardModalVisible(false)}
+                sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
             >
-                <View style={styles.modalOverlay}>
-                    <TouchableOpacity style={styles.modalDismiss} onPress={() => setAddCardModalVisible(false)} />
-                    <View style={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}>
                         <View style={styles.modalHeader}>
                             <Text style={[styles.modalTitle, { color: textColor }]}>Add Flashcard</Text>
-                            <TouchableOpacity onPress={() => setAddCardModalVisible(false)}>
+                            <TouchableOpacity onPress={() => setAddCardModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
                                 <X size={20} color={textColor} />
                             </TouchableOpacity>
                         </View>
@@ -650,26 +812,20 @@ export default function DeckDetailsScreen() {
                                 />
                             </View>
                         </ScrollView>
-                    </View>
-                </View>
-            </Modal>
+            </BottomSheet>
 
             {/* Edit Card Modal */}
-            <Modal
+            <BottomSheet
                 visible={editModalVisible}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setEditModalVisible(false)}
+                onClose={() => setEditModalVisible(false)}
+                sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
             >
-                <View style={styles.modalOverlay}>
-                    <TouchableOpacity style={styles.modalDismiss} onPress={() => setEditModalVisible(false)} />
-                    <View style={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}>
                         <View style={styles.modalHeader}>
                             <View>
                                 <Text style={[styles.modalTitle, { color: textColor }]}>Edit Flashcard</Text>
                                 <Text style={[styles.modalSubtitle, { color: mutedForeground }]}>Long press card in list to open this menu</Text>
                             </View>
-                            <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                            <TouchableOpacity onPress={() => setEditModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
                                 <X size={24} color={textColor} />
                             </TouchableOpacity>
                         </View>
@@ -693,6 +849,8 @@ export default function DeckDetailsScreen() {
                             <TouchableOpacity
                                 style={[styles.deleteBtn, { backgroundColor: '#ef444420' }]}
                                 onPress={() => editingIndex !== null && handleDeleteCard(editingIndex)}
+                                accessibilityLabel="Delete flashcard"
+                                accessibilityRole="button"
                             >
                                 <Trash2 size={18} color="#ef4444" />
                             </TouchableOpacity>
@@ -739,9 +897,7 @@ export default function DeckDetailsScreen() {
                                 />
                             </View>
                         </ScrollView>
-                    </View>
-                </View>
-            </Modal>
+            </BottomSheet>
         </View>
     );
 }
@@ -1151,8 +1307,98 @@ const styles = StyleSheet.create({
     actionGrid: {
         flexDirection: 'row',
         gap: 16,
-        marginBottom: 40,
+        marginBottom: 12,
         paddingHorizontal: 4,
+    },
+    quizBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        height: 52,
+        borderRadius: 18,
+        marginHorizontal: 4,
+        marginBottom: 28,
+    },
+    quizBtnText: {
+        fontSize: 15,
+        fontWeight: '800',
+    },
+    // Sits directly under the quiz button; pull it up against the quiz
+    // button's bottom margin so the two modes read as one group.
+    feedBtn: {
+        marginTop: -16,
+    },
+    examSection: {
+        marginBottom: 8,
+    },
+    examBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        borderRadius: 18,
+        padding: 16,
+        marginHorizontal: 4,
+        marginBottom: 16,
+    },
+    examTitle: {
+        fontSize: 14,
+        fontWeight: '800',
+    },
+    examSubtitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        marginTop: 3,
+    },
+    examAdjust: {
+        gap: 10,
+        alignItems: 'center',
+    },
+    examAdjustBtn: {
+        fontSize: 13,
+        fontWeight: '900',
+    },
+    confusionSection: {
+        marginHorizontal: 4,
+        marginBottom: 16,
+        gap: 10,
+    },
+    confusionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    confusionTitle: {
+        fontSize: 15,
+        fontWeight: '800',
+    },
+    confusionCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        borderRadius: 18,
+        padding: 14,
+        borderLeftWidth: 3,
+        borderLeftColor: '#f59e0b',
+    },
+    confusionQ: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    confusionA: {
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 2,
+    },
+    confusionBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    confusionBadgeText: {
+        fontSize: 13,
+        fontWeight: '900',
+        color: '#f59e0b',
     },
     mainActionBtn: {
         height: 56,

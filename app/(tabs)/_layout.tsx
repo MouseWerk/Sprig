@@ -1,7 +1,7 @@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Tabs } from 'expo-router';
-import { Home, Library, Music, Settings } from 'lucide-react-native';
+import { BarChart3, Home, Library, Music, Settings } from 'lucide-react-native';
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -54,6 +54,13 @@ export default function TabLayout() {
         options={{
           title: t('audio'),
           tabBarIcon: ({ color, size }) => <Music size={28} color={color} strokeWidth={2.5} />,
+        }}
+      />
+      <Tabs.Screen
+        name="stats"
+        options={{
+          title: t('stats'),
+          tabBarIcon: ({ color, size }) => <BarChart3 size={28} color={color} strokeWidth={2.5} />,
         }}
       />
       <Tabs.Screen

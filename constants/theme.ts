@@ -40,9 +40,11 @@ export const Colors = {
     tabIconSelected: tintColorDark,
 
     // Shadcn-like tokens
-    card: '#020617',
+    // card sits one step above the near-black background so cards read as
+    // elevated in dark mode (shadows are invisible on dark).
+    card: '#0f172a',
     cardForeground: '#f8fafc',
-    popover: '#020617',
+    popover: '#0f172a',
     popoverForeground: '#f8fafc',
     primary: '#f8fafc',
     primaryForeground: '#0f172a',

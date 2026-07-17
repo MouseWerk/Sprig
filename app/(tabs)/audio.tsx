@@ -2,7 +2,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { AudioFile, deleteAudioFile, getAudioFiles, saveAudioFile } from '@/utils/Storage';
-import { Audio } from 'expo-av';
+import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,6 +12,7 @@ import {
     Pause,
     Play,
     Plus,
+    SlidersHorizontal,
     Trash2
 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
@@ -24,6 +25,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { SoundMixer } from '@/components/SoundMixer';
 
 export default function AudioPlayerScreen() {
     const insets = useSafeAreaInsets();
@@ -32,10 +34,12 @@ export default function AudioPlayerScreen() {
     const { t } = useLanguage();
 
     const [audios, setAudios] = useState<AudioFile[]>([]);
-    const [sound, setSound] = useState<Audio.Sound | null>(null);
+    const [player, setPlayer] = useState<AudioPlayer | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentAudio, setCurrentAudio] = useState<AudioFile | null>(null);
-    const [playbackStatus, setPlaybackStatus] = useState<any>(null);
+    const [position, setPosition] = useState(0); // seconds
+    const [duration, setDuration] = useState(0); // seconds
+    const [mixerVisible, setMixerVisible] = useState(false);
 
     const backgroundColor = useThemeColor({}, 'background');
     const cardColor = useThemeColor({}, 'card');
@@ -48,13 +52,19 @@ export default function AudioPlayerScreen() {
         loadAudios();
     }, []);
 
-    // Unload the active sound whenever it is replaced or the screen unmounts.
+    // Follow the active player's status; release it when replaced or on unmount.
     useEffect(() => {
-        if (!sound) return;
+        if (!player) return;
+        const sub = player.addListener('playbackStatusUpdate', (status) => {
+            setPosition(status.currentTime || 0);
+            setDuration(status.duration || 0);
+            setIsPlaying(status.playing);
+        });
         return () => {
-            sound.unloadAsync().catch(() => { });
+            sub.remove();
+            try { player.remove(); } catch { /* already released */ }
         };
-    }, [sound]);
+    }, [player]);
 
     const loadAudios = async () => {
         const files = await getAudioFiles();
@@ -82,15 +92,15 @@ export default function AudioPlayerScreen() {
 
     const playAudio = async (item: AudioFile) => {
         try {
-            const { sound: newSound } = await Audio.Sound.createAsync(
-                { uri: item.uri },
-                { shouldPlay: true },
-                onPlaybackStatusUpdate
-            );
+            await setAudioModeAsync({ playsInSilentMode: true }).catch(() => { });
+            const newPlayer = createAudioPlayer({ uri: item.uri }, { updateInterval: 500 });
+            newPlayer.play();
 
-            // The [sound] effect unloads the previous instance on replace
-            setSound(newSound);
+            // The [player] effect releases the previous instance on replace
+            setPlayer(newPlayer);
             setCurrentAudio(item);
+            setPosition(0);
+            setDuration(0);
             setIsPlaying(true);
         } catch (e) {
             console.error('Error playing audio:', e);
@@ -99,20 +109,17 @@ export default function AudioPlayerScreen() {
     };
 
     const togglePlayback = async () => {
-        if (!sound) return;
+        if (!player) return;
         if (isPlaying) {
-            await sound.pauseAsync();
+            player.pause();
             setIsPlaying(false);
         } else {
-            await sound.playAsync();
+            // Restart from the top if the track already finished
+            if (duration > 0 && position >= duration - 0.25) {
+                await player.seekTo(0).catch(() => { });
+            }
+            player.play();
             setIsPlaying(true);
-        }
-    };
-
-    const onPlaybackStatusUpdate = (status: any) => {
-        setPlaybackStatus(status);
-        if (status.didJustFinish) {
-            setIsPlaying(false);
         }
     };
 
@@ -125,9 +132,9 @@ export default function AudioPlayerScreen() {
             destructive: true,
         });
         if (!ok) return;
-        if (currentAudio?.id === id && sound) {
-            // The [sound] effect unloads the instance once it's replaced
-            setSound(null);
+        if (currentAudio?.id === id && player) {
+            // The [player] effect releases the instance once it's cleared
+            setPlayer(null);
             setCurrentAudio(null);
             setIsPlaying(false);
         }
@@ -136,9 +143,8 @@ export default function AudioPlayerScreen() {
         showToast({ message: t('deleted'), type: 'info' });
     };
 
-    const formatTime = (millis: number) => {
-        if (!millis) return '0:00';
-        const totalSeconds = millis / 1000;
+    const formatTime = (totalSeconds: number) => {
+        if (!totalSeconds || !isFinite(totalSeconds)) return '0:00';
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = Math.floor(totalSeconds % 60);
         return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
@@ -161,6 +167,8 @@ export default function AudioPlayerScreen() {
                         style={styles.deleteButtonContainer}
                         onPress={() => handleDelete(item.id)}
                         activeOpacity={0.5}
+                        accessibilityLabel={`Delete ${item.name}`}
+                        accessibilityRole="button"
                     >
                         <Trash2 size={16} color={mutedForeground} />
                     </TouchableOpacity>
@@ -193,14 +201,29 @@ export default function AudioPlayerScreen() {
                 <View style={styles.headerTitleContainer}>
                     <Text style={[styles.title, { color: textColor }]}>{t('audioLibrary')}</Text>
                 </View>
-                <TouchableOpacity
-                    style={[styles.addButton, { backgroundColor: accentColor }]}
-                    onPress={handlePickAudio}
-                    activeOpacity={0.9}
-                >
-                    <Plus size={24} color="#fff" strokeWidth={3} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TouchableOpacity
+                        style={[styles.addButton, { backgroundColor: secondaryBg }]}
+                        onPress={() => setMixerVisible(true)}
+                        activeOpacity={0.9}
+                        accessibilityLabel="Open ambient sound mixer"
+                        accessibilityRole="button"
+                    >
+                        <SlidersHorizontal size={22} color={accentColor} strokeWidth={2.75} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.addButton, { backgroundColor: accentColor }]}
+                        onPress={handlePickAudio}
+                        activeOpacity={0.9}
+                        accessibilityLabel="Add audio file"
+                        accessibilityRole="button"
+                    >
+                        <Plus size={24} color="#fff" strokeWidth={3} />
+                    </TouchableOpacity>
+                </View>
             </View>
+
+            <SoundMixer visible={mixerVisible} onClose={() => setMixerVisible(false)} />
 
             <FlatList
                 data={audios}
@@ -237,7 +260,7 @@ export default function AudioPlayerScreen() {
                                             styles.progressFill,
                                             {
                                                 backgroundColor: accentColor,
-                                                width: `${(playbackStatus?.positionMillis / playbackStatus?.durationMillis) * 100 || 0}%`
+                                                width: `${duration > 0 ? Math.min(100, (position / duration) * 100) : 0}%`
                                             }
                                         ]}
                                     >
@@ -258,11 +281,11 @@ export default function AudioPlayerScreen() {
                                     </Text>
                                     <View style={styles.timeLabel}>
                                         <Text style={[styles.timeText, { color: accentColor }]}>
-                                            {formatTime(playbackStatus?.positionMillis)}
+                                            {formatTime(position)}
                                         </Text>
                                         <Text style={[styles.timeDivider, { color: mutedForeground }]}> / </Text>
                                         <Text style={[styles.timeText, { color: mutedForeground }]}>
-                                            {formatTime(playbackStatus?.durationMillis)}
+                                            {formatTime(duration)}
                                         </Text>
                                     </View>
                                 </View>
@@ -271,6 +294,8 @@ export default function AudioPlayerScreen() {
                                     onPress={togglePlayback}
                                     style={[styles.floatingPlayBtn, { backgroundColor: accentColor }]}
                                     activeOpacity={0.8}
+                                    accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
+                                    accessibilityRole="button"
                                 >
                                     {isPlaying ? (
                                         <Pause size={24} color="#fff" fill="#fff" />

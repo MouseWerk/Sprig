@@ -24,6 +24,11 @@ interface FlashcardSwipeProps {
     highlightMode?: boolean;
     onHighlightChange?: (isFront: boolean, newText: string) => void;
     onFlip?: (flipped: boolean) => void;
+    // Side titles — a reversed study direction shows the answer first, so the
+    // labels must swap along with the content or the front reads "Question"
+    // while displaying the answer.
+    frontLabel?: string;
+    backLabel?: string;
 }
 
 export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
@@ -34,7 +39,9 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
     onSwipeTop,
     highlightMode = false,
     onHighlightChange,
-    onFlip
+    onFlip,
+    frontLabel = 'Question',
+    backLabel = 'Answer'
 }) => {
     const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
     const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
@@ -222,7 +229,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
             >
                 <Card style={[styles.card, { backgroundColor: cardBg }]}>
                     <CardContent style={styles.content}>
-                        <Text style={[styles.label, { color: mutedFg }]} pointerEvents="none">Question</Text>
+                        <Text style={[styles.label, { color: mutedFg }]} pointerEvents="none">{frontLabel}</Text>
                         <ScrollView centerContent showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
                             {highlightMode ? (
                                 <WordSplitter text={question} isFront={true} fontSize={24} />
@@ -232,7 +239,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
                         </ScrollView>
                         <View style={styles.footerHint} pointerEvents="none">
                             <Text style={[styles.hint, { color: mutedFg }]}>
-                                {highlightMode ? 'Tap words to highlight' : 'Tap to reveal answer'}
+                                {highlightMode ? 'Tap words to highlight' : `Tap to reveal ${backLabel.toLowerCase()}`}
                             </Text>
                         </View>
                         {highlightMode && (
@@ -255,7 +262,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
             >
                 <Card style={[styles.card, { backgroundColor: secondaryBg }]}>
                     <CardContent style={styles.content}>
-                        <Text style={[styles.label, { color: mutedFg }]} pointerEvents="none">Answer</Text>
+                        <Text style={[styles.label, { color: mutedFg }]} pointerEvents="none">{backLabel}</Text>
                         <ScrollView centerContent showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
                             {highlightMode ? (
                                 <WordSplitter text={answer} isFront={false} fontSize={22} />
