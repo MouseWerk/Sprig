@@ -1,5 +1,5 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/AppHaptics';
 import { RotateCcw } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, AppState, AppStateStatus, StyleSheet, Text, TouchableOpacity, View } from 'react-native';

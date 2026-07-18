@@ -1,8 +1,9 @@
 import { SoundMixer, anySoundPlaying, stopAllSounds } from '@/components/SoundMixer';
 import { useToast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import * as Haptics from '@/utils/AppHaptics';
+import { FOCUS_MINUTES_OPTIONS, getPrefsSync, setPref } from '@/utils/Preferences';
 import { recordFocusSession } from '@/utils/Storage';
-import * as Haptics from 'expo-haptics';
 import { Stack } from 'expo-router';
 import { Music, Pause, Play, RotateCcw, X } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
@@ -12,7 +13,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { cancelNotification, ensureNotificationPermissions, scheduleFocusWarning } from '../utils/Notifications';
 
 const GRACE_MS = 10_000;
-const DURATIONS = [15, 25, 45, 60];
+const DURATIONS = FOCUS_MINUTES_OPTIONS;
 const BREAK_MINUTES = 5;
 
 // Plant grows through these stages as the session progresses toward bloom.
@@ -53,12 +54,12 @@ export default function FocusScreen() {
     const { showToast } = useToast();
 
     const [phase, setPhase] = useState<Phase>('setup');
-    const [minutes, setMinutes] = useState(25);
-    const [secondsLeft, setSecondsLeft] = useState(25 * 60);
+    const [minutes, setMinutes] = useState(() => getPrefsSync().defaultFocusMinutes);
+    const [secondsLeft, setSecondsLeft] = useState(() => getPrefsSync().defaultFocusMinutes * 60);
     const [mixerVisible, setMixerVisible] = useState(false);
     const [soundsOn, setSoundsOn] = useState(false);
 
-    const totalRef = useRef(25 * 60);
+    const totalRef = useRef(getPrefsSync().defaultFocusMinutes * 60);
     const awayStartRef = useRef<number | null>(null);
     const warningIdRef = useRef<string | null>(null);
     const finishedRef = useRef(false);
@@ -207,7 +208,12 @@ export default function FocusScreen() {
                             <TouchableOpacity
                                 key={d}
                                 style={[styles.durationChip, { backgroundColor: minutes === d ? primaryColor : secondaryBg }]}
-                                onPress={() => { setMinutes(d); setSecondsLeft(d * 60); }}
+                                onPress={() => {
+                                    setMinutes(d);
+                                    setSecondsLeft(d * 60);
+                                    // Remember the pick as the new default length
+                                    setPref('defaultFocusMinutes', d);
+                                }}
                                 activeOpacity={0.85}
                             >
                                 <Text style={{ color: minutes === d ? '#fff' : textColor, fontWeight: '900', fontSize: 18 }}>{d}</Text>

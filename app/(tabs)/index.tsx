@@ -15,7 +15,7 @@ import { Button } from '../../components/ui/Button';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { useToast } from '../../components/ui/Toast';
-import { createEmptyDeck, Deck, deleteDeck, deleteFolder, Folder, getDecks, getFolders, getUserStats, importCsvToDeck, saveFolder, updateDeck, UserStats } from '../../utils/Storage';
+import { createEmptyDeck, Deck, deleteDeck, deleteFolder, Folder, getDecks, getExamPlan, getFolders, getUserStats, importCsvToDeck, saveFolder, updateDeck, UserStats } from '../../utils/Storage';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -220,6 +220,17 @@ export default function HomeScreen() {
               <Text style={styles.dueText}>{dueCount} {t('due')}</Text>
             </View>
           )}
+          {(() => {
+            const plan = getExamPlan(item);
+            if (!plan || plan.daysLeft < 0) return null;
+            return (
+              <View style={[styles.dueBadge, { backgroundColor: plan.daysLeft <= 3 ? '#ef4444' : '#f59e0b' }]}>
+                <Text style={styles.dueText}>
+                  {plan.daysLeft === 0 ? 'EXAM TODAY' : `📅 ${plan.daysLeft}d`}
+                </Text>
+              </View>
+            );
+          })()}
         </View>
 
         <View style={styles.cardBottom}>

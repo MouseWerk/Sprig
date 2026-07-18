@@ -1,7 +1,7 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
 import { getCachedData, setCachedData, updateUserStats } from '@/utils/Storage';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/AppHaptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronsDown, Eye, EyeOff, FileWarning, Shuffle } from 'lucide-react-native';
 import React, { useCallback, useRef, useState } from 'react';

@@ -3,15 +3,18 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/components/ui/Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { replayOnboarding } from '@/components/Onboarding';
 import { SprigLogo } from '@/components/SprigLogo';
 import { createBackup, importBackup } from '@/utils/Backup';
+import { cancelStreakReminder, scheduleStreakReminder } from '@/utils/Notifications';
+import { DAILY_GOAL_OPTIONS, FOCUS_MINUTES_OPTIONS, Preferences, REMINDER_HOUR_MAX, REMINDER_HOUR_MIN, getPrefsSync, setPref, subscribePrefs } from '@/utils/Preferences';
 import { clearCardCache } from '@/utils/Storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
-import { ChevronRight, Database, DownloadCloud, Github, Info, Monitor, Moon, ShieldCheck, Smartphone, Sun, UploadCloud } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { Bell, ChevronRight, Clock, Database, DownloadCloud, Github, Info, Monitor, Moon, PlayCircle, ScrollText, ShieldCheck, Smartphone, Sun, Target, Timer, UploadCloud, Vibrate } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
 import { Linking, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -31,8 +34,26 @@ export default function SettingsScreen() {
   const confirm = useConfirm();
   const { t } = useLanguage();
   const [busy, setBusy] = useState(false);
+  const [prefs, setPrefs] = useState<Preferences>(getPrefsSync());
+  useEffect(() => subscribePrefs(setPrefs), []);
 
   const isDarkMode = theme === 'dark';
+
+  const toggleStreakReminder = async () => {
+    const next = !prefs.streakReminderEnabled;
+    await setPref('streakReminderEnabled', next);
+    // scheduleStreakReminder reads the pref itself: cancels when off,
+    // (re)schedules the daily notification when on.
+    if (next) await scheduleStreakReminder();
+    else await cancelStreakReminder();
+  };
+
+  const shiftReminderHour = async (delta: number) => {
+    const next = Math.max(REMINDER_HOUR_MIN, Math.min(REMINDER_HOUR_MAX, prefs.reminderHour + delta));
+    if (next === prefs.reminderHour) return;
+    await setPref('reminderHour', next);
+    if (prefs.streakReminderEnabled) await scheduleStreakReminder();
+  };
 
   const toggleTheme = async () => {
     const nextMode = isDarkMode ? 'light' : 'dark';
@@ -66,13 +87,16 @@ export default function SettingsScreen() {
   };
 
   const handlePrivacy = async () => {
-    await confirm({
+    const viewFull = await confirm({
       title: 'Your data stays on your device',
       message:
         'Sprig keeps everything local — your decks, PDFs, audio, and study stats are stored only on this phone and are never uploaded to any server. Notifications and reminders are scheduled on-device.',
-      confirmText: 'Got it',
+      confirmText: 'View Full Policy',
       cancelText: 'Close',
     });
+    if (viewFull) {
+      await openUrl('https://mauricekleindienst.github.io/csvtudyapp/privacy.html');
+    }
   };
 
   const openUrl = async (url: string) => {
@@ -193,6 +217,96 @@ export default function SettingsScreen() {
           />
         </View>
 
+        <SectionHeader title="PREFERENCES" />
+        <View style={styles.group}>
+          <View style={[styles.item, { backgroundColor: cardColor }]}>
+            <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
+              <Target size={20} color={accentColor} strokeWidth={2.5} />
+            </View>
+            <Text style={[styles.itemLabel, { color: textColor }]}>Daily Goal</Text>
+            <View style={styles.chipRow}>
+              {DAILY_GOAL_OPTIONS.map(n => (
+                <TouchableOpacity
+                  key={n}
+                  style={[styles.prefChip, { backgroundColor: prefs.dailyGoal === n ? accentColor : secondaryBg }]}
+                  onPress={() => setPref('dailyGoal', n)}
+                  accessibilityLabel={`Daily goal ${n} cards`}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: prefs.dailyGoal === n }}
+                >
+                  <Text style={[styles.prefChipText, { color: prefs.dailyGoal === n ? backgroundColor : mutedForeground }]}>{n}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          <View style={[styles.item, { backgroundColor: cardColor }]}>
+            <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
+              <Timer size={20} color={accentColor} strokeWidth={2.5} />
+            </View>
+            <Text style={[styles.itemLabel, { color: textColor }]}>Focus Length</Text>
+            <View style={styles.chipRow}>
+              {FOCUS_MINUTES_OPTIONS.map(n => (
+                <TouchableOpacity
+                  key={n}
+                  style={[styles.prefChip, { backgroundColor: prefs.defaultFocusMinutes === n ? accentColor : secondaryBg }]}
+                  onPress={() => setPref('defaultFocusMinutes', n)}
+                  accessibilityLabel={`Default focus length ${n} minutes`}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: prefs.defaultFocusMinutes === n }}
+                >
+                  <Text style={[styles.prefChipText, { color: prefs.defaultFocusMinutes === n ? backgroundColor : mutedForeground }]}>{n}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          <SettingItem
+            icon={Bell}
+            label="Streak Reminder"
+            toggle={prefs.streakReminderEnabled}
+            onPress={toggleStreakReminder}
+          />
+          {prefs.streakReminderEnabled && (
+            <View style={[styles.item, { backgroundColor: cardColor }]}>
+              <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
+                <Clock size={20} color={accentColor} strokeWidth={2.5} />
+              </View>
+              <Text style={[styles.itemLabel, { color: textColor }]}>Reminder Time</Text>
+              <View style={styles.chipRow}>
+                <TouchableOpacity
+                  style={[styles.prefChip, { backgroundColor: secondaryBg }]}
+                  onPress={() => shiftReminderHour(-1)}
+                  disabled={prefs.reminderHour <= REMINDER_HOUR_MIN}
+                  accessibilityLabel="Reminder one hour earlier"
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.prefChipText, { color: prefs.reminderHour <= REMINDER_HOUR_MIN ? mutedForeground + '66' : mutedForeground }]}>−</Text>
+                </TouchableOpacity>
+                <View style={[styles.prefChip, { backgroundColor: accentColor, minWidth: 62 }]}>
+                  <Text style={[styles.prefChipText, { color: backgroundColor }]}>
+                    {String(prefs.reminderHour).padStart(2, '0')}:00
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.prefChip, { backgroundColor: secondaryBg }]}
+                  onPress={() => shiftReminderHour(1)}
+                  disabled={prefs.reminderHour >= REMINDER_HOUR_MAX}
+                  accessibilityLabel="Reminder one hour later"
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.prefChipText, { color: prefs.reminderHour >= REMINDER_HOUR_MAX ? mutedForeground + '66' : mutedForeground }]}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+          <SettingItem
+            icon={Vibrate}
+            label="Haptic Feedback"
+            toggle={prefs.hapticsEnabled}
+            onPress={() => setPref('hapticsEnabled', !prefs.hapticsEnabled)}
+          />
+          <SettingItem icon={PlayCircle} label="Replay Intro" onPress={replayOnboarding} />
+        </View>
+
         <SectionHeader title="BACKUP & RESTORE" />
         <View style={styles.group}>
           <SettingItem icon={DownloadCloud} label={busy ? 'Working…' : 'Back Up Everything'} onPress={handleBackup} />
@@ -287,6 +401,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     marginRight: 8,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  prefChip: {
+    minWidth: 36,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prefChipText: {
+    fontSize: 13,
+    fontWeight: '800',
   },
   footer: {
     alignItems: 'center',

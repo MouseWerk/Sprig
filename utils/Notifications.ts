@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { getPrefs } from './Preferences';
 
 // All calls are wrapped so a missing permission, an unsupported platform
 // (web / Expo Go limitations), or any native error can never crash a study
@@ -83,11 +84,31 @@ export async function cancelNotification(id: string | null): Promise<void> {
     }
 }
 
-// Schedule a single "keep your streak alive" reminder ~20 hours out,
-// replacing any previously scheduled one. Called after a study session.
+// Cancel any pending streak reminder (used when the user disables it)
+export async function cancelStreakReminder(): Promise<void> {
+    try {
+        const prevId = await AsyncStorage.getItem(STREAK_REMINDER_ID_KEY);
+        if (prevId) {
+            await cancelNotification(prevId);
+            await AsyncStorage.removeItem(STREAK_REMINDER_ID_KEY);
+        }
+    } catch {
+        // ignore
+    }
+}
+
+// Keep the daily "study reminder" in sync with the preferences: a repeating
+// notification at the user's chosen hour, replacing any previously scheduled
+// one. No-op (and clears any pending one) when the preference is off.
+// Idempotent — safe to call after every study session or settings change.
 export async function scheduleStreakReminder(): Promise<void> {
     if (Platform.OS === 'web') return;
     try {
+        const prefs = await getPrefs();
+        if (!prefs.streakReminderEnabled) {
+            await cancelStreakReminder();
+            return;
+        }
         const granted = await ensureNotificationPermissions();
         if (!granted) return;
 
@@ -102,9 +123,9 @@ export async function scheduleStreakReminder(): Promise<void> {
                 body: 'A few cards today keeps your streak growing. Ready for a quick session?',
             },
             trigger: {
-                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                seconds: 20 * 60 * 60, // ~20 hours
-                repeats: false,
+                type: Notifications.SchedulableTriggerInputTypes.DAILY,
+                hour: Math.max(0, Math.min(23, Math.round(prefs.reminderHour))),
+                minute: 0,
             },
         });
         await AsyncStorage.setItem(STREAK_REMINDER_ID_KEY, id);

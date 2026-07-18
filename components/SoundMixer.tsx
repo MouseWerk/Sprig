@@ -1,7 +1,7 @@
 import { useToast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/AppHaptics';
 import { Bird, CloudLightning, CloudRain, Droplets, Flame, Square, Trees, Waves, Wind, X } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Modal, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';

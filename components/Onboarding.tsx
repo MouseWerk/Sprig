@@ -8,6 +8,14 @@ import { SprigLogo } from './SprigLogo';
 
 const ONBOARDED_KEY = 'csvtudyapp_onboarded';
 
+// The mounted Onboarding instance registers itself here so Settings can
+// replay the intro on demand without any navigation plumbing.
+let replayTrigger: (() => void) | null = null;
+export function replayOnboarding() {
+    AsyncStorage.removeItem(ONBOARDED_KEY).catch(() => { });
+    replayTrigger?.();
+}
+
 interface Slide {
     icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
     title: string;
@@ -64,6 +72,16 @@ export function Onboarding() {
         AsyncStorage.getItem(ONBOARDED_KEY).then(v => {
             if (!v) setVisible(true);
         }).catch(() => { });
+    }, []);
+
+    // Register for on-demand replay (Settings > Replay Intro)
+    useEffect(() => {
+        replayTrigger = () => {
+            setIndex(0);
+            scrollRef.current?.scrollTo({ x: 0, animated: false });
+            setVisible(true);
+        };
+        return () => { replayTrigger = null; };
     }, []);
 
     const finish = () => {

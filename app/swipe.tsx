@@ -1,10 +1,10 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/AppHaptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { CheckCircle2, Edit3, FileWarning, HelpCircle, Sprout, Trophy, Undo2, Volume2, XCircle, Zap } from 'lucide-react-native';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashcardSwipe } from '../components/FlashcardSwipe';
@@ -33,7 +33,15 @@ export default function SwipeScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { showToast } = useToast();
-    const { id, uri, name, mode: initialMode } = useLocalSearchParams<{ id: string, uri: string, name?: string, mode?: string }>();
+    const { id, uri, name, mode: initialMode, cards: drillParam } = useLocalSearchParams<{ id: string, uri: string, name?: string, mode?: string, cards?: string }>();
+
+    // Drill mode: a comma-separated list of card indices (e.g. from the
+    // "Often Confused" section) restricts the session to exactly those cards.
+    const drillSet = useMemo(() => {
+        if (!drillParam) return null;
+        const ids = drillParam.split(',').map(s => parseInt(s, 10)).filter(n => Number.isInteger(n) && n >= 0);
+        return ids.length > 0 ? new Set(ids) : null;
+    }, [drillParam]);
 
     const [cards, setCards] = useState<FlashcardWithIndex[]>([]);
     const [shuffledCards, setShuffledCards] = useState<FlashcardWithIndex[]>([]);
@@ -140,13 +148,16 @@ export default function SwipeScreen() {
     // and never refreshed mid-session, so this list stays stable while
     // swiping - otherwise graded cards would drop out of the due list and
     // shift the queue under the advancing index, skipping cards.
-    const filteredCards = studyMode === 'due'
-        ? shuffledCards.filter(c => {
-            const data = srsData[c.originalIndex];
-            if (!data) return true; // New cards are always due
-            return new Date(data.nextReview) <= new Date();
-        })
-        : shuffledCards;
+    // Drill mode overrides everything: study exactly the requested cards.
+    const filteredCards = drillSet
+        ? shuffledCards.filter(c => drillSet.has(c.originalIndex))
+        : studyMode === 'due'
+            ? shuffledCards.filter(c => {
+                const data = srsData[c.originalIndex];
+                if (!data) return true; // New cards are always due
+                return new Date(data.nextReview) <= new Date();
+            })
+            : shuffledCards;
 
     const currentCard = filteredCards[currentIndex];
     const accuracy = sessionReviewed > 0 ? Math.round((sessionCorrect / sessionReviewed) * 100) : 0;
@@ -444,7 +455,7 @@ export default function SwipeScreen() {
         <View style={[styles.container, { backgroundColor, paddingBottom: insets.bottom }]}>
             <Stack.Screen
                 options={{
-                    title: name || 'Flashcards',
+                    title: drillSet ? 'Drill: Tricky Cards' : (name || 'Flashcards'),
                     headerRight: () => (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 }}>
                             <TouchableOpacity

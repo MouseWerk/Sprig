@@ -1,8 +1,9 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { getLevelInfo } from '@/utils/Levels';
+import { getPrefsSync, subscribePrefs } from '@/utils/Preferences';
 import { UserStats } from '@/utils/Storage';
-import { DAILY_GOAL, getLevelInfo } from '@/utils/Levels';
 import { Flame, Snowflake, Target, Zap } from 'lucide-react-native';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LevelBadge } from './LevelBadge';
 
@@ -20,12 +21,15 @@ export function LevelCard({ stats, displayStreak }: LevelCardProps) {
     const cardColor = useThemeColor({}, 'card');
     const primaryColor = useThemeColor({}, 'primary');
 
+    const [dailyGoal, setDailyGoal] = useState(getPrefsSync().dailyGoal);
+    useEffect(() => subscribePrefs(p => setDailyGoal(p.dailyGoal)), []);
+
     const info = getLevelInfo(stats.totalXp || 0);
 
     const today = new Date().toISOString().split('T')[0];
     const todayCount = stats.dailyReviews?.[today] || 0;
-    const goalProgress = Math.min(1, todayCount / DAILY_GOAL);
-    const goalMet = todayCount >= DAILY_GOAL;
+    const goalProgress = Math.min(1, todayCount / dailyGoal);
+    const goalMet = todayCount >= dailyGoal;
 
     return (
         <View style={[styles.card, { backgroundColor: cardColor }]}>
@@ -81,7 +85,7 @@ export function LevelCard({ stats, displayStreak }: LevelCardProps) {
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={[styles.statValue, { color: textColor }]}>
-                            {Math.min(todayCount, DAILY_GOAL)}<Text style={{ color: mutedForeground, fontSize: 13 }}> / {DAILY_GOAL}</Text>
+                            {Math.min(todayCount, dailyGoal)}<Text style={{ color: mutedForeground, fontSize: 13 }}> / {dailyGoal}</Text>
                         </Text>
                         <Text style={[styles.statLabel, { color: mutedForeground }]}>
                             {goalMet ? 'Goal reached! 🎉' : 'Daily goal'}

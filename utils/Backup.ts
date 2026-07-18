@@ -18,7 +18,7 @@ import {
 } from './Storage';
 
 const BACKUP_VERSION = 1;
-const PREF_KEYS = ['csvtudyapp_library_sort', 'csvtudyapp_focus_mode', 'csvtudyapp_onboarded'];
+const PREF_KEYS = ['csvtudyapp_library_sort', 'csvtudyapp_focus_mode', 'csvtudyapp_onboarded', 'csvtudyapp_prefs'];
 
 interface FileEntry {
     ext: string;

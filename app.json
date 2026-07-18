@@ -12,7 +12,8 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mousewerk.sprig"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +22,11 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.lgsarius.csvtudyapp"
+      "package": "com.mousewerk.sprig",
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "web": {
       "output": "static",
@@ -34,11 +39,11 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 180,
+          "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#EAF1EC",
           "dark": {
-            "backgroundColor": "#020617"
+            "backgroundColor": "#EAF1EC"
           }
         }
       ],

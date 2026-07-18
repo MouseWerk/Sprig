@@ -4,10 +4,10 @@ import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
 import { ConfusionPair, Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getConfusionPairs, getDecks, getExamPlan, importCsvToDeck, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckExamDate, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/AppHaptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { ArrowLeftRight, CalendarDays, CheckCircle2, Circle, Edit2, FileUp, FileWarning, GalleryVerticalEnd, HelpCircle, ListChecks, Play, Plus, RotateCcw, Search, Share2, Trash2, X } from 'lucide-react-native';
+import { ArrowLeftRight, CalendarDays, CheckCircle2, Circle, Edit2, FileUp, FileWarning, GalleryVerticalEnd, HelpCircle, ListChecks, Play, Plus, RotateCcw, Search, Share2, Trash2, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -692,6 +692,27 @@ export default function DeckDetailsScreen() {
                                 <View style={styles.confusionHeader}>
                                     <ArrowLeftRight size={16} color="#f59e0b" strokeWidth={2.5} />
                                     <Text style={[styles.confusionTitle, { color: textColor }]}>Often Confused</Text>
+                                    <View style={{ flex: 1 }} />
+                                    <TouchableOpacity
+                                        style={[styles.drillBtn, { backgroundColor: '#f59e0b' }]}
+                                        onPress={() => {
+                                            if (!deck?.uri) return;
+                                            // Union of every card involved in a confusion pair
+                                            const indices = Array.from(new Set(confusions.flatMap(p => [p.cardA, p.cardB])))
+                                                .filter(i => i >= 0 && i < cards.length);
+                                            if (indices.length === 0) return;
+                                            router.push({
+                                                pathname: '/swipe',
+                                                params: { id, uri: deck.uri, name: deck.name, mode: 'all', cards: indices.join(',') },
+                                            });
+                                        }}
+                                        activeOpacity={0.85}
+                                        accessibilityLabel="Drill the confused cards"
+                                        accessibilityRole="button"
+                                    >
+                                        <Zap size={13} color="#fff" strokeWidth={2.5} fill="#fff" />
+                                        <Text style={styles.drillBtnText}>Drill These</Text>
+                                    </TouchableOpacity>
                                 </View>
                                 {confusions.map(pair => {
                                     const a = cards[pair.cardA];
@@ -1371,6 +1392,19 @@ const styles = StyleSheet.create({
     confusionTitle: {
         fontSize: 15,
         fontWeight: '800',
+    },
+    drillBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 12,
+    },
+    drillBtnText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '900',
     },
     confusionCard: {
         flexDirection: 'row',
