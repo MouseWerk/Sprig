@@ -77,10 +77,31 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
         let buf = Buffer.alloc(0);
         let headerEnd = -1;
         let contentLength = 0;
+        // Depending on platform/bridge, chunks may arrive as Buffer, plain
+        // Uint8Array, or a base64 string. Detected once per connection.
+        let base64Mode = false;
 
-        socket.on('data', (data: Buffer | string) => {
+        const toBuffer = (data: unknown): Buffer => {
+            if (Buffer.isBuffer(data)) return data;
+            if (data instanceof Uint8Array) return Buffer.from(data);
+            const s = String(data);
+            if (base64Mode) return Buffer.from(s.replace(/\s+/g, ''), 'base64');
+            return Buffer.from(s, 'utf8');
+        };
+
+        socket.on('data', (data: unknown) => {
             try {
-                buf = Buffer.concat([buf, Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8')]);
+                buf = Buffer.concat([buf, toBuffer(data)]);
+
+                // If the first chunk was a string that doesn't look like HTTP,
+                // it is almost certainly base64-encoded — reinterpret once.
+                if (!base64Mode && typeof data === 'string' && headerEnd < 0 && !buf.subarray(0, 200).toString('utf8').includes('HTTP/')) {
+                    const decoded = Buffer.from(buf.toString('utf8').replace(/\s+/g, ''), 'base64');
+                    if (decoded.subarray(0, 200).toString('utf8').includes('HTTP/')) {
+                        base64Mode = true;
+                        buf = decoded;
+                    }
+                }
 
                 if (headerEnd < 0) {
                     headerEnd = buf.indexOf('\r\n\r\n');
@@ -105,7 +126,10 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
                 const [requestLine] = head.split('\r\n');
                 const [method, rawPath] = requestLine.split(' ');
 
-                handleRequest(socket, method, rawPath, body, onFileSaved);
+                handleRequest(socket, method, normalizePath(rawPath), body, onFileSaved).catch(e => {
+                    console.error('WebServer handler error:', e);
+                    respond(socket, 500, 'application/json', '{"error":"internal"}');
+                });
             } catch (e) {
                 console.error('WebServer request error:', e);
                 respond(socket, 500, 'application/json', '{"error":"internal"}');
@@ -157,6 +181,17 @@ function respond(socket: any, status: number, type: string, body: string) {
     setTimeout(() => { try { socket.destroy(); } catch { /* gone */ } }, 150);
 }
 
+// Reduce whatever the client sent (query strings, proxy-style absolute
+// URIs) to a plain pathname.
+function normalizePath(rawPath: string | undefined): string {
+    let p = rawPath || '/';
+    if (/^https?:\/\//i.test(p)) {
+        const idx = p.indexOf('/', p.indexOf('//') + 2);
+        p = idx >= 0 ? p.slice(idx) : '/';
+    }
+    return p.split('?')[0].split('#')[0] || '/';
+}
+
 async function handleRequest(
     socket: any,
     method: string,
@@ -164,7 +199,10 @@ async function handleRequest(
     body: string,
     onFileSaved?: (name: string, kind: Kind) => void
 ) {
-    if (method === 'GET' && (path === '/' || path === '/index.html')) {
+    // This server exists to show exactly one page — any GET that isn't the
+    // upload endpoint gets it (so /index.html, odd browser probes and typos
+    // all land somewhere useful).
+    if (method === 'GET' && path !== '/upload') {
         respond(socket, 200, 'text/html', UPLOAD_PAGE);
         return;
     }
@@ -288,7 +326,7 @@ const UPLOAD_PAGE = `<!DOCTYPE html>
   <footer>Sprig · local upload · keep the app open while transferring</footer>
 </div>
 <script>
-const CHUNK = 1049984 * 3 / 3; // ~1MB, multiple of 3 for base64 concat
+const CHUNK = 1050000; // ~1MB and a multiple of 3, so per-chunk base64 strings concatenate into valid base64
 const list = document.getElementById('list');
 
 function wire(zoneId, inputId, kind) {
