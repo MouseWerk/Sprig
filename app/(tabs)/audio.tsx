@@ -1,23 +1,30 @@
 import { useToast } from '@/components/ui/Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { AudioFile, deleteAudioFile, getAudioFiles, saveAudioFile } from '@/utils/Storage';
+import { AudioFile, deleteAudioFile, Folder, getAudioFiles, getFolders, saveAudioFile, updateAudioFile } from '@/utils/Storage';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from 'expo-router';
 import {
+    CheckCircle2,
+    Circle,
     FileMusic,
+    Folder as FolderIcon,
+    FolderInput,
     Music,
     Pause,
     Play,
     Plus,
     SlidersHorizontal,
-    Trash2
+    Trash2,
+    X
 } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     FlatList,
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -26,6 +33,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { SoundMixer } from '@/components/SoundMixer';
+import { BottomSheet } from '@/components/ui/BottomSheet';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 
 export default function AudioPlayerScreen() {
     const insets = useSafeAreaInsets();
@@ -41,6 +51,16 @@ export default function AudioPlayerScreen() {
     const [duration, setDuration] = useState(0); // seconds
     const [mixerVisible, setMixerVisible] = useState(false);
 
+    // Folders (shared with the Library tab), long-press sheet, multi-select
+    const [folders, setFolders] = useState<Folder[]>([]);
+    const [activeFolderId, setActiveFolderId] = useState<string | 'all'>('all');
+    const [editAudio, setEditAudio] = useState<AudioFile | null>(null);
+    const [editAudioName, setEditAudioName] = useState('');
+    const [editAudioFolderId, setEditAudioFolderId] = useState<string | null>(null);
+    const [selectMode, setSelectMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [moveSheetVisible, setMoveSheetVisible] = useState(false);
+
     const backgroundColor = useThemeColor({}, 'background');
     const cardColor = useThemeColor({}, 'card');
     const textColor = useThemeColor({}, 'text');
@@ -52,6 +72,14 @@ export default function AudioPlayerScreen() {
     useEffect(() => {
         loadAudios();
     }, []);
+
+    // Refresh audio and folder lists whenever the tab regains focus, so
+    // folders created on the Library tab show up here without a restart.
+    useFocusEffect(
+        useCallback(() => {
+            loadAudios();
+        }, [])
+    );
 
     // Follow the active player's status; release it when replaced or on unmount.
     useEffect(() => {
@@ -68,8 +96,9 @@ export default function AudioPlayerScreen() {
     }, [player]);
 
     const loadAudios = async () => {
-        const files = await getAudioFiles();
+        const [files, savedFolders] = await Promise.all([getAudioFiles(), getFolders()]);
         setAudios(files);
+        setFolders(savedFolders);
     };
 
     const handlePickAudio = async () => {
@@ -144,6 +173,84 @@ export default function AudioPlayerScreen() {
         showToast({ message: t('deleted'), type: 'info' });
     };
 
+    const openAudioMenu = (item: AudioFile) => {
+        setEditAudio(item);
+        setEditAudioName(item.name);
+        setEditAudioFolderId(item.folderId || null);
+    };
+
+    const handleSaveAudioEdit = async () => {
+        if (!editAudio || !editAudioName.trim()) return;
+        try {
+            await updateAudioFile(editAudio.id, editAudioName.trim(), editAudioFolderId);
+            setEditAudio(null);
+            loadAudios();
+            showToast({ message: 'Audio updated', type: 'success' });
+        } catch (e) {
+            console.error('Error updating audio:', e);
+            showToast({ message: 'Failed to update audio', type: 'error' });
+        }
+    };
+
+    const startSelectMode = (firstId?: string) => {
+        setEditAudio(null);
+        setSelectMode(true);
+        setSelectedIds(new Set(firstId ? [firstId] : []));
+    };
+
+    const exitSelectMode = () => {
+        setSelectMode(false);
+        setSelectedIds(new Set());
+    };
+
+    const toggleSelected = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const handleMoveSelected = async (folderId: string | null) => {
+        setMoveSheetVisible(false);
+        const count = selectedIds.size;
+        try {
+            for (const id of selectedIds) {
+                await updateAudioFile(id, undefined, folderId);
+            }
+            exitSelectMode();
+            loadAudios();
+            showToast({ message: `Moved ${count} file${count === 1 ? '' : 's'}`, type: 'success' });
+        } catch (e) {
+            console.error('Error moving audio:', e);
+            showToast({ message: 'Failed to move files', type: 'error' });
+        }
+    };
+
+    const handleDeleteSelected = async () => {
+        const count = selectedIds.size;
+        const ok = await confirm({
+            title: `Delete ${count} file${count === 1 ? '' : 's'}?`,
+            message: t('areYouSure'),
+            confirmText: t('delete'),
+            cancelText: t('cancel'),
+            destructive: true,
+        });
+        if (!ok) return;
+        for (const id of selectedIds) {
+            if (currentAudio?.id === id && player) {
+                setPlayer(null);
+                setCurrentAudio(null);
+                setIsPlaying(false);
+            }
+            await deleteAudioFile(id);
+        }
+        exitSelectMode();
+        loadAudios();
+        showToast({ message: `Deleted ${count} file${count === 1 ? '' : 's'}`, type: 'info' });
+    };
+
     const formatTime = (totalSeconds: number) => {
         if (!totalSeconds || !isFinite(totalSeconds)) return '0:00';
         const minutes = Math.floor(totalSeconds / 60);
@@ -153,26 +260,42 @@ export default function AudioPlayerScreen() {
 
     const renderAudioItem = ({ item }: { item: AudioFile }) => {
         const isCurrent = currentAudio?.id === item.id;
+        const isSelected = selectedIds.has(item.id);
 
         return (
             <TouchableOpacity
-                style={[styles.audioCard, { backgroundColor: cardColor }]}
-                onPress={() => playAudio(item)}
+                style={[
+                    styles.audioCard,
+                    { backgroundColor: cardColor },
+                    selectMode && isSelected && { borderWidth: 2, borderColor: accentColor },
+                ]}
+                onPress={() => {
+                    if (selectMode) toggleSelected(item.id);
+                    else playAudio(item);
+                }}
+                onLongPress={() => { if (!selectMode) openAudioMenu(item); }}
+                delayLongPress={350}
                 activeOpacity={0.8}
             >
                 <View style={styles.cardHeaderAction}>
                     <View style={[styles.audioIconWrapper, { backgroundColor: accentColor + '10' }]}>
                         <Music size={28} color={accentColor} strokeWidth={2.5} />
                     </View>
-                    <TouchableOpacity
-                        style={styles.deleteButtonContainer}
-                        onPress={() => handleDelete(item.id)}
-                        activeOpacity={0.5}
-                        accessibilityLabel={`Delete ${item.name}`}
-                        accessibilityRole="button"
-                    >
-                        <Trash2 size={16} color={mutedForeground} />
-                    </TouchableOpacity>
+                    {selectMode ? (
+                        isSelected
+                            ? <CheckCircle2 size={20} color={accentColor} strokeWidth={2.5} />
+                            : <Circle size={20} color={mutedForeground} strokeWidth={2} />
+                    ) : (
+                        <TouchableOpacity
+                            style={styles.deleteButtonContainer}
+                            onPress={() => handleDelete(item.id)}
+                            activeOpacity={0.5}
+                            accessibilityLabel={`Delete ${item.name}`}
+                            accessibilityRole="button"
+                        >
+                            <Trash2 size={16} color={mutedForeground} />
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 <View style={styles.cardTop}>
@@ -226,8 +349,33 @@ export default function AudioPlayerScreen() {
 
             <SoundMixer visible={mixerVisible} onClose={() => setMixerVisible(false)} />
 
+            {folders.length > 0 && (
+                <View style={styles.folderFilterRow}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.folderFilterContent}>
+                        <TouchableOpacity
+                            style={[styles.folderFilterChip, { backgroundColor: activeFolderId === 'all' ? accentColor : secondaryBg }]}
+                            onPress={() => setActiveFolderId('all')}
+                        >
+                            <Text style={[styles.folderFilterText, { color: activeFolderId === 'all' ? accentForeground : mutedForeground }]}>All</Text>
+                        </TouchableOpacity>
+                        {folders.map(folder => (
+                            <TouchableOpacity
+                                key={folder.id}
+                                style={[styles.folderFilterChip, { backgroundColor: activeFolderId === folder.id ? accentColor : secondaryBg }]}
+                                onPress={() => setActiveFolderId(activeFolderId === folder.id ? 'all' : folder.id)}
+                            >
+                                <FolderIcon size={13} color={activeFolderId === folder.id ? accentForeground : mutedForeground} strokeWidth={2.5} />
+                                <Text style={[styles.folderFilterText, { color: activeFolderId === folder.id ? accentForeground : mutedForeground }]}>
+                                    {folder.name}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
+
             <FlatList
-                data={audios}
+                data={activeFolderId === 'all' ? audios : audios.filter(a => (a.folderId || null) === activeFolderId)}
                 renderItem={renderAudioItem}
                 keyExtractor={(item) => item.id}
                 numColumns={2}
@@ -309,6 +457,153 @@ export default function AudioPlayerScreen() {
                     </BlurView>
                 </View>
             )}
+
+            {/* Audio context sheet (long-press) */}
+            <BottomSheet
+                visible={editAudio !== null}
+                onClose={() => setEditAudio(null)}
+                sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
+            >
+                <View style={styles.modalHeader}>
+                    <Text style={[styles.modalTitle, { color: textColor }]}>Edit Audio</Text>
+                    <TouchableOpacity onPress={() => setEditAudio(null)} accessibilityLabel="Close" accessibilityRole="button">
+                        <X size={20} color={textColor} />
+                    </TouchableOpacity>
+                </View>
+
+                <ScrollView showsVerticalScrollIndicator={false}>
+                    <Input
+                        label="Audio Name"
+                        value={editAudioName}
+                        onChangeText={setEditAudioName}
+                        placeholder="e.g. Biology Lecture 3"
+                    />
+
+                    <Text style={[styles.sectionLabel, { color: textColor }]}>Move to Folder</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.folderPickerContainer}>
+                        <TouchableOpacity
+                            style={[styles.folderChip, { backgroundColor: editAudioFolderId === null ? accentColor : secondaryBg }]}
+                            onPress={() => setEditAudioFolderId(null)}
+                        >
+                            <Text style={[styles.folderChipText, { color: editAudioFolderId === null ? accentForeground : textColor }]}>None</Text>
+                        </TouchableOpacity>
+                        {folders.map((folder) => (
+                            <TouchableOpacity
+                                key={folder.id}
+                                style={[styles.folderChip, { backgroundColor: editAudioFolderId === folder.id ? accentColor : secondaryBg }]}
+                                onPress={() => setEditAudioFolderId(folder.id)}
+                            >
+                                <FolderIcon size={14} color={editAudioFolderId === folder.id ? accentForeground : textColor} />
+                                <Text style={[styles.folderChipText, { color: editAudioFolderId === folder.id ? accentForeground : textColor }]}>
+                                    {folder.name}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+
+                    <Button
+                        title="Save Changes"
+                        onPress={handleSaveAudioEdit}
+                        style={styles.saveButton}
+                    />
+
+                    <TouchableOpacity
+                        style={[styles.sheetAction, { backgroundColor: secondaryBg }]}
+                        onPress={() => startSelectMode(editAudio?.id)}
+                        activeOpacity={0.8}
+                    >
+                        <CheckCircle2 size={18} color={accentColor} strokeWidth={2.5} />
+                        <Text style={[styles.sheetActionText, { color: textColor }]}>Select Multiple</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.sheetAction, { backgroundColor: '#ef444415' }]}
+                        onPress={() => {
+                            const audio = editAudio;
+                            setEditAudio(null);
+                            if (audio) handleDelete(audio.id);
+                        }}
+                        activeOpacity={0.8}
+                    >
+                        <Trash2 size={18} color="#ef4444" strokeWidth={2.5} />
+                        <Text style={[styles.sheetActionText, { color: '#ef4444' }]}>Delete Audio</Text>
+                    </TouchableOpacity>
+                </ScrollView>
+            </BottomSheet>
+
+            {/* Move-selected sheet */}
+            <BottomSheet
+                visible={moveSheetVisible}
+                onClose={() => setMoveSheetVisible(false)}
+                sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
+            >
+                <View style={styles.modalHeader}>
+                    <Text style={[styles.modalTitle, { color: textColor }]}>
+                        Move {selectedIds.size} file{selectedIds.size === 1 ? '' : 's'}
+                    </Text>
+                    <TouchableOpacity onPress={() => setMoveSheetVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+                        <X size={20} color={textColor} />
+                    </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                    style={[styles.sheetAction, { backgroundColor: secondaryBg }]}
+                    onPress={() => handleMoveSelected(null)}
+                    activeOpacity={0.8}
+                >
+                    <Music size={18} color={accentColor} strokeWidth={2.5} />
+                    <Text style={[styles.sheetActionText, { color: textColor }]}>No folder</Text>
+                </TouchableOpacity>
+                {folders.map(folder => (
+                    <TouchableOpacity
+                        key={folder.id}
+                        style={[styles.sheetAction, { backgroundColor: secondaryBg }]}
+                        onPress={() => handleMoveSelected(folder.id)}
+                        activeOpacity={0.8}
+                    >
+                        <FolderIcon size={18} color={accentColor} strokeWidth={2.5} />
+                        <Text style={[styles.sheetActionText, { color: textColor }]}>{folder.name}</Text>
+                    </TouchableOpacity>
+                ))}
+            </BottomSheet>
+
+            {/* Multi-select action bar */}
+            {selectMode && (
+                <View style={[styles.selectBar, { backgroundColor: accentColor, bottom: insets.bottom + 16 }]}>
+                    <Text style={[styles.selectBarCount, { color: accentForeground }]}>
+                        {selectedIds.size} selected
+                    </Text>
+                    <View style={styles.selectBarActions}>
+                        <TouchableOpacity
+                            style={styles.selectBarBtn}
+                            onPress={() => setMoveSheetVisible(true)}
+                            disabled={selectedIds.size === 0}
+                            accessibilityLabel="Move selected files"
+                            accessibilityRole="button"
+                        >
+                            <FolderInput size={20} color={accentForeground} strokeWidth={2.5} />
+                            <Text style={[styles.selectBarBtnText, { color: accentForeground }]}>Move</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.selectBarBtn}
+                            onPress={handleDeleteSelected}
+                            disabled={selectedIds.size === 0}
+                            accessibilityLabel="Delete selected files"
+                            accessibilityRole="button"
+                        >
+                            <Trash2 size={20} color={accentForeground} strokeWidth={2.5} />
+                            <Text style={[styles.selectBarBtnText, { color: accentForeground }]}>Delete</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.selectBarBtn}
+                            onPress={exitSelectMode}
+                            accessibilityLabel="Cancel selection"
+                            accessibilityRole="button"
+                        >
+                            <X size={20} color={accentForeground} strokeWidth={2.5} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
         </View>
     );
 }
@@ -329,6 +624,116 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
+    },
+    folderFilterRow: {
+        marginBottom: 12,
+    },
+    folderFilterContent: {
+        paddingHorizontal: 24,
+        gap: 8,
+    },
+    folderFilterChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 16,
+    },
+    folderFilterText: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    modalContent: {
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        padding: 24,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        letterSpacing: -0.5,
+    },
+    sectionLabel: {
+        fontSize: 14,
+        fontWeight: '700',
+        marginTop: 16,
+        marginBottom: 10,
+    },
+    folderPickerContainer: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    folderChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+        marginRight: 8,
+        gap: 6,
+    },
+    folderChipText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    saveButton: {
+        marginTop: 16,
+        height: 56,
+        borderRadius: 18,
+    },
+    sheetAction: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        height: 52,
+        borderRadius: 16,
+        paddingHorizontal: 18,
+        marginTop: 10,
+    },
+    sheetActionText: {
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    selectBar: {
+        position: 'absolute',
+        left: 16,
+        right: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderRadius: 20,
+        paddingHorizontal: 20,
+        paddingVertical: 14,
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
+    },
+    selectBarCount: {
+        fontSize: 15,
+        fontWeight: '800',
+    },
+    selectBarActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 22,
+    },
+    selectBarBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    selectBarBtnText: {
+        fontSize: 14,
+        fontWeight: '700',
     },
     title: {
         fontSize: 32,

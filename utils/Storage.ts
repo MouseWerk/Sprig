@@ -41,6 +41,7 @@ export interface AudioFile {
     name: string;
     uri: string;
     duration?: number;
+    folderId?: string | null;
 }
 
 export interface Folder {
@@ -999,10 +1000,10 @@ export async function updateCardSRS(deckId: string, cardIndex: number, grade: nu
 export async function getAudioFiles(): Promise<AudioFile[]> {
     try {
         const db = await getDb();
-        const rows = await db.getAllAsync<{ id: string; name: string; uri: string; duration: number | null }>(
+        const rows = await db.getAllAsync<{ id: string; name: string; uri: string; duration: number | null; folder_id: string | null }>(
             'SELECT * FROM audio_files ORDER BY CAST(id AS INTEGER) DESC'
         );
-        return rows.map(r => ({ id: r.id, name: r.name, uri: r.uri, duration: r.duration ?? undefined }));
+        return rows.map(r => ({ id: r.id, name: r.name, uri: r.uri, duration: r.duration ?? undefined, folderId: r.folder_id }));
     } catch {
         return [];
     }
@@ -1023,6 +1024,13 @@ export async function saveAudioFile(sourceUri: string, name: string): Promise<Au
     const db = await getDb();
     await db.runAsync('INSERT OR REPLACE INTO audio_files (id, name, uri, duration) VALUES (?, ?, ?, ?)', id, name, localUri, null);
     return newAudio;
+}
+
+export async function updateAudioFile(id: string, name?: string, folderId?: string | null): Promise<void> {
+    const db = await getDb();
+    if (name !== undefined) await db.runAsync('UPDATE audio_files SET name = ? WHERE id = ?', name, id);
+    // folderId: undefined = leave unchanged, null = move to root
+    if (folderId !== undefined) await db.runAsync('UPDATE audio_files SET folder_id = ? WHERE id = ?', folderId, id);
 }
 
 export async function deleteAudioFile(id: string): Promise<void> {

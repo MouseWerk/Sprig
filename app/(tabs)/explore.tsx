@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Icons from 'lucide-react-native';
-import { ArrowUpDown, Check, ChevronRight, FileText, FileUp, Folder as FolderIcon, Library, Plus, Trash2, X } from 'lucide-react-native';
+import { ArrowUpDown, Check, CheckCircle2, ChevronRight, Circle, FileText, FileUp, Folder as FolderIcon, FolderInput, Library, Plus, Trash2, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,7 +14,7 @@ import { Button } from '../../components/ui/Button';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { useToast } from '../../components/ui/Toast';
-import { Deck, deleteDeck, deleteFolder, Folder, getDecks, getFolders, saveDeck, saveFolder } from '../../utils/Storage';
+import { Deck, deleteDeck, deleteFolder, Folder, getDecks, getFolders, saveDeck, saveFolder, updateDeck } from '../../utils/Storage';
 
 type SortMode = 'nameAsc' | 'nameDesc' | 'newest' | 'oldest';
 
@@ -71,6 +71,14 @@ export default function LibraryScreen() {
   const [docName, setDocName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('FileText');
   const [newFolderName, setNewFolderName] = useState('');
+
+  // Long-press context sheet (single doc) + multi-select mode
+  const [editDoc, setEditDoc] = useState<Deck | null>(null);
+  const [editDocName, setEditDocName] = useState('');
+  const [editDocFolderId, setEditDocFolderId] = useState<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [moveSheetVisible, setMoveSheetVisible] = useState(false);
 
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
@@ -205,15 +213,97 @@ export default function LibraryScreen() {
     showToast({ message: `"${name}" deleted`, type: 'info' });
   };
 
+  const openDocMenu = (item: Deck) => {
+    setEditDoc(item);
+    setEditDocName(item.name);
+    setEditDocFolderId(item.folderId || null);
+  };
+
+  const handleSaveDocEdit = async () => {
+    if (!editDoc || !editDocName.trim()) return;
+    try {
+      await updateDeck(editDoc.id, editDocName.trim(), undefined, editDocFolderId);
+      setEditDoc(null);
+      loadData();
+      showToast({ message: 'Document updated', type: 'success' });
+    } catch (e) {
+      console.error('Error updating document:', e);
+      showToast({ message: 'Failed to update document', type: 'error' });
+    }
+  };
+
+  const startSelectMode = (firstId?: string) => {
+    setEditDoc(null);
+    setSelectMode(true);
+    setSelectedIds(new Set(firstId ? [firstId] : []));
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleMoveSelected = async (folderId: string | null) => {
+    setMoveSheetVisible(false);
+    const count = selectedIds.size;
+    try {
+      for (const id of selectedIds) {
+        await updateDeck(id, undefined, undefined, folderId);
+      }
+      exitSelectMode();
+      loadData();
+      showToast({ message: `Moved ${count} document${count === 1 ? '' : 's'}`, type: 'success' });
+    } catch (e) {
+      console.error('Error moving documents:', e);
+      showToast({ message: 'Failed to move documents', type: 'error' });
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    const count = selectedIds.size;
+    const ok = await confirm({
+      title: `Delete ${count} document${count === 1 ? '' : 's'}?`,
+      message: 'This permanently removes the selected documents from your library.',
+      confirmText: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    for (const id of selectedIds) {
+      await deleteDeck(id);
+    }
+    exitSelectMode();
+    loadData();
+    showToast({ message: `Deleted ${count} document${count === 1 ? '' : 's'}`, type: 'info' });
+  };
+
   const renderDocItem = (item: Deck) => {
     const IconComponent = (Icons as any)[item.icon] || Icons.FileText;
 
+    const isSelected = selectedIds.has(item.id);
     return (
-      <View style={[styles.docCard, { backgroundColor: secondaryBg }]}>
+      <View style={[
+        styles.docCard,
+        { backgroundColor: secondaryBg },
+        selectMode && isSelected && { borderWidth: 2, borderColor: accentColor },
+      ]}>
         <TouchableOpacity
           style={styles.docContent}
           activeOpacity={0.7}
-          onPress={() => router.push({ pathname: '/pdf-view', params: { id: item.id, uri: item.uri, name: item.name } })}
+          onPress={() => {
+            if (selectMode) toggleSelected(item.id);
+            else router.push({ pathname: '/pdf-view', params: { id: item.id, uri: item.uri, name: item.name } });
+          }}
+          onLongPress={() => { if (!selectMode) openDocMenu(item); }}
+          delayLongPress={350}
         >
           <View style={[styles.docIconContainer, { backgroundColor: accentColor + '10' }]}>
             <IconComponent size={24} color={accentColor} strokeWidth={2.5} />
@@ -222,16 +312,24 @@ export default function LibraryScreen() {
             <Text style={[styles.docName, { color: textColor }]} numberOfLines={1}>{item.name}</Text>
             <Text style={[styles.docSub, { color: mutedForeground }]}>{t('pdfDocument')}</Text>
           </View>
-          <ChevronRight size={18} color={mutedForeground} />
+          {selectMode ? (
+            isSelected
+              ? <CheckCircle2 size={22} color={accentColor} strokeWidth={2.5} />
+              : <Circle size={22} color={mutedForeground} strokeWidth={2} />
+          ) : (
+            <ChevronRight size={18} color={mutedForeground} />
+          )}
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDelete(item.id, item.name)}
-          accessibilityLabel={`Delete ${item.name}`}
-          accessibilityRole="button"
-        >
-          <Trash2 size={18} color="#ef4444" />
-        </TouchableOpacity>
+        {!selectMode && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => handleDelete(item.id, item.name)}
+            accessibilityLabel={`Delete ${item.name}`}
+            accessibilityRole="button"
+          >
+            <Trash2 size={18} color="#ef4444" />
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -499,6 +597,157 @@ export default function LibraryScreen() {
                 </ScrollView>
               )}
       </BottomSheet>
+
+      {/* Document context sheet (long-press) */}
+      <BottomSheet
+        visible={editDoc !== null}
+        onClose={() => setEditDoc(null)}
+        sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
+      >
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: textColor }]}>Edit Document</Text>
+                <TouchableOpacity onPress={() => setEditDoc(null)} accessibilityLabel="Close" accessibilityRole="button">
+                  <X size={20} color={textColor} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.formScroll}>
+                <View style={styles.formSection}>
+                  <Input
+                    label="Document Name"
+                    value={editDocName}
+                    onChangeText={setEditDocName}
+                    placeholder="e.g. Science Book"
+                  />
+
+                  <Text style={[styles.sectionLabel, { color: textColor, marginTop: 16 }]}>Move to Folder</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.folderPickerContainer}>
+                    <TouchableOpacity
+                      style={[styles.folderChip, { backgroundColor: editDocFolderId === null ? accentColor : secondaryBg }]}
+                      onPress={() => setEditDocFolderId(null)}
+                    >
+                      <Text style={[styles.folderChipText, { color: editDocFolderId === null ? primaryForeground : textColor }]}>
+                        {t('root')}
+                      </Text>
+                    </TouchableOpacity>
+                    {folders.map((folder) => (
+                      <TouchableOpacity
+                        key={folder.id}
+                        style={[styles.folderChip, { backgroundColor: editDocFolderId === folder.id ? accentColor : secondaryBg }]}
+                        onPress={() => setEditDocFolderId(folder.id)}
+                      >
+                        <FolderIcon size={14} color={editDocFolderId === folder.id ? primaryForeground : textColor} />
+                        <Text style={[styles.folderChipText, { color: editDocFolderId === folder.id ? primaryForeground : textColor }]}>
+                          {folder.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  <Button
+                    title="Save Changes"
+                    onPress={handleSaveDocEdit}
+                    style={styles.saveButton}
+                  />
+
+                  <TouchableOpacity
+                    style={[styles.sheetAction, { backgroundColor: secondaryBg }]}
+                    onPress={() => startSelectMode(editDoc?.id)}
+                    activeOpacity={0.8}
+                  >
+                    <CheckCircle2 size={18} color={accentColor} strokeWidth={2.5} />
+                    <Text style={[styles.sheetActionText, { color: textColor }]}>Select Multiple</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.sheetAction, { backgroundColor: '#ef444415' }]}
+                    onPress={() => {
+                      const doc = editDoc;
+                      setEditDoc(null);
+                      if (doc) handleDelete(doc.id, doc.name);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Trash2 size={18} color="#ef4444" strokeWidth={2.5} />
+                    <Text style={[styles.sheetActionText, { color: '#ef4444' }]}>Delete Document</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+      </BottomSheet>
+
+      {/* Move-selected sheet */}
+      <BottomSheet
+        visible={moveSheetVisible}
+        onClose={() => setMoveSheetVisible(false)}
+        sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
+      >
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: textColor }]}>
+                  Move {selectedIds.size} document{selectedIds.size === 1 ? '' : 's'}
+                </Text>
+                <TouchableOpacity onPress={() => setMoveSheetVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+                  <X size={20} color={textColor} />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={[styles.sheetAction, { backgroundColor: secondaryBg }]}
+                onPress={() => handleMoveSelected(null)}
+                activeOpacity={0.8}
+              >
+                <Library size={18} color={accentColor} strokeWidth={2.5} />
+                <Text style={[styles.sheetActionText, { color: textColor }]}>{t('root')}</Text>
+              </TouchableOpacity>
+              {folders.map(folder => (
+                <TouchableOpacity
+                  key={folder.id}
+                  style={[styles.sheetAction, { backgroundColor: secondaryBg }]}
+                  onPress={() => handleMoveSelected(folder.id)}
+                  activeOpacity={0.8}
+                >
+                  <FolderIcon size={18} color={accentColor} strokeWidth={2.5} />
+                  <Text style={[styles.sheetActionText, { color: textColor }]}>{folder.name}</Text>
+                </TouchableOpacity>
+              ))}
+      </BottomSheet>
+
+      {/* Multi-select action bar */}
+      {selectMode && (
+        <View style={[styles.selectBar, { backgroundColor: accentColor, bottom: insets.bottom + 16 }]}>
+          <Text style={[styles.selectBarCount, { color: primaryForeground }]}>
+            {selectedIds.size} selected
+          </Text>
+          <View style={styles.selectBarActions}>
+            <TouchableOpacity
+              style={styles.selectBarBtn}
+              onPress={() => setMoveSheetVisible(true)}
+              disabled={selectedIds.size === 0}
+              accessibilityLabel="Move selected documents"
+              accessibilityRole="button"
+            >
+              <FolderInput size={20} color={primaryForeground} strokeWidth={2.5} />
+              <Text style={[styles.selectBarBtnText, { color: primaryForeground }]}>Move</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.selectBarBtn}
+              onPress={handleDeleteSelected}
+              disabled={selectedIds.size === 0}
+              accessibilityLabel="Delete selected documents"
+              accessibilityRole="button"
+            >
+              <Trash2 size={20} color={primaryForeground} strokeWidth={2.5} />
+              <Text style={[styles.selectBarBtnText, { color: primaryForeground }]}>Delete</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.selectBarBtn}
+              onPress={exitSelectMode}
+              accessibilityLabel="Cancel selection"
+              accessibilityRole="button"
+            >
+              <X size={20} color={primaryForeground} strokeWidth={2.5} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -752,5 +1001,69 @@ const styles = StyleSheet.create({
     marginTop: 12,
     height: 56,
     borderRadius: 18,
+  },
+  folderPickerContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  folderChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginRight: 8,
+    gap: 6,
+  },
+  folderChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  sheetAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    height: 52,
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    marginTop: 10,
+  },
+  sheetActionText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  selectBar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+  },
+  selectBarCount: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  selectBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 22,
+  },
+  selectBarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  selectBarBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
   }
 });

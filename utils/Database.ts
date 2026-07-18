@@ -104,6 +104,7 @@ async function initDb(): Promise<SQLite.SQLiteDatabase> {
     `);
 
     await addColumnIfMissing(db, 'decks', 'exam_date', 'TEXT');
+    await addColumnIfMissing(db, 'audio_files', 'folder_id', 'TEXT');
 
     await migrateFromAsyncStorage(db);
     return db;
