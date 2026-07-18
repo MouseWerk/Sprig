@@ -58,7 +58,7 @@ export default function HomeScreen() {
   const primaryForeground = useThemeColor({}, 'primaryForeground');
 
   const loadData = useCallback(async () => {
-    const [savedDecks, savedFolders, savedStats] = await Promise.all([getDecks(), getFolders(), getUserStats()]);
+    const [savedDecks, savedFolders, savedStats] = await Promise.all([getDecks(), getFolders('deck'), getUserStats()]);
     setDecks(savedDecks.filter(d => d.type === 'csv'));
     setFolders(savedFolders);
     setStats(savedStats);
@@ -172,7 +172,7 @@ export default function HomeScreen() {
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
     try {
-      await saveFolder(newFolderName, currentFolderId);
+      await saveFolder(newFolderName, currentFolderId, 'deck');
       setNewFolderName('');
       setNewFolderModalVisible(false);
       loadData();
@@ -820,10 +820,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Badges must wrap: with three of them (count, due, exam) a nowrap row's
+  // min-content width would push the card past its half-screen column.
   cardTop: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'flex-start',
     alignItems: 'center',
+    gap: 6,
     marginBottom: 16,
   },
   deckIconContainer: {
@@ -856,7 +860,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
-    marginLeft: 10,
   },
   dueText: {
     color: '#ffffff',

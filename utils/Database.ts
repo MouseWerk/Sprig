@@ -106,16 +106,32 @@ async function initDb(): Promise<SQLite.SQLiteDatabase> {
     await addColumnIfMissing(db, 'decks', 'exam_date', 'TEXT');
     await addColumnIfMissing(db, 'audio_files', 'folder_id', 'TEXT');
 
+    // Folders are scoped per area (deck / pdf / audio) instead of shared.
+    // On upgrade, claim all pre-existing folders for the Home tab and move
+    // PDFs and audio back to their roots so nothing lands in a folder that
+    // is no longer visible on its tab.
+    const kindAdded = await addColumnIfMissing(db, 'folders', 'kind', 'TEXT');
+    if (kindAdded) {
+        await db.execAsync(`
+            UPDATE folders SET kind = 'deck' WHERE kind IS NULL;
+            UPDATE decks SET folder_id = NULL WHERE type = 'pdf' AND folder_id IS NOT NULL;
+            UPDATE audio_files SET folder_id = NULL WHERE folder_id IS NOT NULL;
+        `);
+    }
+
     await migrateFromAsyncStorage(db);
     return db;
 }
 
-// Additive schema upgrades for databases created before a column existed
-async function addColumnIfMissing(db: SQLite.SQLiteDatabase, table: string, column: string, type: string): Promise<void> {
+// Additive schema upgrades for databases created before a column existed.
+// Returns true when the column was just added, so one-time backfills can run.
+async function addColumnIfMissing(db: SQLite.SQLiteDatabase, table: string, column: string, type: string): Promise<boolean> {
     const cols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
     if (!cols.some(c => c.name === column)) {
         await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+        return true;
     }
+    return false;
 }
 
 function safeParse<T>(raw: string | null, fallback: T): T {

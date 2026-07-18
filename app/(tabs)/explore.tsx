@@ -89,7 +89,7 @@ export default function LibraryScreen() {
   const borderColor = useThemeColor({}, 'border');
 
   const loadData = useCallback(async () => {
-    const [savedDecks, savedFolders] = await Promise.all([getDecks(), getFolders()]);
+    const [savedDecks, savedFolders] = await Promise.all([getDecks(), getFolders('pdf')]);
     setPdfs(savedDecks.filter(d => d.type === 'pdf'));
     setFolders(savedFolders);
   }, []);
@@ -177,7 +177,7 @@ export default function LibraryScreen() {
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
     try {
-      await saveFolder(newFolderName, currentFolderId);
+      await saveFolder(newFolderName, currentFolderId, 'pdf');
       setNewFolderName('');
       setNewFolderModalVisible(false);
       loadData();

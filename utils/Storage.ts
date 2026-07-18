@@ -44,11 +44,16 @@ export interface AudioFile {
     folderId?: string | null;
 }
 
+// Each area keeps its own folder namespace — a folder created for PDFs
+// never shows up between flashcard decks and vice versa.
+export type FolderKind = 'deck' | 'pdf' | 'audio';
+
 export interface Folder {
     id: string;
     name: string;
     parentId: string | null; // ID of the parent folder for subfolders
     createdAt?: number; // epoch ms; older items fall back to parsing their id
+    kind?: FolderKind;
 }
 
 export interface UserStats {
@@ -578,17 +583,22 @@ export async function recordQuizCompleted(): Promise<StatsUpdateResult> {
 }
 
 // Folder Management
-export async function getFolders(): Promise<Folder[]> {
+export async function getFolders(kind?: FolderKind): Promise<Folder[]> {
     try {
         const db = await getDb();
-        const rows = await db.getAllAsync<{ id: string; name: string; parent_id: string | null; created_at: number | null }>(
-            'SELECT * FROM folders ORDER BY COALESCE(created_at, CAST(id AS INTEGER)) ASC'
-        );
+        const rows = kind
+            ? await db.getAllAsync<{ id: string; name: string; parent_id: string | null; created_at: number | null; kind: string | null }>(
+                'SELECT * FROM folders WHERE kind = ? ORDER BY COALESCE(created_at, CAST(id AS INTEGER)) ASC', kind
+            )
+            : await db.getAllAsync<{ id: string; name: string; parent_id: string | null; created_at: number | null; kind: string | null }>(
+                'SELECT * FROM folders ORDER BY COALESCE(created_at, CAST(id AS INTEGER)) ASC'
+            );
         return rows.map(r => ({
             id: r.id,
             name: r.name,
             parentId: r.parent_id,
             createdAt: r.created_at ?? undefined,
+            kind: (r.kind as FolderKind) ?? 'deck',
         }));
     } catch (e) {
         console.error('Error getting folders', e);
@@ -596,18 +606,19 @@ export async function getFolders(): Promise<Folder[]> {
     }
 }
 
-export async function saveFolder(name: string, parentId: string | null = null): Promise<Folder> {
+export async function saveFolder(name: string, parentId: string | null = null, kind: FolderKind = 'deck'): Promise<Folder> {
     const newFolder: Folder = {
         id: generateId(),
         name,
         parentId,
         createdAt: Date.now(),
+        kind,
     };
 
     const db = await getDb();
     await db.runAsync(
-        'INSERT INTO folders (id, name, parent_id, created_at) VALUES (?, ?, ?, ?)',
-        newFolder.id, newFolder.name, newFolder.parentId, newFolder.createdAt ?? null
+        'INSERT INTO folders (id, name, parent_id, created_at, kind) VALUES (?, ?, ?, ?, ?)',
+        newFolder.id, newFolder.name, newFolder.parentId, newFolder.createdAt ?? null, kind
     );
     return newFolder;
 }
@@ -1060,8 +1071,8 @@ export async function importDeckRecord(deck: Deck): Promise<void> {
 export async function importFolderRecord(folder: Folder): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-        'INSERT OR REPLACE INTO folders (id, name, parent_id, created_at) VALUES (?, ?, ?, ?)',
-        folder.id, folder.name, folder.parentId, folder.createdAt ?? null
+        'INSERT OR REPLACE INTO folders (id, name, parent_id, created_at, kind) VALUES (?, ?, ?, ?, ?)',
+        folder.id, folder.name, folder.parentId, folder.createdAt ?? null, folder.kind ?? 'deck'
     );
 }
 

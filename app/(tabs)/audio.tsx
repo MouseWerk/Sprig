@@ -1,7 +1,7 @@
 import { useToast } from '@/components/ui/Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { AudioFile, deleteAudioFile, Folder, getAudioFiles, getFolders, saveAudioFile, updateAudioFile } from '@/utils/Storage';
+import { AudioFile, deleteAudioFile, Folder, getAudioFiles, getFolders, saveAudioFile, saveFolder, updateAudioFile } from '@/utils/Storage';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
@@ -60,6 +60,8 @@ export default function AudioPlayerScreen() {
     const [selectMode, setSelectMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [moveSheetVisible, setMoveSheetVisible] = useState(false);
+    const [newFolderSheetVisible, setNewFolderSheetVisible] = useState(false);
+    const [newFolderName, setNewFolderName] = useState('');
 
     const backgroundColor = useThemeColor({}, 'background');
     const cardColor = useThemeColor({}, 'card');
@@ -96,7 +98,7 @@ export default function AudioPlayerScreen() {
     }, [player]);
 
     const loadAudios = async () => {
-        const [files, savedFolders] = await Promise.all([getAudioFiles(), getFolders()]);
+        const [files, savedFolders] = await Promise.all([getAudioFiles(), getFolders('audio')]);
         setAudios(files);
         setFolders(savedFolders);
     };
@@ -171,6 +173,19 @@ export default function AudioPlayerScreen() {
         await deleteAudioFile(id);
         loadAudios();
         showToast({ message: t('deleted'), type: 'info' });
+    };
+
+    const handleCreateFolder = async () => {
+        if (!newFolderName.trim()) return;
+        try {
+            await saveFolder(newFolderName.trim(), null, 'audio');
+            setNewFolderName('');
+            setNewFolderSheetVisible(false);
+            loadAudios();
+        } catch (e) {
+            console.error('Error creating folder:', e);
+            showToast({ message: 'Failed to create folder', type: 'error' });
+        }
     };
 
     const openAudioMenu = (item: AudioFile) => {
@@ -326,6 +341,15 @@ export default function AudioPlayerScreen() {
                     <Text style={[styles.title, { color: textColor }]}>{t('audioLibrary')}</Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TouchableOpacity
+                        style={[styles.addButton, { backgroundColor: secondaryBg }]}
+                        onPress={() => setNewFolderSheetVisible(true)}
+                        activeOpacity={0.9}
+                        accessibilityLabel="New folder"
+                        accessibilityRole="button"
+                    >
+                        <FolderIcon size={24} color={accentColor} strokeWidth={3} />
+                    </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.addButton, { backgroundColor: secondaryBg }]}
                         onPress={() => setMixerVisible(true)}
@@ -564,6 +588,31 @@ export default function AudioPlayerScreen() {
                         <Text style={[styles.sheetActionText, { color: textColor }]}>{folder.name}</Text>
                     </TouchableOpacity>
                 ))}
+            </BottomSheet>
+
+            {/* New audio folder sheet */}
+            <BottomSheet
+                visible={newFolderSheetVisible}
+                onClose={() => setNewFolderSheetVisible(false)}
+                sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
+            >
+                <View style={styles.modalHeader}>
+                    <Text style={[styles.modalTitle, { color: textColor }]}>New Folder</Text>
+                    <TouchableOpacity onPress={() => setNewFolderSheetVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+                        <X size={20} color={textColor} />
+                    </TouchableOpacity>
+                </View>
+                <Input
+                    label="Folder Name"
+                    value={newFolderName}
+                    onChangeText={setNewFolderName}
+                    placeholder="e.g. Lectures"
+                />
+                <Button
+                    title="Create Folder"
+                    onPress={handleCreateFolder}
+                    style={{ marginTop: 24 }}
+                />
             </BottomSheet>
 
             {/* Multi-select action bar */}
