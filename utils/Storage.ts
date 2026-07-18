@@ -629,9 +629,10 @@ export async function deleteFolder(id: string): Promise<void> {
     await serialized(() =>
         db.withTransactionAsync(async () => {
             await db.runAsync('DELETE FROM folders WHERE id = ?', id);
-            // Move child folders and decks in this folder to root
+            // Move child folders and contents of this folder to root
             await db.runAsync('UPDATE folders SET parent_id = NULL WHERE parent_id = ?', id);
             await db.runAsync('UPDATE decks SET folder_id = NULL WHERE folder_id = ?', id);
+            await db.runAsync('UPDATE audio_files SET folder_id = NULL WHERE folder_id = ?', id);
         })
     );
 }
@@ -1021,7 +1022,7 @@ export async function getAudioFiles(): Promise<AudioFile[]> {
     }
 }
 
-export async function saveAudioFile(sourceUri: string, name: string): Promise<AudioFile> {
+export async function saveAudioFile(sourceUri: string, name: string, folderId: string | null = null): Promise<AudioFile> {
     const id = Date.now().toString();
     const localUri = `${FileSystem.documentDirectory}audio/${id}_${name}`;
 
@@ -1032,9 +1033,9 @@ export async function saveAudioFile(sourceUri: string, name: string): Promise<Au
 
     await FileSystem.copyAsync({ from: sourceUri, to: localUri });
 
-    const newAudio: AudioFile = { id, name, uri: localUri };
+    const newAudio: AudioFile = { id, name, uri: localUri, folderId };
     const db = await getDb();
-    await db.runAsync('INSERT OR REPLACE INTO audio_files (id, name, uri, duration) VALUES (?, ?, ?, ?)', id, name, localUri, null);
+    await db.runAsync('INSERT OR REPLACE INTO audio_files (id, name, uri, duration, folder_id) VALUES (?, ?, ?, ?, ?)', id, name, localUri, null, folderId);
     return newAudio;
 }
 

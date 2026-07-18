@@ -1,7 +1,7 @@
 import { useToast } from '@/components/ui/Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { AudioFile, deleteAudioFile, Folder, getAudioFiles, getFolders, saveAudioFile, saveFolder, setAudioPosition, updateAudioFile } from '@/utils/Storage';
+import { AudioFile, deleteAudioFile, deleteFolder, Folder, getAudioFiles, getFolders, saveAudioFile, saveFolder, setAudioPosition, updateAudioFile } from '@/utils/Storage';
 import Slider from '@react-native-community/slider';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { BlurView } from 'expo-blur';
@@ -9,6 +9,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useFocusEffect } from 'expo-router';
 import {
     CheckCircle2,
+    ChevronRight,
     Circle,
     FastForward,
     FileMusic,
@@ -53,9 +54,9 @@ export default function AudioPlayerScreen() {
     const [duration, setDuration] = useState(0); // seconds
     const [mixerVisible, setMixerVisible] = useState(false);
 
-    // Folders (shared with the Library tab), long-press sheet, multi-select
+    // Audio's own folders, navigated like the Home/Library tabs
     const [folders, setFolders] = useState<Folder[]>([]);
-    const [activeFolderId, setActiveFolderId] = useState<string | 'all'>('all');
+    const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
     const [editAudio, setEditAudio] = useState<AudioFile | null>(null);
     const [editAudioName, setEditAudioName] = useState('');
     const [editAudioFolderId, setEditAudioFolderId] = useState<string | null>(null);
@@ -69,6 +70,11 @@ export default function AudioPlayerScreen() {
     const pendingResumeRef = useRef<number | null>(null);
     const lastSaveRef = useRef(0);
     const seekingRef = useRef(false);
+    // The player lives in a ref so it can be disposed synchronously — state
+    // updates are batched, and tying disposal to them leaks a playing
+    // instance for every tap that lands before the next render.
+    const playerRef = useRef<AudioPlayer | null>(null);
+    const switchSeqRef = useRef(0);
 
     const backgroundColor = useThemeColor({}, 'background');
     const cardColor = useThemeColor({}, 'card');
@@ -90,11 +96,13 @@ export default function AudioPlayerScreen() {
         }, [])
     );
 
-    // Follow the active player's status; release it when replaced or on unmount.
+    // Follow the active player's status. Disposal is NOT done here — the ref
+    // owns the instance; this effect only manages the status subscription.
     useEffect(() => {
         if (!player) return;
         const audioId = currentAudio?.id;
         const sub = player.addListener('playbackStatusUpdate', (status) => {
+            if (playerRef.current !== player) return; // superseded instance
             // Resume where the track was left once the duration is known
             const resume = pendingResumeRef.current;
             if (resume !== null && status.duration > 0) {
@@ -119,13 +127,33 @@ export default function AudioPlayerScreen() {
                 }
             }
         });
-        return () => {
-            sub.remove();
-            try { player.remove(); } catch { /* already released */ }
-        };
+        return () => { sub.remove(); };
         // currentAudio is set in the same update as player, so [player] suffices
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [player]);
+
+    const disposePlayer = () => {
+        const p = playerRef.current;
+        playerRef.current = null;
+        if (p) {
+            try { p.remove(); } catch { /* already released */ }
+        }
+    };
+
+    // Stop playback entirely and hide the floating player.
+    const stopPlayback = () => {
+        switchSeqRef.current++;
+        if (currentAudio && position > 0) setAudioPosition(currentAudio.id, position);
+        disposePlayer();
+        setPlayer(null);
+        setCurrentAudio(null);
+        setIsPlaying(false);
+        setPosition(0);
+        setDuration(0);
+    };
+
+    // Release the active player when the screen unmounts.
+    useEffect(() => () => disposePlayer(), []);
 
     const loadAudios = async () => {
         const [files, savedFolders] = await Promise.all([getAudioFiles(), getFolders('audio')]);
@@ -142,7 +170,7 @@ export default function AudioPlayerScreen() {
 
             if (!result.canceled && result.assets && result.assets.length > 0) {
                 const asset = result.assets[0];
-                await saveAudioFile(asset.uri, asset.name);
+                await saveAudioFile(asset.uri, asset.name, currentFolderId);
                 loadAudios();
                 showToast({ message: t('audioFileAdded'), type: 'success' });
             }
@@ -153,20 +181,32 @@ export default function AudioPlayerScreen() {
     };
 
     const playAudio = async (item: AudioFile) => {
+        // Tapping the track that's already loaded toggles play/pause instead
+        // of stacking a fresh player on top of the old one.
+        if (currentAudio?.id === item.id && playerRef.current) {
+            togglePlayback();
+            return;
+        }
+
+        const seq = ++switchSeqRef.current;
         try {
             await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true }).catch(() => { });
+            if (seq !== switchSeqRef.current) return; // a newer tap won the race
+
+            disposePlayer();
             const newPlayer = createAudioPlayer({ uri: item.uri }, { updateInterval: 500 });
+            playerRef.current = newPlayer;
             // Pick up where this track was left; the status listener seeks
             // once the duration is known.
-            pendingResumeRef.current = item.position && item.position > 5 ? item.position : null;
+            const resume = item.position && item.position > 5 ? item.position : null;
+            pendingResumeRef.current = resume;
             if (playbackRate !== 1) newPlayer.setPlaybackRate(playbackRate, 'high');
             newPlayer.play();
 
-            // The [player] effect releases the previous instance on replace
             setPlayer(newPlayer);
             setCurrentAudio(item);
-            setPosition(0);
-            setDuration(0);
+            setPosition(resume ?? 0);
+            setDuration(item.duration || 0);
             setIsPlaying(true);
         } catch (e) {
             console.error('Error playing audio:', e);
@@ -175,25 +215,28 @@ export default function AudioPlayerScreen() {
     };
 
     const togglePlayback = async () => {
-        if (!player) return;
+        const p = playerRef.current;
+        if (!p) return;
         if (isPlaying) {
-            player.pause();
+            p.pause();
             setIsPlaying(false);
             if (currentAudio) setAudioPosition(currentAudio.id, position);
         } else {
             // Restart from the top if the track already finished
             if (duration > 0 && position >= duration - 0.25) {
-                await player.seekTo(0).catch(() => { });
+                await p.seekTo(0).catch(() => { });
+                setPosition(0);
             }
-            player.play();
+            p.play();
             setIsPlaying(true);
         }
     };
 
     const seekTo = (seconds: number) => {
-        if (!player) return;
+        const p = playerRef.current;
+        if (!p) return;
         const to = Math.max(0, duration > 0 ? Math.min(duration, seconds) : seconds);
-        player.seekTo(to).catch(() => { });
+        p.seekTo(to).catch(() => { });
         setPosition(to);
         if (currentAudio) setAudioPosition(currentAudio.id, to);
     };
@@ -204,7 +247,7 @@ export default function AudioPlayerScreen() {
     const cyclePlaybackRate = () => {
         const next = PLAYBACK_RATES[(PLAYBACK_RATES.indexOf(playbackRate) + 1) % PLAYBACK_RATES.length];
         setPlaybackRateState(next);
-        if (player) player.setPlaybackRate(next, 'high');
+        playerRef.current?.setPlaybackRate(next, 'high');
     };
 
     const handleDelete = async (id: string) => {
@@ -216,12 +259,7 @@ export default function AudioPlayerScreen() {
             destructive: true,
         });
         if (!ok) return;
-        if (currentAudio?.id === id && player) {
-            // The [player] effect releases the instance once it's cleared
-            setPlayer(null);
-            setCurrentAudio(null);
-            setIsPlaying(false);
-        }
+        if (currentAudio?.id === id) stopPlayback();
         await deleteAudioFile(id);
         loadAudios();
         showToast({ message: t('deleted'), type: 'info' });
@@ -238,6 +276,21 @@ export default function AudioPlayerScreen() {
             console.error('Error creating folder:', e);
             showToast({ message: 'Failed to create folder', type: 'error' });
         }
+    };
+
+    const handleDeleteFolder = async (id: string, name: string) => {
+        const ok = await confirm({
+            title: 'Delete Folder',
+            message: `Delete "${name}"? Audio files inside will be moved out of the folder.`,
+            confirmText: t('delete'),
+            cancelText: t('cancel'),
+            destructive: true,
+        });
+        if (!ok) return;
+        await deleteFolder(id);
+        if (currentFolderId === id) setCurrentFolderId(null);
+        loadAudios();
+        showToast({ message: `"${name}" deleted`, type: 'info' });
     };
 
     const openAudioMenu = (item: AudioFile) => {
@@ -306,11 +359,7 @@ export default function AudioPlayerScreen() {
         });
         if (!ok) return;
         for (const id of selectedIds) {
-            if (currentAudio?.id === id && player) {
-                setPlayer(null);
-                setCurrentAudio(null);
-                setIsPlaying(false);
-            }
+            if (currentAudio?.id === id) stopPlayback();
             await deleteAudioFile(id);
         }
         exitSelectMode();
@@ -324,6 +373,36 @@ export default function AudioPlayerScreen() {
         const seconds = Math.floor(totalSeconds % 60);
         return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     };
+
+    const renderFolderItem = (item: Folder) => (
+        <TouchableOpacity
+            style={[styles.audioCard, { backgroundColor: cardColor }]}
+            onPress={() => setCurrentFolderId(item.id)}
+            activeOpacity={0.8}
+        >
+            <View style={styles.cardHeaderAction}>
+                <View style={[styles.audioIconWrapper, { backgroundColor: accentColor + '15' }]}>
+                    <FolderIcon size={28} color={accentColor} fill={accentColor + '30'} />
+                </View>
+                {!selectMode && (
+                    <TouchableOpacity
+                        style={styles.deleteButtonContainer}
+                        onPress={() => handleDeleteFolder(item.id, item.name)}
+                        activeOpacity={0.5}
+                        accessibilityLabel={`Delete folder ${item.name}`}
+                        accessibilityRole="button"
+                    >
+                        <Trash2 size={16} color={mutedForeground} />
+                    </TouchableOpacity>
+                )}
+            </View>
+            <View style={styles.cardTop} />
+            <View style={styles.cardBottom}>
+                <Text style={[styles.audioName, { color: textColor }]} numberOfLines={2}>{item.name}</Text>
+                <Text style={[styles.audioDate, { color: mutedForeground }]}>Folder</Text>
+            </View>
+        </TouchableOpacity>
+    );
 
     const renderAudioItem = ({ item }: { item: AudioFile }) => {
         const isCurrent = currentAudio?.id === item.id;
@@ -390,7 +469,9 @@ export default function AudioPlayerScreen() {
         <View style={[styles.container, { backgroundColor }]}>
             <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
                 <View style={styles.headerTitleContainer}>
-                    <Text style={[styles.title, { color: textColor }]}>{t('audioLibrary')}</Text>
+                    <TouchableOpacity onPress={() => setCurrentFolderId(null)} disabled={!currentFolderId}>
+                        <Text style={[styles.title, { color: textColor }]}>{t('audioLibrary')}</Text>
+                    </TouchableOpacity>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                     <TouchableOpacity
@@ -425,34 +506,26 @@ export default function AudioPlayerScreen() {
 
             <SoundMixer visible={mixerVisible} onClose={() => setMixerVisible(false)} />
 
-            {folders.length > 0 && (
-                <View style={styles.folderFilterRow}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.folderFilterContent}>
-                        <TouchableOpacity
-                            style={[styles.folderFilterChip, { backgroundColor: activeFolderId === 'all' ? accentColor : secondaryBg }]}
-                            onPress={() => setActiveFolderId('all')}
-                        >
-                            <Text style={[styles.folderFilterText, { color: activeFolderId === 'all' ? accentForeground : mutedForeground }]}>All</Text>
-                        </TouchableOpacity>
-                        {folders.map(folder => (
-                            <TouchableOpacity
-                                key={folder.id}
-                                style={[styles.folderFilterChip, { backgroundColor: activeFolderId === folder.id ? accentColor : secondaryBg }]}
-                                onPress={() => setActiveFolderId(activeFolderId === folder.id ? 'all' : folder.id)}
-                            >
-                                <FolderIcon size={13} color={activeFolderId === folder.id ? accentForeground : mutedForeground} strokeWidth={2.5} />
-                                <Text style={[styles.folderFilterText, { color: activeFolderId === folder.id ? accentForeground : mutedForeground }]}>
-                                    {folder.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
+            {currentFolderId !== null && (
+                <View style={styles.breadcrumb}>
+                    <TouchableOpacity onPress={() => setCurrentFolderId(null)}>
+                        <Text style={[styles.breadcrumbText, { color: mutedForeground }]}>Root</Text>
+                    </TouchableOpacity>
+                    <ChevronRight size={14} color={mutedForeground} />
+                    <Text style={[styles.breadcrumbText, { color: textColor, fontWeight: '800' }]}>
+                        {folders.find(f => f.id === currentFolderId)?.name ?? 'Folder'}
+                    </Text>
                 </View>
             )}
 
             <FlatList
-                data={activeFolderId === 'all' ? audios : audios.filter(a => (a.folderId || null) === activeFolderId)}
-                renderItem={renderAudioItem}
+                data={[
+                    ...(currentFolderId === null ? folders.map(f => ({ ...f, isFolder: true as const })) : []),
+                    ...audios.filter(a => (a.folderId || null) === currentFolderId).map(a => ({ ...a, isFolder: false as const })),
+                ]}
+                renderItem={({ item }) => item.isFolder
+                    ? renderFolderItem(item as unknown as Folder)
+                    : renderAudioItem({ item: item as unknown as AudioFile })}
                 keyExtractor={(item) => item.id}
                 numColumns={2}
                 contentContainerStyle={[styles.listContent, { paddingBottom: currentAudio ? 200 : insets.bottom + 24 }]}
@@ -477,7 +550,21 @@ export default function AudioPlayerScreen() {
             {currentAudio && (
                 <View style={[styles.floatingPlayer, { bottom: insets.bottom + 10 }]}>
                     <BlurView intensity={80} tint={backgroundColor === '#ffffff' ? 'light' : 'dark'} style={styles.playerBlur}>
-                        <View style={[styles.playerInner, { backgroundColor: cardColor + '90' }]}>
+                        <View style={[styles.playerInner, { backgroundColor: cardColor + 'F2' }]}>
+                            <View style={styles.playerTitleRow}>
+                                <Text style={[styles.nowPlaying, { color: textColor }]} numberOfLines={1}>
+                                    {currentAudio.name}
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={stopPlayback}
+                                    hitSlop={8}
+                                    accessibilityLabel="Close player"
+                                    accessibilityRole="button"
+                                >
+                                    <X size={18} color={mutedForeground} strokeWidth={2.5} />
+                                </TouchableOpacity>
+                            </View>
+
                             <Slider
                                 style={styles.seekSlider}
                                 minimumValue={0}
@@ -496,21 +583,9 @@ export default function AudioPlayerScreen() {
                             />
 
                             <View style={styles.playerMain}>
-                                <View style={styles.playerInfoColumn}>
-                                    <Text style={[styles.nowPlaying, { color: textColor }]} numberOfLines={1}>
-                                        {currentAudio.name}
-                                    </Text>
-                                    <View style={styles.timeLabel}>
-                                        <Text style={[styles.timeText, { color: accentColor }]}>
-                                            {formatTime(position)}
-                                        </Text>
-                                        <Text style={[styles.timeDivider, { color: mutedForeground }]}> / </Text>
-                                        <Text style={[styles.timeText, { color: mutedForeground }]}>
-                                            {formatTime(duration)}
-                                        </Text>
-                                    </View>
-                                </View>
-
+                                <Text style={[styles.timeText, styles.timeEdge, { color: accentColor }]}>
+                                    {formatTime(position)}
+                                </Text>
                                 <View style={styles.playerControls}>
                                     <TouchableOpacity
                                         onPress={cyclePlaybackRate}
@@ -529,7 +604,7 @@ export default function AudioPlayerScreen() {
                                         accessibilityLabel="Back 15 seconds"
                                         accessibilityRole="button"
                                     >
-                                        <Rewind size={24} color={textColor} strokeWidth={2.25} />
+                                        <Rewind size={26} color={textColor} strokeWidth={2.25} />
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         onPress={togglePlayback}
@@ -550,9 +625,12 @@ export default function AudioPlayerScreen() {
                                         accessibilityLabel="Forward 15 seconds"
                                         accessibilityRole="button"
                                     >
-                                        <FastForward size={24} color={textColor} strokeWidth={2.25} />
+                                        <FastForward size={26} color={textColor} strokeWidth={2.25} />
                                     </TouchableOpacity>
                                 </View>
+                                <Text style={[styles.timeText, styles.timeEdge, styles.timeRight, { color: mutedForeground }]}>
+                                    {formatTime(duration)}
+                                </Text>
                             </View>
                         </View>
                     </BlurView>
@@ -586,7 +664,7 @@ export default function AudioPlayerScreen() {
                             style={[styles.folderChip, { backgroundColor: editAudioFolderId === null ? accentColor : secondaryBg }]}
                             onPress={() => setEditAudioFolderId(null)}
                         >
-                            <Text style={[styles.folderChipText, { color: editAudioFolderId === null ? accentForeground : textColor }]}>None</Text>
+                            <Text style={[styles.folderChipText, { color: editAudioFolderId === null ? accentForeground : textColor }]}>Root</Text>
                         </TouchableOpacity>
                         {folders.map((folder) => (
                             <TouchableOpacity
@@ -652,7 +730,7 @@ export default function AudioPlayerScreen() {
                     activeOpacity={0.8}
                 >
                     <Music size={18} color={accentColor} strokeWidth={2.5} />
-                    <Text style={[styles.sheetActionText, { color: textColor }]}>No folder</Text>
+                    <Text style={[styles.sheetActionText, { color: textColor }]}>Root</Text>
                 </TouchableOpacity>
                 {folders.map(folder => (
                     <TouchableOpacity
@@ -751,24 +829,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 12,
     },
-    folderFilterRow: {
-        marginBottom: 12,
-    },
-    folderFilterContent: {
-        paddingHorizontal: 24,
-        gap: 8,
-    },
-    folderFilterChip: {
+    breadcrumb: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 16,
+        gap: 4,
+        paddingHorizontal: 24,
+        marginBottom: 12,
     },
-    folderFilterText: {
-        fontSize: 13,
-        fontWeight: '700',
+    breadcrumbText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
     modalContent: {
         borderTopLeftRadius: 28,
@@ -1023,15 +1093,28 @@ const styles = StyleSheet.create({
         paddingTop: 12,
         borderRadius: 30,
     },
+    playerTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        marginBottom: 2,
+    },
     seekSlider: {
         width: '100%',
         height: 32,
-        marginBottom: 4,
+        marginBottom: 2,
     },
     playerControls: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 14,
+    },
+    timeEdge: {
+        minWidth: 42,
+    },
+    timeRight: {
+        textAlign: 'right',
     },
     rateChip: {
         paddingHorizontal: 10,
@@ -1050,27 +1133,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
     },
-    playerInfoColumn: {
-        flex: 1,
-        marginRight: 16,
-    },
     nowPlaying: {
+        flex: 1,
         fontSize: 16,
         fontWeight: '800',
         letterSpacing: -0.3,
     },
-    timeLabel: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 4,
-    },
     timeText: {
         fontSize: 12,
         fontWeight: '800',
-    },
-    timeDivider: {
-        fontSize: 12,
-        fontWeight: '600',
+        fontVariant: ['tabular-nums'],
     },
     floatingPlayBtn: {
         width: 52,
