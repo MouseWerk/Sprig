@@ -896,6 +896,63 @@ export async function recordConfusion(deckId: string, cardX: number, cardY: numb
     );
 }
 
+// Cross-deck "hardest cards": lowest SM-2 ease factors first. Only cards
+// that have actually been reviewed and struggled with (ease below the 2.5
+// starting value) qualify.
+export interface HardCard {
+    deckId: string;
+    deckName: string;
+    deckUri: string;
+    cardIndex: number;
+    question: string;
+    easeFactor: number;
+}
+
+export async function getHardestCards(limit: number = 8): Promise<HardCard[]> {
+    try {
+        const db = await getDb();
+        const rows = await db.getAllAsync<{
+            deck_id: string; card_index: number; ease_factor: number;
+            question: string; name: string; uri: string;
+        }>(
+            `SELECT s.deck_id, s.card_index, s.ease_factor, c.question, d.name, d.uri
+             FROM srs s
+             JOIN cards_cache c ON c.deck_id = s.deck_id AND c.card_index = s.card_index
+             JOIN decks d ON d.id = s.deck_id
+             WHERE s.ease_factor < 2.5
+             ORDER BY s.ease_factor ASC
+             LIMIT ?`,
+            limit
+        );
+        return rows.map(r => ({
+            deckId: r.deck_id,
+            deckName: r.name,
+            deckUri: r.uri,
+            cardIndex: r.card_index,
+            question: r.question,
+            easeFactor: r.ease_factor,
+        }));
+    } catch {
+        return [];
+    }
+}
+
+// Full wipe: every table + the copied deck/audio files. Preferences and
+// theme (AsyncStorage) are cleared by the caller.
+export async function wipeAllData(): Promise<void> {
+    const db = await getDb();
+    await serialized(() =>
+        db.withTransactionAsync(async () => {
+            for (const table of ['decks', 'folders', 'srs', 'cards_cache', 'audio_files', 'pdf_progress', 'confusions', 'kv']) {
+                await db.runAsync(`DELETE FROM ${table}`);
+            }
+        })
+    );
+    for (const dir of ['decks/', 'audio/']) {
+        await FileSystem.deleteAsync(`${FileSystem.documentDirectory}${dir}`, { idempotent: true }).catch(() => { });
+    }
+}
+
 // Pairs confused at least twice, most-confused first
 export async function getConfusionPairs(deckId: string, limit: number = 5): Promise<ConfusionPair[]> {
     try {

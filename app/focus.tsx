@@ -1,7 +1,9 @@
 import { SoundMixer, anySoundPlaying, stopAllSounds } from '@/components/SoundMixer';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from '@/utils/AppHaptics';
+import { useNavigation } from '@react-navigation/native';
 import { FOCUS_MINUTES_OPTIONS, getPrefsSync, setPref } from '@/utils/Preferences';
 import { recordFocusSession } from '@/utils/Storage';
 import { Stack } from 'expo-router';
@@ -52,6 +54,8 @@ function Ring({ size, progress, color, track }: RingProps) {
 export default function FocusScreen() {
     const insets = useSafeAreaInsets();
     const { showToast } = useToast();
+    const confirm = useConfirm();
+    const navigation = useNavigation();
 
     const [phase, setPhase] = useState<Phase>('setup');
     const [minutes, setMinutes] = useState(() => getPrefsSync().defaultFocusMinutes);
@@ -123,6 +127,25 @@ export default function FocusScreen() {
     useEffect(() => {
         return () => { cancelNotification(warningIdRef.current); };
     }, []);
+
+    // Leaving mid-session via back would silently kill the plant - confirm
+    // first. Setup/done/dead phases navigate away freely.
+    useEffect(() => {
+        const unsub = navigation.addListener('beforeRemove', (e: any) => {
+            if (phaseRef.current !== 'running' && phaseRef.current !== 'paused') return;
+            e.preventDefault();
+            confirm({
+                title: 'Give up this session?',
+                message: 'Your plant won\'t survive if you leave now.',
+                confirmText: 'Give Up',
+                destructive: true,
+            }).then(ok => {
+                if (ok) navigation.dispatch(e.data.action);
+            });
+        });
+        return unsub;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [navigation]);
 
     const startSession = async (mins: number) => {
         await ensureNotificationPermissions();

@@ -8,13 +8,13 @@ import { SprigLogo } from '@/components/SprigLogo';
 import { createBackup, importBackup } from '@/utils/Backup';
 import { cancelStreakReminder, scheduleStreakReminder } from '@/utils/Notifications';
 import { DAILY_GOAL_OPTIONS, FOCUS_MINUTES_OPTIONS, Preferences, REMINDER_HOUR_MAX, REMINDER_HOUR_MIN, getPrefsSync, setPref, subscribePrefs } from '@/utils/Preferences';
-import { clearCardCache } from '@/utils/Storage';
+import { clearCardCache, wipeAllData } from '@/utils/Storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { Bell, ChevronRight, Clock, Database, DownloadCloud, Github, Info, Monitor, Moon, PlayCircle, ScrollText, ShieldCheck, Smartphone, Sun, Target, Timer, UploadCloud, Vibrate } from 'lucide-react-native';
+import { Bell, ChevronRight, Clock, Coffee, Database, DownloadCloud, Github, Info, Monitor, Moon, PlayCircle, ScrollText, ShieldCheck, Smartphone, Star, Sun, Target, Timer, Trash2, UploadCloud, Vibrate } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Linking, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -110,6 +110,43 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleRate = async () => {
+    // Try the Play Store app first, fall back to the web listing
+    try {
+      await Linking.openURL('market://details?id=com.mousewerk.sprig');
+    } catch {
+      await openUrl('https://play.google.com/store/apps/details?id=com.mousewerk.sprig');
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    const first = await confirm({
+      title: 'Delete all data?',
+      message: 'This permanently removes every deck, PDF, audio file, and all your stats and achievements. A backup first is strongly recommended.',
+      confirmText: 'Continue',
+      destructive: true,
+    });
+    if (!first) return;
+    const second = await confirm({
+      title: 'Are you absolutely sure?',
+      message: 'There is no undo. Everything will be gone.',
+      confirmText: 'Delete Everything',
+      destructive: true,
+    });
+    if (!second) return;
+    setBusy(true);
+    try {
+      await wipeAllData();
+      await AsyncStorage.clear();
+      showToast({ message: 'All data deleted. Restart Sprig for a fresh start.', type: 'info' });
+    } catch (e) {
+      console.error('Wipe failed:', e);
+      showToast({ message: 'Could not delete everything', type: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleBackup = async () => {
     if (busy) return;
     setBusy(true);
@@ -155,16 +192,16 @@ export default function SettingsScreen() {
     }
   };
 
-  const SettingItem = ({ icon: Icon, label, value, onPress, toggle, rightElement }: any) => (
+  const SettingItem = ({ icon: Icon, label, value, onPress, toggle, rightElement, destructive }: any) => (
     <TouchableOpacity
       style={[styles.item, { backgroundColor: cardColor }]}
       onPress={onPress}
       activeOpacity={onPress ? 0.7 : 1}
     >
-      <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
-        <Icon size={20} color={accentColor} strokeWidth={2.5} />
+      <View style={[styles.iconContainer, { backgroundColor: destructive ? '#ef444418' : secondaryBg }]}>
+        <Icon size={20} color={destructive ? '#ef4444' : accentColor} strokeWidth={2.5} />
       </View>
-      <Text style={[styles.itemLabel, { color: textColor }]}>{label}</Text>
+      <Text style={[styles.itemLabel, { color: destructive ? '#ef4444' : textColor }]}>{label}</Text>
       {value && <Text style={[styles.itemValue, { color: mutedForeground }]}>{value}</Text>}
       {toggle !== undefined && (
         <Switch
@@ -319,10 +356,13 @@ export default function SettingsScreen() {
         <View style={styles.group}>
           <SettingItem icon={Database} label="Clear Cache" onPress={handleClearCache} />
           <SettingItem icon={ShieldCheck} label="Privacy" onPress={handlePrivacy} />
+          <SettingItem icon={Trash2} label="Delete All Data" onPress={handleDeleteAll} destructive />
         </View>
 
         <SectionHeader title="COMMUNITY" />
         <View style={styles.group}>
+          <SettingItem icon={Coffee} label="Support Development" onPress={() => openUrl('https://buymeacoffee.com/mousewerk')} />
+          <SettingItem icon={Star} label="Rate Sprig" onPress={handleRate} />
           <SettingItem icon={Github} label="Github Repository" onPress={() => openUrl('https://github.com/MouseWerk/Sprig')} />
           <SettingItem icon={Smartphone} label="Share with Friends" onPress={handleShare} />
         </View>

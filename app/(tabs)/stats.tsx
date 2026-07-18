@@ -3,12 +3,51 @@ import { LevelCard } from '@/components/LevelCard';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { ACHIEVEMENTS, unlockedCount } from '@/utils/Achievements';
 import { getLevelInfo } from '@/utils/Levels';
-import { getDecks, getUserStats, UserStats } from '@/utils/Storage';
+import { getDecks, getHardestCards, getUserStats, HardCard, UserStats } from '@/utils/Storage';
+import { startTodaySession, TodayDeckEntry } from '@/utils/TodayPlan';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Award, BookOpen, ChevronRight, Clock, Database, Flame, Snowflake, TrendingUp, Zap } from 'lucide-react-native';
+import { Award, BookOpen, Brain, ChevronRight, Clock, Database, Flame, Snowflake, TrendingUp, Zap } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+interface WeekRecap {
+    thisWeek: number;
+    activeDays: number;
+    bestDay: string | null;
+    bestCount: number;
+    deltaPct: number | null; // vs previous 7 days; null when last week was empty
+}
+
+// Sums the last 7 days (incl. today) and the 7 before from the per-day
+// review counts the heatmap already stores.
+function computeWeekRecap(dailyReviews: Record<string, number> | undefined): WeekRecap {
+    const recap: WeekRecap = { thisWeek: 0, activeDays: 0, bestDay: null, bestCount: 0, deltaPct: null };
+    if (!dailyReviews) return recap;
+    let lastWeek = 0;
+    for (let i = 0; i < 14; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().split('T')[0];
+        const n = dailyReviews[key] || 0;
+        if (i < 7) {
+            recap.thisWeek += n;
+            if (n > 0) recap.activeDays++;
+            if (n > recap.bestCount) {
+                recap.bestCount = n;
+                recap.bestDay = DAY_NAMES[d.getDay()];
+            }
+        } else {
+            lastWeek += n;
+        }
+    }
+    if (lastWeek > 0) {
+        recap.deltaPct = Math.round(((recap.thisWeek - lastWeek) / lastWeek) * 100);
+    }
+    return recap;
+}
 
 export default function StatsScreen() {
     const insets = useSafeAreaInsets();
@@ -23,17 +62,47 @@ export default function StatsScreen() {
     const router = useRouter();
     const [stats, setStats] = useState<UserStats | null>(null);
     const [deckCount, setDeckCount] = useState(0);
+    const [hardest, setHardest] = useState<HardCard[]>([]);
 
     useFocusEffect(
         useCallback(() => {
-            Promise.all([getUserStats(), getDecks()])
-                .then(([userStats, decks]) => {
+            Promise.all([getUserStats(), getDecks(), getHardestCards(8)])
+                .then(([userStats, decks, hard]) => {
                     setStats(userStats);
                     setDeckCount(decks.length);
+                    setHardest(hard);
                 })
                 .catch(() => { });
         }, [])
     );
+
+    // Drill all listed hard cards, grouped per deck and chained like a
+    // Today session.
+    const drillHardest = () => {
+        if (hardest.length === 0) return;
+        const byDeck = new Map<string, TodayDeckEntry>();
+        for (const c of hardest) {
+            const entry = byDeck.get(c.deckId) ?? { deckId: c.deckId, deckName: c.deckName, uri: c.deckUri, cardIndices: [] };
+            if (!entry.cardIndices.includes(c.cardIndex)) entry.cardIndices.push(c.cardIndex);
+            byDeck.set(c.deckId, entry);
+        }
+        const entries = Array.from(byDeck.values());
+        const first = startTodaySession({ entries, totalCards: hardest.length, dueCount: 0, examCount: 0, trickyCount: hardest.length });
+        if (!first) return;
+        router.push({
+            pathname: '/swipe',
+            params: {
+                id: first.deckId,
+                uri: first.uri,
+                name: first.deckName,
+                mode: 'all',
+                cards: first.cardIndices.join(','),
+                today: '1',
+            },
+        });
+    };
+
+    const recap = computeWeekRecap(stats?.dailyReviews);
 
     const formatStudyTime = (seconds: number) => {
         if (seconds < 60) return `${seconds}s`;
@@ -91,10 +160,63 @@ export default function StatsScreen() {
             >
                 {stats && <LevelCard stats={stats} displayStreak={displayStreak} />}
 
+                {recap.thisWeek > 0 && (
+                    <>
+                        <SectionHeader title="THIS WEEK" />
+                        <View style={[styles.recapCard, { backgroundColor: cardColor }]}>
+                            <View style={styles.recapTop}>
+                                <Text style={[styles.recapBig, { color: textColor }]}>{recap.thisWeek}</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[styles.recapLabel, { color: mutedForeground }]}>
+                                        cards in the last 7 days
+                                    </Text>
+                                    {recap.deltaPct !== null && (
+                                        <Text style={[styles.recapDelta, { color: recap.deltaPct >= 0 ? '#22c55e' : '#ef4444' }]}>
+                                            {recap.deltaPct >= 0 ? '▲' : '▼'} {Math.abs(recap.deltaPct)}% vs the week before
+                                        </Text>
+                                    )}
+                                </View>
+                            </View>
+                            <Text style={[styles.recapSub, { color: mutedForeground }]}>
+                                {recap.activeDays} active day{recap.activeDays === 1 ? '' : 's'}
+                                {recap.bestDay ? ` · best: ${recap.bestDay} (${recap.bestCount})` : ''}
+                            </Text>
+                        </View>
+                    </>
+                )}
+
                 <SectionHeader title="ACTIVITY" />
                 <View style={[styles.heatmapCard, { backgroundColor: cardColor }]}>
                     <ReviewHeatmap data={stats?.dailyReviews} />
                 </View>
+
+                {hardest.length > 0 && (
+                    <>
+                        <View style={styles.hardHeaderRow}>
+                            <SectionHeader title="TOUGHEST CARDS" />
+                            <TouchableOpacity
+                                style={[styles.hardDrillBtn, { backgroundColor: accentColor }]}
+                                onPress={drillHardest}
+                                accessibilityLabel="Drill your toughest cards"
+                                accessibilityRole="button"
+                            >
+                                <Brain size={13} color={backgroundColor} strokeWidth={2.5} />
+                                <Text style={[styles.hardDrillText, { color: backgroundColor }]}>Drill</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.group}>
+                            {hardest.map(c => (
+                                <View key={`${c.deckId}-${c.cardIndex}`} style={[styles.item, { backgroundColor: cardColor }]}>
+                                    <View style={[styles.hardDot, { backgroundColor: c.easeFactor <= 1.5 ? '#ef4444' : c.easeFactor <= 2.0 ? '#f97316' : '#eab308' }]} />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.hardQuestion, { color: textColor }]} numberOfLines={1}>{c.question}</Text>
+                                        <Text style={[styles.hardDeck, { color: mutedForeground }]} numberOfLines={1}>{c.deckName}</Text>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    </>
+                )}
 
                 <SectionHeader title="LIFETIME" />
                 <View style={styles.group}>
@@ -163,6 +285,69 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         padding: 16,
         alignItems: 'center',
+    },
+    recapCard: {
+        borderRadius: 24,
+        padding: 18,
+        gap: 8,
+    },
+    recapTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+    },
+    recapBig: {
+        fontSize: 40,
+        fontWeight: '900',
+        letterSpacing: -1,
+    },
+    recapLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    recapDelta: {
+        fontSize: 12,
+        fontWeight: '800',
+        marginTop: 2,
+    },
+    recapSub: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    hardHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingRight: 4,
+    },
+    hardDrillBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+        marginTop: 8,
+    },
+    hardDrillText: {
+        fontSize: 12,
+        fontWeight: '900',
+    },
+    hardDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        marginRight: 14,
+        marginLeft: 4,
+    },
+    hardQuestion: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    hardDeck: {
+        fontSize: 11,
+        fontWeight: '600',
+        marginTop: 1,
     },
     group: {
         borderRadius: 24,

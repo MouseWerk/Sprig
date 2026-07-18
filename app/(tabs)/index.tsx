@@ -3,7 +3,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Icons from 'lucide-react-native';
-import { CalendarCheck, ChevronRight, FileUp, Folder as FolderIcon, Leaf, Play, Plus, Search, Trash2, X } from 'lucide-react-native';
+import { CalendarCheck, ChevronRight, ClipboardPaste, FileUp, Folder as FolderIcon, Leaf, Play, Plus, Search, Trash2, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +15,8 @@ import { Button } from '../../components/ui/Button';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { useToast } from '../../components/ui/Toast';
+import * as FileSystem from 'expo-file-system/legacy';
+import { parseFlashcardsText } from '../../utils/CsvParser';
 import { createEmptyDeck, Deck, deleteDeck, deleteFolder, Folder, getDecks, getExamPlan, getFolders, getUserStats, importCsvToDeck, saveFolder, updateDeck, UserStats } from '../../utils/Storage';
 import { buildTodayPlan, startTodaySession, TodayPlan } from '../../utils/TodayPlan';
 
@@ -31,6 +33,8 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [stats, setStats] = useState<UserStats | null>(null);
   const [todayPlan, setTodayPlan] = useState<TodayPlan | null>(null);
+  const [showPaste, setShowPaste] = useState(false);
+  const [pasteText, setPasteText] = useState('');
 
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [newFolderModalVisible, setNewFolderModalVisible] = useState(false);
@@ -127,6 +131,38 @@ export default function HomeScreen() {
       showToast({ message: t('deckCreated').replace('{name}', name), type: 'success' });
     } catch (e) {
       console.error('Error importing file:', e);
+      showToast({ message: t('error'), type: 'error' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleImportPasted = async () => {
+    const text = pasteText.trim();
+    if (!text) return;
+    const parsed = parseFlashcardsText(text);
+    if (parsed.length === 0) {
+      showToast({ message: 'No question/answer pairs found in the pasted text', type: 'warning' });
+      return;
+    }
+    setImporting(true);
+    try {
+      const name = boxName.trim() || 'Pasted Deck';
+      const tmp = `${FileSystem.cacheDirectory}pasted_${Date.now()}.csv`;
+      await FileSystem.writeAsStringAsync(tmp, text);
+      const newDeck = await createEmptyDeck(name, selectedIcon, currentFolderId);
+      await importCsvToDeck(newDeck.id, tmp);
+      await FileSystem.deleteAsync(tmp, { idempotent: true }).catch(() => { });
+
+      setImportModalVisible(false);
+      setBoxName('');
+      setSelectedIcon('Book');
+      setPasteText('');
+      setShowPaste(false);
+      loadData();
+      showToast({ message: `"${name}" created · ${parsed.length} cards`, type: 'success' });
+    } catch (e) {
+      console.error('Error importing pasted cards:', e);
       showToast({ message: t('error'), type: 'error' });
     } finally {
       setImporting(false);
@@ -585,6 +621,43 @@ export default function HomeScreen() {
                     </View>
                   </TouchableOpacity>
 
+                  <TouchableOpacity
+                    style={[styles.importZone, { borderColor: accentColor, backgroundColor: secondaryBg }]}
+                    onPress={() => setShowPaste(p => !p)}
+                    activeOpacity={0.8}
+                    accessibilityLabel="Paste cards as text"
+                    accessibilityRole="button"
+                  >
+                    <ClipboardPaste size={22} color={accentColor} strokeWidth={2.5} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.pickText, { color: textColor, fontSize: 15 }]}>Paste Cards as Text</Text>
+                      <Text style={[styles.pickSub, { color: mutedForeground }]}>
+                        One card per line: question, answer
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {showPaste && (
+                    <>
+                      <TextInput
+                        style={[styles.pasteInput, { color: textColor, backgroundColor: secondaryBg, borderColor: accentColor + '40' }]}
+                        value={pasteText}
+                        onChangeText={setPasteText}
+                        placeholder={'What is H2O?, Water\nCapital of France - Paris\n…'}
+                        placeholderTextColor={mutedForeground}
+                        multiline
+                        autoCorrect={false}
+                        accessibilityLabel="Pasted cards text"
+                      />
+                      <Button
+                        title={importing ? 'Importing…' : 'Import Pasted Cards'}
+                        onPress={handleImportPasted}
+                        disabled={importing || pasteText.trim().length === 0}
+                        style={{ height: 52 }}
+                      />
+                    </>
+                  )}
+
                   <Button
                     title="Start Building"
                     onPress={handleCreateDeck}
@@ -924,6 +997,15 @@ const styles = StyleSheet.create({
   pickSub: {
     fontSize: 13,
     opacity: 0.6,
+  },
+  pasteInput: {
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 14,
+    minHeight: 110,
+    fontSize: 14,
+    fontWeight: '500',
+    textAlignVertical: 'top',
   },
   importZone: {
     flexDirection: 'row',
