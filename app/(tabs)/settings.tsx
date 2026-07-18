@@ -9,7 +9,7 @@ import { createBackup, importBackup } from '@/utils/Backup';
 import { cancelStreakReminder, scheduleStreakReminder } from '@/utils/Notifications';
 import { DAILY_GOAL_OPTIONS, FOCUS_MINUTES_OPTIONS, Preferences, REMINDER_HOUR_MAX, REMINDER_HOUR_MIN, getPrefsSync, setPref, subscribePrefs } from '@/utils/Preferences';
 import { clearCardCache, wipeAllData } from '@/utils/Storage';
-import { getWebServerUrl, isWebServerRunning, isWebServerSupported, startWebServer, stopWebServer } from '@/utils/WebServer';
+import { getWebServerLog, getWebServerUrl, isWebServerRunning, isWebServerSupported, startWebServer, stopWebServer } from '@/utils/WebServer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
@@ -42,8 +42,13 @@ export default function SettingsScreen() {
 
   const [webServerOn, setWebServerOn] = useState(isWebServerRunning());
   const [webServerUrl, setWebServerUrl] = useState<string | null>(null);
+  const [webServerLog, setWebServerLog] = useState<string[]>([]);
   useEffect(() => {
-    if (webServerOn) getWebServerUrl().then(setWebServerUrl);
+    if (!webServerOn) return;
+    getWebServerUrl().then(setWebServerUrl);
+    // Poll the request log so incoming connections are visible right here
+    const timer = setInterval(() => setWebServerLog(getWebServerLog()), 2000);
+    return () => clearInterval(timer);
   }, [webServerOn]);
 
   const toggleWebServer = async () => {
@@ -399,6 +404,18 @@ export default function SettingsScreen() {
               </View>
             </View>
           )}
+          {webServerOn && webServerLog.length > 0 && (
+            <View style={[styles.item, { backgroundColor: cardColor, alignItems: 'flex-start' }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.itemHint, { color: mutedForeground, marginBottom: 6 }]}>Recent requests</Text>
+                {webServerLog.slice(0, 6).map((line, i) => (
+                  <Text key={i} style={[styles.logLine, { color: mutedForeground }]} numberOfLines={1}>
+                    {line}
+                  </Text>
+                ))}
+              </View>
+            </View>
+          )}
         </View>
 
         <SectionHeader title="BACKUP & RESTORE" />
@@ -504,6 +521,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     marginTop: 3,
+  },
+  logLine: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontFamily: 'monospace',
   },
   chipRow: {
     flexDirection: 'row',

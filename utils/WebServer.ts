@@ -39,6 +39,18 @@ let server: { close: () => void } | null = null;
 const uploads = new Map<string, PendingUpload>();
 let sweepTimer: ReturnType<typeof setInterval> | null = null;
 
+// Small on-device request log so connection problems can be diagnosed from
+// the Settings screen without adb or a debugger.
+const requestLog: string[] = [];
+function logRequest(entry: string) {
+    const time = new Date().toTimeString().slice(0, 8);
+    requestLog.unshift(`${time}  ${entry}`);
+    if (requestLog.length > 20) requestLog.pop();
+}
+export function getWebServerLog(): string[] {
+    return [...requestLog];
+}
+
 export function isWebServerSupported(): boolean {
     // In Expo Go the JS package resolves but the native module is absent.
     return NativeModules.TcpSockets != null;
@@ -89,8 +101,17 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
             return Buffer.from(s, 'utf8');
         };
 
+        let loggedFirstChunk = false;
+
         socket.on('data', (data: unknown) => {
             try {
+                if (!loggedFirstChunk) {
+                    loggedFirstChunk = true;
+                    const kind = Buffer.isBuffer(data) ? 'buffer' : data instanceof Uint8Array ? 'bytes' : typeof data;
+                    const preview = toBuffer(data).subarray(0, 60).toString('utf8').replace(/[^\x20-\x7e]/g, '·');
+                    logRequest(`in (${kind}): ${preview}`);
+                }
+
                 buf = Buffer.concat([buf, toBuffer(data)]);
 
                 // If the first chunk was a string that doesn't look like HTTP,
@@ -100,10 +121,17 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
                     if (decoded.subarray(0, 200).toString('utf8').includes('HTTP/')) {
                         base64Mode = true;
                         buf = decoded;
+                        logRequest('note: chunks arrive base64-encoded');
                     }
                 }
 
                 if (headerEnd < 0) {
+                    // Ignore leading blank lines (allowed by the HTTP spec and
+                    // seen from some clients between keep-alive requests).
+                    let skip = 0;
+                    while (skip < buf.length && (buf[skip] === 13 || buf[skip] === 10)) skip++;
+                    if (skip > 0) buf = buf.subarray(skip);
+
                     headerEnd = buf.indexOf('\r\n\r\n');
                     if (headerEnd < 0) {
                         if (buf.length > 64 * 1024) socket.destroy();
@@ -123,22 +151,38 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
 
                 const head = buf.subarray(0, headerEnd).toString('utf8');
                 const body = buf.subarray(bodyStart, bodyStart + contentLength).toString('utf8');
-                const [requestLine] = head.split('\r\n');
-                const [method, rawPath] = requestLine.split(' ');
+                const requestLine = head.split('\r\n').map(l => l.trim()).find(l => l.length > 0) || '';
 
-                handleRequest(socket, method, normalizePath(rawPath), body, onFileSaved).catch(e => {
+                if (!/HTTP\//i.test(requestLine)) {
+                    // Not parseable as HTTP at all — serve the page rather than
+                    // a 404 so a browser always lands somewhere useful.
+                    logRequest(`unparseable request line: "${requestLine.slice(0, 60)}" -> serving page`);
+                    respond(socket, 200, 'text/html', UPLOAD_PAGE);
+                    return;
+                }
+
+                const [method, rawPath] = requestLine.split(/\s+/);
+                const path = normalizePath(rawPath);
+                logRequest(`${method} ${path}`);
+
+                handleRequest(socket, (method || '').toUpperCase(), path, body, onFileSaved).catch(e => {
                     console.error('WebServer handler error:', e);
                     respond(socket, 500, 'application/json', '{"error":"internal"}');
                 });
             } catch (e) {
                 console.error('WebServer request error:', e);
+                logRequest(`error: ${String(e).slice(0, 80)}`);
                 respond(socket, 500, 'application/json', '{"error":"internal"}');
             }
         });
         socket.on('error', () => { /* client vanished — nothing to do */ });
     });
 
+    (server as any).on?.('error', (e: unknown) => {
+        logRequest(`server error: ${String(e).slice(0, 80)}`);
+    });
     (server as any).listen({ port: WEB_SERVER_PORT, host: '0.0.0.0' });
+    logRequest(`server listening on :${WEB_SERVER_PORT}`);
 
     sweepTimer = setInterval(() => {
         const now = Date.now();
@@ -266,7 +310,13 @@ async function handleRequest(
         return;
     }
 
-    respond(socket, 404, 'text/plain', 'Not found');
+    if (method === 'POST') {
+        respond(socket, 404, 'application/json', '{"error":"unknown endpoint"}');
+        return;
+    }
+    // HEAD/OPTIONS and anything else: the page is always a safe answer.
+    logRequest(`method ${method} -> serving page`);
+    respond(socket, 200, 'text/html', UPLOAD_PAGE);
 }
 
 function sanitizeName(name: string): string {
