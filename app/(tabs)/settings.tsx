@@ -9,12 +9,13 @@ import { createBackup, importBackup } from '@/utils/Backup';
 import { cancelStreakReminder, scheduleStreakReminder } from '@/utils/Notifications';
 import { DAILY_GOAL_OPTIONS, FOCUS_MINUTES_OPTIONS, Preferences, REMINDER_HOUR_MAX, REMINDER_HOUR_MIN, getPrefsSync, setPref, subscribePrefs } from '@/utils/Preferences';
 import { clearCardCache, wipeAllData } from '@/utils/Storage';
+import { getWebServerUrl, isWebServerRunning, isWebServerSupported, startWebServer, stopWebServer } from '@/utils/WebServer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { Bell, ChevronRight, Clock, Coffee, Database, DownloadCloud, Github, Info, Monitor, Moon, PlayCircle, ScrollText, ShieldCheck, Smartphone, Star, Sun, Target, Timer, Trash2, UploadCloud, Vibrate } from 'lucide-react-native';
+import { Bell, ChevronRight, Clock, Coffee, Database, DownloadCloud, Github, Info, Monitor, Moon, PlayCircle, ScrollText, ShieldCheck, Smartphone, Star, Sun, Target, Timer, Trash2, UploadCloud, Vibrate, Wifi } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Linking, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,6 +39,37 @@ export default function SettingsScreen() {
   const [busy, setBusy] = useState(false);
   const [prefs, setPrefs] = useState<Preferences>(getPrefsSync());
   useEffect(() => subscribePrefs(setPrefs), []);
+
+  const [webServerOn, setWebServerOn] = useState(isWebServerRunning());
+  const [webServerUrl, setWebServerUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (webServerOn) getWebServerUrl().then(setWebServerUrl);
+  }, [webServerOn]);
+
+  const toggleWebServer = async () => {
+    if (webServerOn) {
+      stopWebServer();
+      setWebServerOn(false);
+      setWebServerUrl(null);
+      return;
+    }
+    if (!isWebServerSupported()) {
+      showToast({ message: 'Web upload needs the full app build — it isn\'t available in Expo Go', type: 'warning' });
+      return;
+    }
+    try {
+      const url = await startWebServer((name) => {
+        showToast({ message: `Received ${name}`, type: 'success' });
+      });
+      setWebServerUrl(url);
+      setWebServerOn(true);
+    } catch (e: any) {
+      showToast({
+        message: e?.message === 'no-network' ? 'Connect to WiFi first' : 'Could not start the upload server',
+        type: 'error',
+      });
+    }
+  };
 
   const isDarkMode = theme === 'dark';
 
@@ -346,6 +378,29 @@ export default function SettingsScreen() {
           <SettingItem icon={PlayCircle} label="Replay Intro" onPress={replayOnboarding} />
         </View>
 
+        <SectionHeader title="WEB UPLOAD" />
+        <View style={styles.group}>
+          <SettingItem
+            icon={Wifi}
+            label="Upload from Computer"
+            toggle={webServerOn}
+            onPress={toggleWebServer}
+          />
+          {webServerOn && webServerUrl && (
+            <View style={[styles.item, { backgroundColor: cardColor }]}>
+              <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
+                <Monitor size={20} color={accentColor} strokeWidth={2.5} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.itemLabel, { color: textColor }]}>{webServerUrl}</Text>
+                <Text style={[styles.itemHint, { color: mutedForeground }]}>
+                  Open this address in a browser on the same WiFi to drop PDFs and audio files into Sprig. Keep the app open while transferring.
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+
         <SectionHeader title="BACKUP & RESTORE" />
         <View style={styles.group}>
           <SettingItem icon={DownloadCloud} label={busy ? 'Working…' : 'Back Up Everything'} onPress={handleBackup} />
@@ -444,6 +499,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     marginRight: 8,
+  },
+  itemHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 3,
   },
   chipRow: {
     flexDirection: 'row',
