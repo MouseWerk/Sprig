@@ -97,7 +97,7 @@ export default function SettingsScreen() {
       cancelText: 'Close',
     });
     if (viewFull) {
-      await openUrl('https://mauricekleindienst.github.io/csvtudyapp/privacy.html');
+      await openUrl('https://mousewerk.de/sprig/privacy');
     }
   };
 
