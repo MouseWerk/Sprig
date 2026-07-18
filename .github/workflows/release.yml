@@ -1,0 +1,114 @@
+name: Build and Release APK
+
+# Builds a signed release APK whenever the version in app.json is bumped
+# on master, and publishes it as a GitHub release tagged v<version>.
+#
+# Required repository secret:
+#   EXPO_TOKEN — an Expo access token (expo.dev → Account settings → Access tokens)
+#                for the account that owns the EAS project.
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - app.json
+  workflow_dispatch:   # manual "Run workflow" button — always builds
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+      version: ${{ steps.diff.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Compare app.json version with previous commit
+        id: diff
+        run: |
+          CURRENT=$(jq -r '.expo.version' app.json)
+          PREVIOUS=$(git show HEAD~1:app.json 2>/dev/null | jq -r '.expo.version' || echo "")
+          echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Manual run, building v$CURRENT."
+          elif [ "$CURRENT" != "$PREVIOUS" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Version bump detected: $PREVIOUS -> $CURRENT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Version unchanged ($CURRENT), skipping release."
+          fi
+
+  release:
+    needs: check-version
+    if: needs.check-version.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so --generate-notes covers all commits
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build release APK on EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          npx eas-cli build \
+            --platform android \
+            --profile production-apk \
+            --non-interactive \
+            --wait \
+            --json > build.json
+          cat build.json
+
+      - name: Download APK artifact
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          APK_URL=$(jq -r '.[0].artifacts.buildUrl' build.json)
+          curl -fL "$APK_URL" -o "Sprig-v$VERSION.apk"
+          ls -la "Sprig-v$VERSION.apk"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            gh release upload "v$VERSION" "Sprig-v$VERSION.apk" --clobber
+          else
+            gh release create "v$VERSION" \
+              "Sprig-v$VERSION.apk" \
+              --title "Sprig v$VERSION" \
+              --generate-notes \
+              --target "$GITHUB_SHA"
+          fi
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: apk-v${{ needs.check-version.outputs.version }}
+          path: Sprig-*.apk
+          retention-days: 30

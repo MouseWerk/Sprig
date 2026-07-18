@@ -9,14 +9,16 @@
 A calm, offline-first study app for Android. Import a `question,answer` file and it becomes a
 spaced-repetition deck — swipe through cards, quiz yourself, and grow a plant while you focus.
 
-[Website](https://mauricekleindienst.github.io/csvtudyapp/) ·
-[Privacy Policy](https://mauricekleindienst.github.io/csvtudyapp/privacy.html) ·
-[Buy me a coffee ☕](https://buymeacoffee.com/mousewerk)
-
 ![Expo](https://img.shields.io/badge/Expo_SDK_54-000020?logo=expo&logoColor=white)
 ![React Native](https://img.shields.io/badge/React_Native-0f172a?logo=react&logoColor=61dafb)
 ![Android](https://img.shields.io/badge/Android-white?logo=android&logoColor=3ddc84)
 ![Offline first](https://img.shields.io/badge/100%25_offline-no_account_needed-0f172a)
+
+<br>
+
+<a href="https://buymeacoffee.com/mousewerk">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy me a coffee" height="48">
+</a>
 
 <br>
 
@@ -73,7 +75,9 @@ The landing page lives in [`docs/`](docs/) and is served with GitHub Pages.
 
 If Sprig helps you study, you can support development here:
 
-<a href="https://buymeacoffee.com/mousewerk"><img src="https://img.shields.io/badge/Buy_me_a_coffee-mousewerk-ffdd00?logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
+<a href="https://buymeacoffee.com/mousewerk">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy me a coffee" height="48">
+</a>
 
 ## Credits
 

@@ -323,7 +323,7 @@ export default function SettingsScreen() {
 
         <SectionHeader title="COMMUNITY" />
         <View style={styles.group}>
-          <SettingItem icon={Github} label="Github Repository" onPress={() => openUrl('https://github.com/mauricekleindienst/csvtudyapp')} />
+          <SettingItem icon={Github} label="Github Repository" onPress={() => openUrl('https://github.com/MouseWerk/Sprig')} />
           <SettingItem icon={Smartphone} label="Share with Friends" onPress={handleShare} />
         </View>
 
