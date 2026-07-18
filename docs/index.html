@@ -11,31 +11,22 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --sage: #EAF1EC;
-    --sage-deep: #DCE8E0;
-    --ink: #0D1712;
-    --leaf: #2F5D4A;
-    --leaf-soft: #5A7A6B;
-    --paper: #F6FAF7;
+    /* slate tokens, mirroring the app's constants/theme.ts */
+    --bg: #ffffff;
+    --ink: #0f172a;
+    --card: #ffffff;
+    --muted: #f1f5f9;
+    --muted-fg: #64748b;
+    --border: #e2e8f0;
     --radius: 20px;
     --display: "Bricolage Grotesque", system-ui, sans-serif;
     --body: "Instrument Sans", system-ui, sans-serif;
     --mono: "Spline Sans Mono", ui-monospace, monospace;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --sage: #0D1712;
-      --sage-deep: #14211B;
-      --ink: #EAF1EC;
-      --leaf: #8FB8A5;
-      --leaf-soft: #6E8F80;
-      --paper: #16241D;
-    }
-  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
-    background: var(--sage);
+    background: var(--bg);
     color: var(--ink);
     font-family: var(--body);
     font-size: 17px;
@@ -43,7 +34,8 @@
     -webkit-font-smoothing: antialiased;
   }
   a { color: inherit; }
-  :focus-visible { outline: 3px solid var(--leaf); outline-offset: 3px; border-radius: 4px; }
+  svg { display: block; }
+  :focus-visible { outline: 3px solid var(--muted-fg); outline-offset: 3px; border-radius: 4px; }
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
 
   /* ---------- nav ---------- */
@@ -55,19 +47,21 @@
   .brand img { width: 34px; height: 34px; border-radius: 9px; }
   .brand span { font-family: var(--display); font-weight: 800; font-size: 1.25rem; letter-spacing: -0.02em; }
   .nav-links { display: flex; align-items: center; gap: 22px; }
-  .nav-links a { text-decoration: none; font-weight: 600; font-size: 0.95rem; color: var(--leaf-soft); }
+  .nav-links a { text-decoration: none; font-weight: 600; font-size: 0.95rem; color: var(--muted-fg); }
   .nav-links a:hover { color: var(--ink); }
   .btn {
-    display: inline-block; text-decoration: none; font-weight: 600;
-    background: var(--ink); color: var(--sage) !important;
+    display: inline-flex; align-items: center; gap: 8px;
+    text-decoration: none; font-weight: 600;
+    background: var(--ink); color: var(--bg) !important;
     padding: 11px 22px; border-radius: 999px; font-size: 0.95rem;
     transition: transform 0.15s ease;
   }
   .btn:hover { transform: translateY(-2px); }
   .btn.ghost {
     background: transparent; color: var(--ink) !important;
-    box-shadow: inset 0 0 0 2px var(--ink);
+    box-shadow: inset 0 0 0 2px var(--border);
   }
+  .btn.ghost:hover { box-shadow: inset 0 0 0 2px var(--ink); }
 
   /* ---------- hero ---------- */
   header.hero {
@@ -75,7 +69,7 @@
     align-items: center; padding: 64px 0 96px;
   }
   .eyebrow {
-    font-family: var(--mono); font-size: 0.8rem; color: var(--leaf);
+    font-family: var(--mono); font-size: 0.8rem; color: var(--muted-fg);
     letter-spacing: 0.08em; margin-bottom: 18px; display: block;
   }
   h1 {
@@ -84,39 +78,45 @@
     line-height: 1.02; letter-spacing: -0.035em;
     margin-bottom: 22px;
   }
-  h1 em { font-style: normal; color: var(--leaf); }
-  .hero p.sub { font-size: 1.15rem; color: var(--leaf-soft); max-width: 34ch; margin-bottom: 32px; }
+  h1 em {
+    font-style: normal;
+    text-decoration: underline;
+    text-decoration-thickness: 6px;
+    text-decoration-color: var(--border);
+    text-underline-offset: 8px;
+  }
+  .hero p.sub { font-size: 1.15rem; color: var(--muted-fg); max-width: 34ch; margin-bottom: 32px; }
   .hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
-  .cta-note { font-size: 0.85rem; color: var(--leaf-soft); width: 100%; margin-top: 10px; }
+  .cta-note { font-size: 0.85rem; color: var(--muted-fg); width: 100%; margin-top: 10px; }
 
   /* csv → cards visual */
   .demo { position: relative; min-height: 420px; }
   .csv-file {
-    background: var(--ink); color: var(--sage);
+    background: var(--ink); color: var(--bg);
     border-radius: var(--radius); padding: 22px 24px 26px;
     font-family: var(--mono); font-size: 0.85rem; line-height: 2.1;
     position: absolute; bottom: 0; left: 0; right: 12%;
-    box-shadow: 0 24px 60px -30px rgba(13, 23, 18, 0.55);
+    box-shadow: 0 24px 60px -30px rgba(15, 23, 42, 0.5);
   }
   .csv-file .filename {
     display: flex; gap: 8px; align-items: center;
-    color: var(--leaf-soft); font-size: 0.75rem; margin-bottom: 10px;
+    color: var(--muted-fg); font-size: 0.75rem; margin-bottom: 10px;
     letter-spacing: 0.06em;
   }
-  .csv-file .filename::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--leaf); }
+  .csv-file .filename::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--muted-fg); }
   .csv-row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .csv-row .comma { color: var(--leaf); }
+  .csv-row .comma { color: var(--muted-fg); }
   .card {
     position: absolute; width: 62%;
-    background: var(--paper); border-radius: var(--radius);
+    background: var(--card); border-radius: var(--radius);
     padding: 22px 24px;
-    box-shadow: 0 18px 44px -22px rgba(13, 23, 18, 0.4);
-    border: 1px solid var(--sage-deep);
+    box-shadow: 0 18px 44px -22px rgba(15, 23, 42, 0.35);
+    border: 1px solid var(--border);
   }
   .card .q { font-family: var(--display); font-weight: 700; font-size: 1.05rem; letter-spacing: -0.01em; }
-  .card .a { color: var(--leaf); font-weight: 600; font-size: 0.9rem; margin-top: 6px; }
+  .card .a { color: var(--muted-fg); font-weight: 600; font-size: 0.9rem; margin-top: 6px; }
   .card .tag {
-    font-family: var(--mono); font-size: 0.65rem; color: var(--leaf-soft);
+    font-family: var(--mono); font-size: 0.65rem; color: var(--muted-fg);
     letter-spacing: 0.1em; text-transform: uppercase; display: block; margin-bottom: 8px;
   }
   .card1 { top: 4%;  right: 0;   transform: rotate(3deg); }
@@ -141,26 +141,26 @@
     font-size: clamp(1.8rem, 4vw, 2.6rem); letter-spacing: -0.03em;
     margin-bottom: 14px;
   }
-  .section-sub { color: var(--leaf-soft); max-width: 52ch; margin-bottom: 48px; }
+  .section-sub { color: var(--muted-fg); max-width: 52ch; margin-bottom: 48px; }
 
   .steps { position: relative; padding-left: 40px; }
   .steps::before {
-    content: ""; position: absolute; left: 11px; top: 8px; bottom: 8px;
-    width: 3px; border-radius: 3px;
-    background: linear-gradient(to bottom, var(--leaf-soft), var(--leaf));
+    content: ""; position: absolute; left: 7px; top: 8px; bottom: 8px;
+    width: 2px; border-radius: 2px; background: var(--border);
   }
   .step { position: relative; padding-bottom: 42px; max-width: 60ch; }
   .step:last-child { padding-bottom: 0; }
   .step::before {
-    content: ""; position: absolute; left: -37px; top: 6px;
-    width: 16px; height: 16px; border-radius: 50% 50% 50% 0;
-    background: var(--leaf); transform: rotate(-45deg);
+    content: ""; position: absolute; left: -38px; top: 7px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--ink); border: 3px solid var(--bg);
+    box-shadow: 0 0 0 2px var(--border);
   }
   .step h3 { font-family: var(--display); font-weight: 700; font-size: 1.25rem; letter-spacing: -0.01em; margin-bottom: 6px; }
-  .step p { color: var(--leaf-soft); }
+  .step p { color: var(--muted-fg); }
   .step code {
     font-family: var(--mono); font-size: 0.85em;
-    background: var(--sage-deep); padding: 2px 7px; border-radius: 6px;
+    background: var(--muted); padding: 2px 7px; border-radius: 6px;
   }
 
   /* ---------- features ---------- */
@@ -168,38 +168,43 @@
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
   }
   .feature {
-    background: var(--paper); border: 1px solid var(--sage-deep);
+    background: var(--card); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 26px 24px;
   }
-  .feature .glyph { font-size: 1.6rem; display: block; margin-bottom: 14px; }
+  .feature .glyph {
+    width: 44px; height: 44px; border-radius: 13px;
+    background: var(--muted); color: var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 16px;
+  }
   .feature h3 { font-family: var(--display); font-weight: 700; font-size: 1.1rem; letter-spacing: -0.01em; margin-bottom: 6px; }
-  .feature p { color: var(--leaf-soft); font-size: 0.95rem; }
+  .feature p { color: var(--muted-fg); font-size: 0.95rem; }
 
   /* ---------- privacy ---------- */
   .privacy-band {
-    background: var(--ink); color: var(--sage);
+    background: var(--ink); color: var(--bg);
     border-radius: calc(var(--radius) + 8px);
     padding: 56px 48px;
     display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 40px; align-items: center;
   }
-  .privacy-band h2 { color: var(--sage); }
-  .privacy-band p { color: var(--leaf-soft); }
-  .privacy-band ul { list-style: none; display: grid; gap: 12px; }
-  .privacy-band li { display: flex; gap: 12px; align-items: baseline; font-weight: 500; }
-  .privacy-band li::before { content: "✓"; color: var(--leaf); font-weight: 700; }
-  .privacy-band a.policy { color: var(--leaf); font-weight: 600; }
+  .privacy-band h2 { color: var(--bg); }
+  .privacy-band p { color: var(--muted-fg); }
+  .privacy-band ul { list-style: none; display: grid; gap: 14px; }
+  .privacy-band li { display: flex; gap: 12px; align-items: center; font-weight: 500; }
+  .privacy-band li svg { flex: none; color: var(--muted-fg); }
+  .privacy-band a.policy { color: var(--bg); font-weight: 600; }
 
   /* ---------- download / footer ---------- */
   .download { text-align: center; }
   .download .hero-ctas { justify-content: center; }
   footer {
-    border-top: 1px solid var(--sage-deep);
+    border-top: 1px solid var(--border);
     padding: 32px 0 48px; margin-top: 48px;
     display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
-    color: var(--leaf-soft); font-size: 0.9rem;
+    color: var(--muted-fg); font-size: 0.9rem;
   }
   footer .links { display: flex; gap: 20px; }
-  footer a { color: var(--leaf-soft); }
+  footer a { color: var(--muted-fg); }
   footer a:hover { color: var(--ink); }
 
   /* ---------- responsive ---------- */
@@ -243,15 +248,15 @@
       </div>
     </div>
     <div class="demo" aria-hidden="true">
-      <div class="card card1"><span class="tag">Card 1 of 3</span><div class="q">mitochondria</div><div class="a">the powerhouse of the cell</div></div>
-      <div class="card card2"><span class="tag">Card 2 of 3</span><div class="q">photosynthesis</div><div class="a">light → glucose + oxygen</div></div>
-      <div class="card card3"><span class="tag">Card 3 of 3</span><div class="q">le chien</div><div class="a">the dog</div></div>
       <div class="csv-file">
         <span class="filename">biology_week3.csv</span>
         <div class="csv-row">mitochondria<span class="comma">,</span>the powerhouse of the cell</div>
         <div class="csv-row">photosynthesis<span class="comma">,</span>light → glucose + oxygen</div>
         <div class="csv-row">le chien<span class="comma">,</span>the dog</div>
       </div>
+      <div class="card card1"><span class="tag">Card 1 of 3</span><div class="q">mitochondria</div><div class="a">the powerhouse of the cell</div></div>
+      <div class="card card2"><span class="tag">Card 2 of 3</span><div class="q">photosynthesis</div><div class="a">light → glucose + oxygen</div></div>
+      <div class="card card3"><span class="tag">Card 3 of 3</span><div class="q">le chien</div><div class="a">the dog</div></div>
     </div>
   </header>
 
@@ -275,15 +280,33 @@
   </section>
 
   <section id="features">
-    <h2>A quiet little study garden</h2>
-    <p class="section-sub">Everything in Sprig is built for one thing: helping you actually sit down and learn.</p>
+    <h2>Everything you need to actually study</h2>
+    <p class="section-sub">Six tools, one quiet app. No ads, no upsells, no distractions.</p>
     <div class="grid">
-      <div class="feature"><span class="glyph">🃏</span><h3>Swipe to learn</h3><p>SM-2 spaced repetition decides when each card comes back. Right if you knew it, left if you didn’t.</p></div>
-      <div class="feature"><span class="glyph">✅</span><h3>Quiz mode</h3><p>Multiple-choice questions generated from your own deck, with your weak cards showing up more often.</p></div>
-      <div class="feature"><span class="glyph">📱</span><h3>Feed mode</h3><p>Scroll question and answer cards like a social feed — study during the scrolling you were going to do anyway.</p></div>
-      <div class="feature"><span class="glyph">🌱</span><h3>Focus garden</h3><p>Start a focus session and a plant grows while you stay in the app. Leave too long and it wilts. Don’t let it wilt.</p></div>
-      <div class="feature"><span class="glyph">🌧️</span><h3>Ambient sounds</h3><p>Rain, campfire, forest, ocean — mix your own background while you study or focus.</p></div>
-      <div class="feature"><span class="glyph">📈</span><h3>Stats &amp; streaks</h3><p>Daily streaks, levels, and achievements track the habit — not just the hours.</p></div>
+      <div class="feature">
+        <span class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg></span>
+        <h3>Swipe to learn</h3><p>SM-2 spaced repetition decides when each card comes back. Right if you knew it, left if you didn’t.</p>
+      </div>
+      <div class="feature">
+        <span class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg></span>
+        <h3>Quiz mode</h3><p>Multiple-choice questions generated from your own deck, with your weak cards showing up more often.</p>
+      </div>
+      <div class="feature">
+        <span class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg></span>
+        <h3>Feed mode</h3><p>Scroll question and answer cards like a social feed — study during the scrolling you were going to do anyway.</p>
+      </div>
+      <div class="feature">
+        <span class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-3.7.3-4.9 1.4-4.9 2z"/></svg></span>
+        <h3>Focus garden</h3><p>Start a focus session and a plant grows while you stay in the app. Leave too long and it wilts. Don’t let it wilt.</p>
+      </div>
+      <div class="feature">
+        <span class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 14v6"/><path d="M8 14v6"/><path d="M12 16v6"/></svg></span>
+        <h3>Ambient sounds</h3><p>Rain, campfire, forest, ocean — mix your own background while you study or focus.</p>
+      </div>
+      <div class="feature">
+        <span class="glyph"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span>
+        <h3>Stats &amp; streaks</h3><p>Daily streaks, levels, and achievements track the habit — not just the hours.</p>
+      </div>
     </div>
   </section>
 
@@ -294,10 +317,10 @@
         <p>Sprig has no servers, no accounts, and no analytics. Your decks, stats, and audio live in a local database on your device — delete the app and they’re gone. That’s the whole privacy policy, but you can <a class="policy" href="privacy.html">read the long version</a> too.</p>
       </div>
       <ul>
-        <li>Works fully offline</li>
-        <li>No account, ever</li>
-        <li>No tracking or analytics</li>
-        <li>Your files stay your files</li>
+        <li><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Works fully offline</li>
+        <li><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>No account, ever</li>
+        <li><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>No tracking or analytics</li>
+        <li><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Your files stay your files</li>
       </ul>
     </div>
   </section>
@@ -306,7 +329,7 @@
     <h2>Plant your first deck</h2>
     <p class="section-sub" style="margin-inline:auto">Sprig is free and open source. Coming soon to Google Play — until then, grab the latest APK from GitHub.</p>
     <div class="hero-ctas">
-      <a class="btn" href="https://github.com/mauricekleindienst/csvtudyapp/releases">Download APK</a>
+      <a class="btn" href="https://github.com/mauricekleindienst/csvtudyapp/releases"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>Download APK</a>
       <a class="btn ghost" href="https://github.com/mauricekleindienst/csvtudyapp">View the source</a>
     </div>
   </section>

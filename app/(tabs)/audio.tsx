@@ -210,7 +210,7 @@ export default function AudioPlayerScreen() {
                         accessibilityLabel="Open ambient sound mixer"
                         accessibilityRole="button"
                     >
-                        <SlidersHorizontal size={22} color={accentColor} strokeWidth={2.75} />
+                        <SlidersHorizontal size={24} color={accentColor} strokeWidth={3} />
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.addButton, { backgroundColor: accentColor }]}
@@ -321,15 +321,17 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingBottom: 12,
+        paddingHorizontal: 24,
+        paddingBottom: 20,
         zIndex: 10,
     },
     headerTitleContainer: {
-        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
     },
     title: {
-        fontSize: 36,
+        fontSize: 32,
         fontWeight: '900',
         letterSpacing: -1,
     },

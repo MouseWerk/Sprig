@@ -30,7 +30,7 @@ export const translations = {
     folderPlaceholder: 'e.g. History',
     
     // Audio Screen
-    audioLibrary: 'Audio Library',
+    audioLibrary: 'Audios',
     noAudioMessage: 'No audio files yet',
     addAudio: 'Add Audio',
     audioFileAdded: 'Audio file added!',
