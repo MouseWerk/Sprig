@@ -1,14 +1,14 @@
 import { useToast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
-import { ConfusionPair, Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getConfusionPairs, getDecks, getExamPlan, importCsvToDeck, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckExamDate, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
+import { ConfusionPair, Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getConfusionPairs, getDecks, importCsvToDeck, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckExamDate, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from '@/utils/AppHaptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { ArrowLeftRight, CalendarDays, CheckCircle2, Circle, Edit2, FileUp, FileWarning, GalleryVerticalEnd, HelpCircle, ListChecks, Play, Plus, RotateCcw, Search, Share2, Trash2, X, Zap } from 'lucide-react-native';
+import { ArrowLeftRight, CalendarDays, CheckCircle2, Circle, Edit2, FileUp, FileWarning, GalleryVerticalEnd, HelpCircle, Keyboard, ListChecks, Play, Plus, RotateCcw, Search, Share2, Trash2, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -225,18 +225,6 @@ export default function DeckDetailsScreen() {
         await updateDeckExamDate(id, dateKey);
         setDeck(d => (d ? { ...d, examDate: dateKey } : d));
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    };
-
-    const shiftExamDate = async (deltaDays: number) => {
-        if (!id || !deck?.examDate) return;
-        const d = new Date(deck.examDate + 'T00:00:00');
-        d.setDate(d.getDate() + deltaDays);
-        // Don't shift the exam into the past
-        const dateKey = d.toISOString().split('T')[0];
-        if (dateKey < new Date().toISOString().split('T')[0]) return;
-        await updateDeckExamDate(id, dateKey);
-        setDeck(prev => (prev ? { ...prev, examDate: dateKey } : prev));
-        Haptics.selectionAsync();
     };
 
     const handleExportDeck = async () => {
@@ -470,70 +458,61 @@ export default function DeckDetailsScreen() {
                                 <Text style={[styles.progressLabel, { color: progressColor, opacity: 0.8 }]}>Mastery</Text>
                             </View>
                             <View style={styles.progressStatsRight}>
-                                <Text style={[styles.deckTitleLarge, { color: textColor }]}>{deck.name}</Text>
-                                <Text style={[styles.deckSubtitleSmall, { color: mutedForeground }]}>
-                                    {cards.length} cards collected
-                                </Text>
-                            </View>
-                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: 80, justifyContent: 'flex-end' }}>
-                                <TouchableOpacity
-                                    style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
-                                    onPress={handleExportDeck}
-                                    accessibilityLabel="Export deck"
-                                    accessibilityRole="button"
-                                >
-                                    <Share2 size={20} color={accentColor} strokeWidth={3} />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
-                                    onPress={handleImportCsv}
-                                    accessibilityLabel="Import cards from CSV"
-                                    accessibilityRole="button"
-                                >
-                                    <FileUp size={20} color={accentColor} strokeWidth={3} />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
-                                    onPress={() => setAddCardModalVisible(true)}
-                                    accessibilityLabel="Add flashcard"
-                                    accessibilityRole="button"
-                                >
-                                    <Plus size={20} color={accentColor} strokeWidth={3} />
-                                </TouchableOpacity>
+                                <View style={styles.deckTitleRow}>
+                                    <Text style={[styles.deckTitleLarge, { color: textColor }]} numberOfLines={2}>{deck.name}</Text>
+                                    <View style={styles.deckActions}>
+                                        <TouchableOpacity
+                                            style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
+                                            onPress={handleExportDeck}
+                                            accessibilityLabel="Export deck"
+                                            accessibilityRole="button"
+                                        >
+                                            <Share2 size={15} color={accentColor} strokeWidth={3} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
+                                            onPress={handleImportCsv}
+                                            accessibilityLabel="Import cards from CSV"
+                                            accessibilityRole="button"
+                                        >
+                                            <FileUp size={15} color={accentColor} strokeWidth={3} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
+                                            onPress={() => setAddCardModalVisible(true)}
+                                            accessibilityLabel="Add flashcard"
+                                            accessibilityRole="button"
+                                        >
+                                            <Plus size={15} color={accentColor} strokeWidth={3} />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                                {(() => {
+                                    const learned = deck?.learnedIndices?.length || 0;
+                                    const dueCount = Object.values(deck?.srsData || {}).filter(data =>
+                                        new Date(data.nextReview) <= new Date()
+                                    ).length + (cards.length - Object.keys(deck?.srsData || {}).length);
+                                    return (
+                                        <Text style={[styles.deckSubtitleSmall, { color: mutedForeground }]}>
+                                            {cards.length} cards
+                                            {'  ·  '}
+                                            <Text style={{ color: cards.length > 0 && learned === cards.length ? '#22c55e' : mutedForeground }}>{learned} learned</Text>
+                                            {'  ·  '}
+                                            {dueCount > 0 ? (
+                                                <Text style={{ color: '#ef4444', fontWeight: '700' }}>{dueCount} due</Text>
+                                            ) : (
+                                                <Text style={{ color: '#22c55e', fontWeight: '700' }}>all clear ✓</Text>
+                                            )}
+                                        </Text>
+                                    );
+                                })()}
                             </View>
                         </View>
 
-                        <View style={styles.statsContainer}>
-                            <View style={[styles.statCard, { backgroundColor: cardColor }]}>
-                                <Text style={[styles.statValue, { color: textColor }]}>{cards.length}</Text>
-                                <Text style={[styles.statLabel, { color: mutedForeground }]}>Total</Text>
-                            </View>
-                            <View style={[styles.statCard, { backgroundColor: cardColor }]}>
-                                <Text style={[styles.statValue, { color: cards.length > 0 && (deck?.learnedIndices?.length || 0) === cards.length ? '#22c55e' : textColor }]}>
-                                    {deck?.learnedIndices?.length || 0}
-                                </Text>
-                                <Text style={[styles.statLabel, { color: mutedForeground }]}>Learned</Text>
-                            </View>
-                            {(() => {
-                                const dueCount = Object.values(deck?.srsData || {}).filter(data =>
-                                    new Date(data.nextReview) <= new Date()
-                                ).length + (cards.length - Object.keys(deck?.srsData || {}).length);
-
-                                return dueCount > 0 ? (
-                                    <View style={[styles.statCard, { backgroundColor: cardColor }]}>
-                                        <Text style={[styles.statValue, { color: '#ef4444' }]}>{dueCount}</Text>
-                                        <Text style={[styles.statLabel, { color: mutedForeground }]}>Due</Text>
-                                    </View>
-                                ) : (
-                                    <View style={[styles.statCard, { backgroundColor: cardColor }]}>
-                                        <CheckCircle2 size={20} color="#22c55e" />
-                                        <Text style={[styles.statLabel, { color: mutedForeground, marginTop: 4 }]}>Clear</Text>
-                                    </View>
-                                );
-                            })()}
-                        </View>
-
-                        <View style={styles.actionGrid}>
+                        {/* One primary action, then the other study modes as a
+                            compact equal-width tile row - replaces four stacked
+                            full-width buttons. */}
+                        <View style={styles.studyBlock}>
                             <Button
                                 title="Review Due"
                                 onPress={() => {
@@ -546,159 +525,149 @@ export default function DeckDetailsScreen() {
                                         params: { id, uri: deck.uri, name: deck?.name, mode: 'due' }
                                     });
                                 }}
-                                style={[styles.mainActionBtn, { flex: 1 }]}
+                                style={styles.mainActionBtn}
                                 icon={<Play size={22} color={primaryForeground} fill={primaryForeground} />}
                             />
-                            <Button
-                                title="Study All"
-                                variant="outline"
-                                onPress={() => {
-                                    if (!deck?.uri) {
-                                        showToast({ message: 'This deck has no cards to study', type: 'error' });
-                                        return;
-                                    }
-                                    router.push({
-                                        pathname: '/swipe',
-                                        params: { id, uri: deck.uri, name: deck?.name, mode: 'all' }
-                                    });
-                                }}
-                                style={[styles.secondaryActionBtn, { borderColor: accentColor }]}
-                                textStyle={{ color: accentColor }}
-                                icon={<RotateCcw size={20} color={accentColor} />}
-                            />
-                        </View>
-
-                        <TouchableOpacity
-                            style={[styles.quizBtn, { backgroundColor: secondaryBg }]}
-                            onPress={() => {
-                                if (!deck?.uri) {
-                                    showToast({ message: 'This deck has no cards to study', type: 'error' });
-                                    return;
-                                }
-                                if (cards.length < 4) {
-                                    showToast({ message: 'Quiz mode needs at least 4 cards', type: 'warning' });
-                                    return;
-                                }
-                                router.push({ pathname: '/quiz', params: { id, uri: deck.uri, name: deck?.name } });
-                            }}
-                            activeOpacity={0.85}
-                        >
-                            <ListChecks size={20} color={accentColor} strokeWidth={2.5} />
-                            <Text style={[styles.quizBtnText, { color: accentColor }]}>Quiz Me (Multiple Choice)</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.quizBtn, styles.feedBtn, { backgroundColor: secondaryBg }]}
-                            onPress={() => {
-                                if (!deck?.uri || cards.length === 0) {
-                                    showToast({ message: 'This deck has no cards to study', type: 'error' });
-                                    return;
-                                }
-                                router.push({ pathname: '/feed', params: { id, uri: deck.uri, name: deck?.name } });
-                            }}
-                            activeOpacity={0.85}
-                        >
-                            <GalleryVerticalEnd size={20} color={accentColor} strokeWidth={2.5} />
-                            <Text style={[styles.quizBtnText, { color: accentColor }]}>Scroll & Learn (Feed)</Text>
-                        </TouchableOpacity>
-
-                        <View style={styles.directionRow}>
-                            <Text style={[styles.directionLabel, { color: mutedForeground }]}>Study Direction</Text>
-                            <View style={styles.directionChips}>
-                                {directionOptions.map(opt => {
-                                    const active = (deck.studyDirection || 'normal') === opt.key;
-                                    return (
-                                        <TouchableOpacity
-                                            key={opt.key}
-                                            style={[
-                                                styles.filterChip,
-                                                { backgroundColor: active ? accentColor : cardColor }
-                                            ]}
-                                            onPress={() => handleSetDirection(opt.key)}
-                                        >
-                                            <Text style={[
-                                                styles.filterChipText,
-                                                { color: active ? primaryForeground : mutedForeground }
-                                            ]}>
-                                                {opt.label}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
+                            <View style={styles.modeRow}>
+                                <TouchableOpacity
+                                    style={[styles.modeTile, { backgroundColor: secondaryBg }]}
+                                    onPress={() => {
+                                        if (!deck?.uri) {
+                                            showToast({ message: 'This deck has no cards to study', type: 'error' });
+                                            return;
+                                        }
+                                        router.push({ pathname: '/swipe', params: { id, uri: deck.uri, name: deck?.name, mode: 'all' } });
+                                    }}
+                                    activeOpacity={0.85}
+                                    accessibilityLabel="Study all cards"
+                                    accessibilityRole="button"
+                                >
+                                    <RotateCcw size={19} color={accentColor} strokeWidth={2.5} />
+                                    <Text style={[styles.modeTileText, { color: textColor }]}>Study All</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.modeTile, { backgroundColor: secondaryBg }]}
+                                    onPress={() => {
+                                        if (!deck?.uri) {
+                                            showToast({ message: 'This deck has no cards to study', type: 'error' });
+                                            return;
+                                        }
+                                        if (cards.length < 4) {
+                                            showToast({ message: 'Quiz mode needs at least 4 cards', type: 'warning' });
+                                            return;
+                                        }
+                                        router.push({ pathname: '/quiz', params: { id, uri: deck.uri, name: deck?.name } });
+                                    }}
+                                    activeOpacity={0.85}
+                                    accessibilityLabel="Quiz with multiple choice"
+                                    accessibilityRole="button"
+                                >
+                                    <ListChecks size={19} color={accentColor} strokeWidth={2.5} />
+                                    <Text style={[styles.modeTileText, { color: textColor }]}>Quiz</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.modeTile, { backgroundColor: secondaryBg }]}
+                                    onPress={() => {
+                                        if (!deck?.uri || cards.length === 0) {
+                                            showToast({ message: 'This deck has no cards to study', type: 'error' });
+                                            return;
+                                        }
+                                        router.push({ pathname: '/feed', params: { id, uri: deck.uri, name: deck?.name } });
+                                    }}
+                                    activeOpacity={0.85}
+                                    accessibilityLabel="Scroll and learn feed"
+                                    accessibilityRole="button"
+                                >
+                                    <GalleryVerticalEnd size={19} color={accentColor} strokeWidth={2.5} />
+                                    <Text style={[styles.modeTileText, { color: textColor }]}>Feed</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.modeTile, { backgroundColor: secondaryBg }]}
+                                    onPress={() => {
+                                        if (!deck?.uri || cards.length === 0) {
+                                            showToast({ message: 'This deck has no cards to study', type: 'error' });
+                                            return;
+                                        }
+                                        router.push({ pathname: '/type', params: { id, uri: deck.uri, name: deck?.name } });
+                                    }}
+                                    activeOpacity={0.85}
+                                    accessibilityLabel="Type the answer mode"
+                                    accessibilityRole="button"
+                                >
+                                    <Keyboard size={19} color={accentColor} strokeWidth={2.5} />
+                                    <Text style={[styles.modeTileText, { color: textColor }]}>Type</Text>
+                                </TouchableOpacity>
                             </View>
                         </View>
 
+                        {/* Direction + exam grouped into one quiet options card
+                            instead of two floating label rows. */}
                         {(() => {
-                            const plan = deck ? getExamPlan(deck) : null;
-                            const examSet = !!deck?.examDate;
+                            const examSet = !!deck.examDate;
                             return (
-                                <View style={styles.examSection}>
-                                    <View style={styles.directionRow}>
-                                        <Text style={[styles.directionLabel, { color: mutedForeground }]}>Exam Countdown</Text>
-                                        <View style={styles.directionChips}>
-                                            <TouchableOpacity
-                                                style={[styles.filterChip, { backgroundColor: examSet ? cardColor : accentColor }]}
-                                                onPress={clearExamDate}
-                                            >
-                                                <Text style={[styles.filterChipText, { color: examSet ? mutedForeground : primaryForeground }]}>Off</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={[styles.filterChip, { backgroundColor: examSet ? accentColor : cardColor }]}
-                                                onPress={() => setShowExamPicker(true)}
-                                                accessibilityLabel="Pick exam date"
-                                                accessibilityRole="button"
-                                            >
-                                                <CalendarDays size={13} color={examSet ? primaryForeground : mutedForeground} strokeWidth={2.5} />
-                                                <Text style={[styles.filterChipText, { color: examSet ? primaryForeground : mutedForeground }]}>
-                                                    {examSet
-                                                        ? new Date(deck!.examDate! + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
-                                                        : 'Pick date'}
-                                                </Text>
-                                            </TouchableOpacity>
+                                <>
+                                    <View style={[styles.optionsCard, { backgroundColor: cardColor }]}>
+                                        <View style={styles.optionRow}>
+                                            <Text style={[styles.optionLabel, { color: mutedForeground }]}>Direction</Text>
+                                            <View style={styles.optionChips}>
+                                                {directionOptions.map(opt => {
+                                                    const active = (deck.studyDirection || 'normal') === opt.key;
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={opt.key}
+                                                            style={[
+                                                                styles.filterChip,
+                                                                { backgroundColor: active ? accentColor : secondaryBg }
+                                                            ]}
+                                                            onPress={() => handleSetDirection(opt.key)}
+                                                        >
+                                                            <Text style={[
+                                                                styles.filterChipText,
+                                                                { color: active ? primaryForeground : mutedForeground }
+                                                            ]}>
+                                                                {opt.label}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    );
+                                                })}
+                                            </View>
                                         </View>
+                                        <View style={[styles.optionDivider, { backgroundColor: secondaryBg }]} />
+                                        <View style={styles.optionRow}>
+                                            <Text style={[styles.optionLabel, { color: mutedForeground }]}>Exam</Text>
+                                            <View style={styles.optionChips}>
+                                                <TouchableOpacity
+                                                    style={[styles.filterChip, { backgroundColor: examSet ? secondaryBg : accentColor }]}
+                                                    onPress={clearExamDate}
+                                                >
+                                                    <Text style={[styles.filterChipText, { color: examSet ? mutedForeground : primaryForeground }]}>Off</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={[styles.filterChip, { backgroundColor: examSet ? accentColor : secondaryBg }]}
+                                                    onPress={() => setShowExamPicker(true)}
+                                                    accessibilityLabel="Pick exam date"
+                                                    accessibilityRole="button"
+                                                >
+                                                    <CalendarDays size={13} color={examSet ? primaryForeground : mutedForeground} strokeWidth={2.5} />
+                                                    <Text style={[styles.filterChipText, { color: examSet ? primaryForeground : mutedForeground }]}>
+                                                        {examSet
+                                                            ? new Date(deck.examDate! + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+                                                            : 'Pick date'}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                        {showExamPicker && (
+                                            <DateTimePicker
+                                                value={deck.examDate ? new Date(deck.examDate + 'T00:00:00') : new Date()}
+                                                mode="date"
+                                                minimumDate={new Date()}
+                                                onChange={onExamDatePicked}
+                                            />
+                                        )}
                                     </View>
 
-                                    {showExamPicker && (
-                                        <DateTimePicker
-                                            value={deck?.examDate ? new Date(deck.examDate + 'T00:00:00') : new Date()}
-                                            mode="date"
-                                            minimumDate={new Date()}
-                                            onChange={onExamDatePicked}
-                                        />
-                                    )}
-
-                                    {plan && (
-                                        <View style={[styles.examBanner, { backgroundColor: cardColor }]}>
-                                            <CalendarDays size={22} color={plan.daysLeft < 0 ? mutedForeground : accentColor} strokeWidth={2.5} />
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={[styles.examTitle, { color: textColor }]}>
-                                                    {plan.daysLeft < 0
-                                                        ? 'Exam date has passed'
-                                                        : plan.daysLeft === 0
-                                                            ? 'Exam is today!'
-                                                            : `Exam in ${plan.daysLeft} day${plan.daysLeft === 1 ? '' : 's'}`}
-                                                    {'  ·  '}
-                                                    {new Date(deck!.examDate! + 'T00:00:00').toLocaleDateString()}
-                                                </Text>
-                                                <Text style={[styles.examSubtitle, { color: plan.onTrack ? '#22c55e' : mutedForeground }]}>
-                                                    {plan.onTrack
-                                                        ? 'All cards learned — you\'re ready! 🎉'
-                                                        : plan.daysLeft > 0
-                                                            ? `Study ${plan.cardsPerDay} card${plan.cardsPerDay === 1 ? '' : 's'}/day to cover the remaining ${plan.remainingCards}`
-                                                            : `${plan.remainingCards} card${plan.remainingCards === 1 ? '' : 's'} still unlearned`}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.examAdjust}>
-                                                <TouchableOpacity onPress={() => shiftExamDate(-1)} hitSlop={8} accessibilityLabel="Exam one day earlier" accessibilityRole="button">
-                                                    <Text style={[styles.examAdjustBtn, { color: accentColor }]}>−1d</Text>
-                                                </TouchableOpacity>
-                                                <TouchableOpacity onPress={() => shiftExamDate(1)} hitSlop={8} accessibilityLabel="Exam one day later" accessibilityRole="button">
-                                                    <Text style={[styles.examAdjustBtn, { color: accentColor }]}>+1d</Text>
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
-                                    )}
-                                </View>
+                                </>
                             );
                         })()}
 
@@ -944,30 +913,28 @@ const styles = StyleSheet.create({
     },
     headerDashboard: {
         padding: 20,
-        gap: 20,
+        gap: 14,
     },
     mainProgressCard: {
-        padding: 24,
-        borderRadius: 32,
+        padding: 18,
+        borderRadius: 24,
         flexDirection: 'row',
         alignItems: 'center',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.08,
+        shadowRadius: 14,
+        elevation: 5,
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.05)',
     },
     progressCircleContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        width: 68,
+        height: 68,
+        borderRadius: 34,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 4,
-        borderColor: 'rgba(255,255,255,0.3)',
     },
     progressPercentage: {
         fontSize: 22,
@@ -1034,30 +1001,57 @@ const styles = StyleSheet.create({
         marginTop: 10,
         marginLeft: 4,
     },
-    directionRow: {
+    optionsCard: {
+        borderRadius: 18,
+        paddingHorizontal: 16,
+        paddingVertical: 4,
+    },
+    optionRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginTop: 16,
+        paddingVertical: 10,
+        minHeight: 48,
     },
-    directionLabel: {
+    optionLabel: {
         fontSize: 11,
         fontWeight: '800',
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
-    directionChips: {
+    optionChips: {
         flexDirection: 'row',
         gap: 6,
+        flexWrap: 'wrap',
+        justifyContent: 'flex-end',
+        flexShrink: 1,
+    },
+    optionDivider: {
+        height: 1,
+        opacity: 0.6,
     },
     progressStatsRight: {
         flex: 1,
-        marginLeft: 20,
+        marginLeft: 16,
+    },
+    deckTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: 10,
+        marginBottom: 6,
+    },
+    deckActions: {
+        flexDirection: 'row',
+        gap: 6,
+        flexShrink: 0,
     },
     deckTitleLarge: {
-        fontSize: 24,
+        flex: 1,
+        fontSize: 22,
         fontWeight: '800',
         letterSpacing: -0.5,
+        lineHeight: 27,
     },
     deckSubtitleSmall: {
         fontSize: 13,
@@ -1315,87 +1309,25 @@ const styles = StyleSheet.create({
     wordTextHighlightFront: {
         fontSize: 18,
     },
-    statsContainer: {
-        flexDirection: 'row',
-        gap: 16,
-        marginBottom: 28,
+    studyBlock: {
+        gap: 10,
     },
-    statCard: {
+    modeRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    modeTile: {
         flex: 1,
-        padding: 18,
-        borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
+        gap: 6,
+        paddingVertical: 12,
+        borderRadius: 16,
     },
-    statValue: {
-        fontSize: 20,
-        fontWeight: '900',
-    },
-    statLabel: {
-        fontSize: 10,
-        fontWeight: '700',
-        textTransform: 'uppercase',
-        marginTop: 4,
-        letterSpacing: 0.5,
-    },
-    actionGrid: {
-        flexDirection: 'row',
-        gap: 16,
-        marginBottom: 12,
-        paddingHorizontal: 4,
-    },
-    quizBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        height: 52,
-        borderRadius: 18,
-        marginHorizontal: 4,
-        marginBottom: 28,
-    },
-    quizBtnText: {
-        fontSize: 15,
+    modeTileText: {
+        fontSize: 12,
         fontWeight: '800',
-    },
-    // Sits directly under the quiz button; pull it up against the quiz
-    // button's bottom margin so the two modes read as one group.
-    feedBtn: {
-        marginTop: -16,
-    },
-    examSection: {
-        marginBottom: 8,
-    },
-    examBanner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        borderRadius: 18,
-        padding: 16,
-        marginHorizontal: 4,
-        marginBottom: 16,
-    },
-    examTitle: {
-        fontSize: 14,
-        fontWeight: '800',
-    },
-    examSubtitle: {
-        fontSize: 13,
-        fontWeight: '600',
-        marginTop: 3,
-    },
-    examAdjust: {
-        gap: 10,
-        alignItems: 'center',
-    },
-    examAdjustBtn: {
-        fontSize: 13,
-        fontWeight: '900',
+        letterSpacing: -0.2,
     },
     confusionSection: {
         marginHorizontal: 4,
@@ -1455,19 +1387,6 @@ const styles = StyleSheet.create({
     mainActionBtn: {
         height: 56,
         borderRadius: 18,
-    },
-    secondaryActionBtn: {
-        flex: 1,
-        height: 56,
-        borderRadius: 18,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-    },
-    secondaryActionText: {
-        fontSize: 15,
-        fontWeight: '700',
     },
     wordTextHighlighted: {
         fontWeight: '800',

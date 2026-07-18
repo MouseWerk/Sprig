@@ -15,6 +15,7 @@ import { FlashcardData, parseFlashcardsCsv } from '../utils/CsvParser';
 import { xpForGrade } from '../utils/Levels';
 import { scheduleStreakReminder } from '../utils/Notifications';
 import { applySwipeResult, getCachedData, getDecks, restoreCardSRS, setCachedData, SRSCardData, updateCardInDeck, updateDeckProgress, updateUserStats } from '../utils/Storage';
+import { nextTodayEntry, peekNextTodayEntry } from '../utils/TodayPlan';
 
 interface UndoEntry {
     originalIndex: number;
@@ -33,7 +34,7 @@ export default function SwipeScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { showToast } = useToast();
-    const { id, uri, name, mode: initialMode, cards: drillParam } = useLocalSearchParams<{ id: string, uri: string, name?: string, mode?: string, cards?: string }>();
+    const { id, uri, name, mode: initialMode, cards: drillParam, today } = useLocalSearchParams<{ id: string, uri: string, name?: string, mode?: string, cards?: string, today?: string }>();
 
     // Drill mode: a comma-separated list of card indices (e.g. from the
     // "Often Confused" section) restricts the session to exactly those cards.
@@ -42,6 +43,26 @@ export default function SwipeScreen() {
         const ids = drillParam.split(',').map(s => parseInt(s, 10)).filter(n => Number.isInteger(n) && n >= 0);
         return ids.length > 0 ? new Set(ids) : null;
     }, [drillParam]);
+
+    // Part of a chained cross-deck "Today" session?
+    const isTodaySession = today === '1';
+    const nextToday = isTodaySession ? peekNextTodayEntry() : null;
+
+    const handleNextTodayDeck = () => {
+        const next = nextTodayEntry();
+        if (!next) return;
+        router.replace({
+            pathname: '/swipe',
+            params: {
+                id: next.deckId,
+                uri: next.uri,
+                name: next.deckName,
+                mode: 'all',
+                cards: next.cardIndices.join(','),
+                today: '1',
+            },
+        });
+    };
 
     const [cards, setCards] = useState<FlashcardWithIndex[]>([]);
     const [shuffledCards, setShuffledCards] = useState<FlashcardWithIndex[]>([]);
@@ -443,8 +464,21 @@ export default function SwipeScreen() {
                         You reviewed {sessionReviewed} card{sessionReviewed === 1 ? '' : 's'} this session. Keep it up!
                     </Text>
                     <View style={[styles.buttonGroup, { gap: 12 }]}>
-                        <Button title="Study Again" onPress={handleRestartSession} style={styles.actionButton} />
-                        <Button title="Done" variant="secondary" onPress={() => router.back()} style={styles.actionButton} />
+                        {isTodaySession && nextToday ? (
+                            <>
+                                <Button
+                                    title={`Next: ${nextToday.deckName} (${nextToday.cardIndices.length})`}
+                                    onPress={handleNextTodayDeck}
+                                    style={styles.actionButton}
+                                />
+                                <Button title="Stop for Today" variant="secondary" onPress={() => router.back()} style={styles.actionButton} />
+                            </>
+                        ) : (
+                            <>
+                                <Button title="Study Again" onPress={handleRestartSession} style={styles.actionButton} />
+                                <Button title="Done" variant="secondary" onPress={() => router.back()} style={styles.actionButton} />
+                            </>
+                        )}
                     </View>
                 </View>
             </View>
@@ -455,7 +489,7 @@ export default function SwipeScreen() {
         <View style={[styles.container, { backgroundColor, paddingBottom: insets.bottom }]}>
             <Stack.Screen
                 options={{
-                    title: drillSet ? 'Drill: Tricky Cards' : (name || 'Flashcards'),
+                    title: isTodaySession ? `Today · ${name || 'Flashcards'}` : drillSet ? 'Drill: Tricky Cards' : (name || 'Flashcards'),
                     headerRight: () => (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 }}>
                             <TouchableOpacity

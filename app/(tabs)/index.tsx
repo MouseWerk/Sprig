@@ -3,7 +3,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Icons from 'lucide-react-native';
-import { ChevronRight, FileUp, Folder as FolderIcon, Leaf, Plus, Search, Trash2, X } from 'lucide-react-native';
+import { CalendarCheck, ChevronRight, FileUp, Folder as FolderIcon, Leaf, Play, Plus, Search, Trash2, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +16,7 @@ import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { useToast } from '../../components/ui/Toast';
 import { createEmptyDeck, Deck, deleteDeck, deleteFolder, Folder, getDecks, getExamPlan, getFolders, getUserStats, importCsvToDeck, saveFolder, updateDeck, UserStats } from '../../utils/Storage';
+import { buildTodayPlan, startTodaySession, TodayPlan } from '../../utils/TodayPlan';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -29,6 +30,7 @@ export default function HomeScreen() {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [stats, setStats] = useState<UserStats | null>(null);
+  const [todayPlan, setTodayPlan] = useState<TodayPlan | null>(null);
 
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [newFolderModalVisible, setNewFolderModalVisible] = useState(false);
@@ -56,6 +58,8 @@ export default function HomeScreen() {
     setDecks(savedDecks.filter(d => d.type === 'csv'));
     setFolders(savedFolders);
     setStats(savedStats);
+    // Rebuild the Today queue in the background - cheap, all local reads
+    buildTodayPlan().then(setTodayPlan).catch(() => setTodayPlan(null));
   }, []);
 
   useFocusEffect(
@@ -63,6 +67,23 @@ export default function HomeScreen() {
       loadData();
     }, [loadData])
   );
+
+  const handleStartToday = () => {
+    if (!todayPlan || todayPlan.totalCards === 0) return;
+    const first = startTodaySession(todayPlan);
+    if (!first) return;
+    router.push({
+      pathname: '/swipe',
+      params: {
+        id: first.deckId,
+        uri: first.uri,
+        name: first.deckName,
+        mode: 'all',
+        cards: first.cardIndices.join(','),
+        today: '1',
+      },
+    });
+  };
 
 
 
@@ -413,6 +434,35 @@ export default function HomeScreen() {
           !searching && !currentFolderId ? (
             <View>
               {stats && <LevelCard stats={stats} displayStreak={displayStreak} />}
+              {todayPlan && todayPlan.totalCards > 0 && (
+                <TouchableOpacity
+                  style={[styles.todayCard, { backgroundColor: secondaryBg }]}
+                  onPress={handleStartToday}
+                  activeOpacity={0.85}
+                  accessibilityLabel={`Start today's session with ${todayPlan.totalCards} cards`}
+                  accessibilityRole="button"
+                >
+                  <View style={[styles.focusIcon, { backgroundColor: accentColor + '15' }]}>
+                    <CalendarCheck size={22} color={accentColor} strokeWidth={2.5} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.focusTitle, { color: textColor }]}>
+                      Your {todayPlan.totalCards} for today
+                    </Text>
+                    <Text style={[styles.focusSub, { color: mutedForeground }]} numberOfLines={1}>
+                      {[
+                        todayPlan.dueCount > 0 ? `${todayPlan.dueCount} due` : null,
+                        todayPlan.examCount > 0 ? `${todayPlan.examCount} exam prep` : null,
+                        todayPlan.trickyCount > 0 ? `${todayPlan.trickyCount} tricky` : null,
+                      ].filter(Boolean).join(' · ') || 'Ready when you are'}
+                      {todayPlan.entries.length > 1 ? ` · ${todayPlan.entries.length} decks` : ''}
+                    </Text>
+                  </View>
+                  <View style={[styles.todayGo, { backgroundColor: accentColor }]}>
+                    <Play size={16} color={primaryForeground} fill={primaryForeground} />
+                  </View>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[styles.focusCard, { backgroundColor: accentColor }]}
                 onPress={() => router.push('/focus')}
@@ -908,6 +958,22 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: 16,
     borderRadius: 20,
+  },
+  todayCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginHorizontal: 10,
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 20,
+  },
+  todayGo: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   focusIcon: {
     width: 44,
