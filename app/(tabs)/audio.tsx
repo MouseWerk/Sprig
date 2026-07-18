@@ -2,8 +2,8 @@ import { useToast } from '@/components/ui/Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { AudioFile, deleteAudioFile, deleteFolder, Folder, getAudioFiles, getFolders, saveAudioFile, saveFolder, setAudioPosition, updateAudioFile } from '@/utils/Storage';
+import { ensurePlayerSetup, isNativePlayerAvailable, tp } from '@/utils/NativePlayer';
 import Slider from '@react-native-community/slider';
-import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import { useFocusEffect } from 'expo-router';
@@ -47,7 +47,6 @@ export default function AudioPlayerScreen() {
     const { t } = useLanguage();
 
     const [audios, setAudios] = useState<AudioFile[]>([]);
-    const [player, setPlayer] = useState<AudioPlayer | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentAudio, setCurrentAudio] = useState<AudioFile | null>(null);
     const [position, setPosition] = useState(0); // seconds
@@ -67,14 +66,11 @@ export default function AudioPlayerScreen() {
     const [newFolderName, setNewFolderName] = useState('');
 
     const [playbackRate, setPlaybackRateState] = useState(1);
-    const pendingResumeRef = useRef<number | null>(null);
     const lastSaveRef = useRef(0);
     const seekingRef = useRef(false);
-    // The player lives in a ref so it can be disposed synchronously — state
-    // updates are batched, and tying disposal to them leaks a playing
-    // instance for every tap that lands before the next render.
-    const playerRef = useRef<AudioPlayer | null>(null);
     const switchSeqRef = useRef(0);
+    const currentAudioRef = useRef<AudioFile | null>(null);
+    currentAudioRef.current = currentAudio;
 
     const backgroundColor = useThemeColor({}, 'background');
     const cardColor = useThemeColor({}, 'card');
@@ -96,64 +92,54 @@ export default function AudioPlayerScreen() {
         }, [])
     );
 
-    // Follow the active player's status. Disposal is NOT done here — the ref
-    // owns the instance; this effect only manages the status subscription.
+    // Subscribe to native player state (play/pause from the notification,
+    // lock screen or headset land here too) and poll playback progress.
     useEffect(() => {
-        if (!player) return;
-        const audioId = currentAudio?.id;
-        const sub = player.addListener('playbackStatusUpdate', (status) => {
-            if (playerRef.current !== player) return; // superseded instance
-            // Resume where the track was left once the duration is known
-            const resume = pendingResumeRef.current;
-            if (resume !== null && status.duration > 0) {
-                pendingResumeRef.current = null;
-                if (resume < status.duration - 5) {
-                    player.seekTo(resume).catch(() => { });
-                    setPosition(resume);
-                }
-            }
-            if (!seekingRef.current) setPosition(status.currentTime || 0);
-            setDuration(status.duration || 0);
-            setIsPlaying(status.playing);
+        if (!isNativePlayerAvailable()) return;
+        const { TrackPlayer, Event, State } = tp();
 
-            // Persist the position every few seconds so reopening resumes here;
-            // a finished track restarts from the top next time.
-            if (audioId) {
-                if (status.didJustFinish) {
-                    setAudioPosition(audioId, 0);
-                } else if (status.playing && Date.now() - lastSaveRef.current > 5000) {
-                    lastSaveRef.current = Date.now();
-                    setAudioPosition(audioId, status.currentTime || 0);
-                }
-            }
+        const stateSub = TrackPlayer.addEventListener(Event.PlaybackState, ({ state }) => {
+            setIsPlaying(state === State.Playing || state === State.Buffering);
         });
-        return () => { sub.remove(); };
-        // currentAudio is set in the same update as player, so [player] suffices
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [player]);
+        const endSub = TrackPlayer.addEventListener(Event.PlaybackQueueEnded, () => {
+            const audio = currentAudioRef.current;
+            if (audio) setAudioPosition(audio.id, 0);
+            setIsPlaying(false);
+            setPosition(0);
+        });
 
-    const disposePlayer = () => {
-        const p = playerRef.current;
-        playerRef.current = null;
-        if (p) {
-            try { p.remove(); } catch { /* already released */ }
-        }
-    };
+        const progressTimer = setInterval(async () => {
+            if (!currentAudioRef.current) return;
+            try {
+                const progress = await TrackPlayer.getProgress();
+                if (!seekingRef.current) setPosition(progress.position || 0);
+                setDuration(progress.duration || 0);
+                // Persist the position every few seconds so reopening resumes here
+                const playing = (await TrackPlayer.getPlaybackState()).state === State.Playing;
+                if (playing && Date.now() - lastSaveRef.current > 5000) {
+                    lastSaveRef.current = Date.now();
+                    setAudioPosition(currentAudioRef.current.id, progress.position || 0);
+                }
+            } catch { /* player not ready */ }
+        }, 500);
 
-    // Stop playback entirely and hide the floating player.
+        return () => {
+            stateSub.remove();
+            endSub.remove();
+            clearInterval(progressTimer);
+        };
+    }, []);
+
+    // Stop playback entirely, remove the media notification, hide the player.
     const stopPlayback = () => {
         switchSeqRef.current++;
         if (currentAudio && position > 0) setAudioPosition(currentAudio.id, position);
-        disposePlayer();
-        setPlayer(null);
+        if (isNativePlayerAvailable()) tp().TrackPlayer.reset().catch(() => { });
         setCurrentAudio(null);
         setIsPlaying(false);
         setPosition(0);
         setDuration(0);
     };
-
-    // Release the active player when the screen unmounts.
-    useEffect(() => () => disposePlayer(), []);
 
     const loadAudios = async () => {
         const [files, savedFolders] = await Promise.all([getAudioFiles(), getFolders('audio')]);
@@ -181,31 +167,38 @@ export default function AudioPlayerScreen() {
     };
 
     const playAudio = async (item: AudioFile) => {
-        // Tapping the track that's already loaded toggles play/pause instead
-        // of stacking a fresh player on top of the old one.
-        if (currentAudio?.id === item.id && playerRef.current) {
+        if (!isNativePlayerAvailable()) {
+            showToast({ message: 'Audio playback needs the full app build — it isn\'t available in Expo Go', type: 'warning' });
+            return;
+        }
+        // Tapping the track that's already loaded toggles play/pause.
+        if (currentAudio?.id === item.id) {
             togglePlayback();
             return;
         }
 
         const seq = ++switchSeqRef.current;
         try {
-            await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true }).catch(() => { });
+            await ensurePlayerSetup();
             if (seq !== switchSeqRef.current) return; // a newer tap won the race
 
-            disposePlayer();
-            const newPlayer = createAudioPlayer({ uri: item.uri }, { updateInterval: 500 });
-            playerRef.current = newPlayer;
-            // Pick up where this track was left; the status listener seeks
-            // once the duration is known.
-            const resume = item.position && item.position > 5 ? item.position : null;
-            pendingResumeRef.current = resume;
-            if (playbackRate !== 1) newPlayer.setPlaybackRate(playbackRate, 'high');
-            newPlayer.play();
+            const { TrackPlayer } = tp();
+            const resume = item.position && item.position > 5 ? item.position : 0;
 
-            setPlayer(newPlayer);
+            await TrackPlayer.reset();
+            await TrackPlayer.add({
+                id: item.id,
+                url: item.uri,
+                title: item.name,
+                artist: 'Sprig',
+            });
+            if (seq !== switchSeqRef.current) return;
+            if (playbackRate !== 1) await TrackPlayer.setRate(playbackRate);
+            if (resume > 0) await TrackPlayer.seekTo(resume);
+            await TrackPlayer.play();
+
             setCurrentAudio(item);
-            setPosition(resume ?? 0);
+            setPosition(resume);
             setDuration(item.duration || 0);
             setIsPlaying(true);
         } catch (e) {
@@ -215,30 +208,29 @@ export default function AudioPlayerScreen() {
     };
 
     const togglePlayback = async () => {
-        const p = playerRef.current;
-        if (!p) return;
+        if (!currentAudio || !isNativePlayerAvailable()) return;
+        const { TrackPlayer } = tp();
         if (isPlaying) {
-            p.pause();
+            await TrackPlayer.pause().catch(() => { });
             setIsPlaying(false);
-            if (currentAudio) setAudioPosition(currentAudio.id, position);
+            setAudioPosition(currentAudio.id, position);
         } else {
             // Restart from the top if the track already finished
             if (duration > 0 && position >= duration - 0.25) {
-                await p.seekTo(0).catch(() => { });
+                await TrackPlayer.seekTo(0).catch(() => { });
                 setPosition(0);
             }
-            p.play();
+            await TrackPlayer.play().catch(() => { });
             setIsPlaying(true);
         }
     };
 
     const seekTo = (seconds: number) => {
-        const p = playerRef.current;
-        if (!p) return;
+        if (!currentAudio || !isNativePlayerAvailable()) return;
         const to = Math.max(0, duration > 0 ? Math.min(duration, seconds) : seconds);
-        p.seekTo(to).catch(() => { });
+        tp().TrackPlayer.seekTo(to).catch(() => { });
         setPosition(to);
-        if (currentAudio) setAudioPosition(currentAudio.id, to);
+        setAudioPosition(currentAudio.id, to);
     };
 
     const skipBy = (delta: number) => seekTo(position + delta);
@@ -247,7 +239,7 @@ export default function AudioPlayerScreen() {
     const cyclePlaybackRate = () => {
         const next = PLAYBACK_RATES[(PLAYBACK_RATES.indexOf(playbackRate) + 1) % PLAYBACK_RATES.length];
         setPlaybackRateState(next);
-        playerRef.current?.setPlaybackRate(next, 'high');
+        if (isNativePlayerAvailable()) tp().TrackPlayer.setRate(next).catch(() => { });
     };
 
     const handleDelete = async (id: string) => {
