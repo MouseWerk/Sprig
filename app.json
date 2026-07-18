@@ -2,22 +2,18 @@
   "expo": {
     "name": "Sprig",
     "slug": "csvtudyapp",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "csvtudyapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mousewerk.sprig",
       "infoPlist": {
-        "UIBackgroundModes": [
-          "audio"
-        ]
+        "UIBackgroundModes": ["audio"]
       }
     },
     "android": {
@@ -35,9 +31,7 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "category": [
-            "DEFAULT"
-          ],
+          "category": ["DEFAULT"],
           "data": [
             {
               "scheme": "content",
