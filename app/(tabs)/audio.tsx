@@ -1,15 +1,16 @@
 import { useToast } from '@/components/ui/Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { AudioFile, deleteAudioFile, Folder, getAudioFiles, getFolders, saveAudioFile, saveFolder, updateAudioFile } from '@/utils/Storage';
+import { AudioFile, deleteAudioFile, Folder, getAudioFiles, getFolders, saveAudioFile, saveFolder, setAudioPosition, updateAudioFile } from '@/utils/Storage';
+import Slider from '@react-native-community/slider';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import {
     CheckCircle2,
     Circle,
+    FastForward,
     FileMusic,
     Folder as FolderIcon,
     FolderInput,
@@ -17,11 +18,12 @@ import {
     Pause,
     Play,
     Plus,
+    Rewind,
     SlidersHorizontal,
     Trash2,
     X
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     FlatList,
     ScrollView,
@@ -63,6 +65,11 @@ export default function AudioPlayerScreen() {
     const [newFolderSheetVisible, setNewFolderSheetVisible] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
 
+    const [playbackRate, setPlaybackRateState] = useState(1);
+    const pendingResumeRef = useRef<number | null>(null);
+    const lastSaveRef = useRef(0);
+    const seekingRef = useRef(false);
+
     const backgroundColor = useThemeColor({}, 'background');
     const cardColor = useThemeColor({}, 'card');
     const textColor = useThemeColor({}, 'text');
@@ -86,15 +93,38 @@ export default function AudioPlayerScreen() {
     // Follow the active player's status; release it when replaced or on unmount.
     useEffect(() => {
         if (!player) return;
+        const audioId = currentAudio?.id;
         const sub = player.addListener('playbackStatusUpdate', (status) => {
-            setPosition(status.currentTime || 0);
+            // Resume where the track was left once the duration is known
+            const resume = pendingResumeRef.current;
+            if (resume !== null && status.duration > 0) {
+                pendingResumeRef.current = null;
+                if (resume < status.duration - 5) {
+                    player.seekTo(resume).catch(() => { });
+                    setPosition(resume);
+                }
+            }
+            if (!seekingRef.current) setPosition(status.currentTime || 0);
             setDuration(status.duration || 0);
             setIsPlaying(status.playing);
+
+            // Persist the position every few seconds so reopening resumes here;
+            // a finished track restarts from the top next time.
+            if (audioId) {
+                if (status.didJustFinish) {
+                    setAudioPosition(audioId, 0);
+                } else if (status.playing && Date.now() - lastSaveRef.current > 5000) {
+                    lastSaveRef.current = Date.now();
+                    setAudioPosition(audioId, status.currentTime || 0);
+                }
+            }
         });
         return () => {
             sub.remove();
             try { player.remove(); } catch { /* already released */ }
         };
+        // currentAudio is set in the same update as player, so [player] suffices
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [player]);
 
     const loadAudios = async () => {
@@ -124,8 +154,12 @@ export default function AudioPlayerScreen() {
 
     const playAudio = async (item: AudioFile) => {
         try {
-            await setAudioModeAsync({ playsInSilentMode: true }).catch(() => { });
+            await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true }).catch(() => { });
             const newPlayer = createAudioPlayer({ uri: item.uri }, { updateInterval: 500 });
+            // Pick up where this track was left; the status listener seeks
+            // once the duration is known.
+            pendingResumeRef.current = item.position && item.position > 5 ? item.position : null;
+            if (playbackRate !== 1) newPlayer.setPlaybackRate(playbackRate, 'high');
             newPlayer.play();
 
             // The [player] effect releases the previous instance on replace
@@ -145,6 +179,7 @@ export default function AudioPlayerScreen() {
         if (isPlaying) {
             player.pause();
             setIsPlaying(false);
+            if (currentAudio) setAudioPosition(currentAudio.id, position);
         } else {
             // Restart from the top if the track already finished
             if (duration > 0 && position >= duration - 0.25) {
@@ -153,6 +188,23 @@ export default function AudioPlayerScreen() {
             player.play();
             setIsPlaying(true);
         }
+    };
+
+    const seekTo = (seconds: number) => {
+        if (!player) return;
+        const to = Math.max(0, duration > 0 ? Math.min(duration, seconds) : seconds);
+        player.seekTo(to).catch(() => { });
+        setPosition(to);
+        if (currentAudio) setAudioPosition(currentAudio.id, to);
+    };
+
+    const skipBy = (delta: number) => seekTo(position + delta);
+
+    const PLAYBACK_RATES = [1, 1.25, 1.5, 2];
+    const cyclePlaybackRate = () => {
+        const next = PLAYBACK_RATES[(PLAYBACK_RATES.indexOf(playbackRate) + 1) % PLAYBACK_RATES.length];
+        setPlaybackRateState(next);
+        if (player) player.setPlaybackRate(next, 'high');
     };
 
     const handleDelete = async (id: string) => {
@@ -426,26 +478,22 @@ export default function AudioPlayerScreen() {
                 <View style={[styles.floatingPlayer, { bottom: insets.bottom + 10 }]}>
                     <BlurView intensity={80} tint={backgroundColor === '#ffffff' ? 'light' : 'dark'} style={styles.playerBlur}>
                         <View style={[styles.playerInner, { backgroundColor: cardColor + '90' }]}>
-                            <View style={styles.progressContainer}>
-                                <View style={[styles.progressBar, { backgroundColor: secondaryBg }]}>
-                                    <View
-                                        style={[
-                                            styles.progressFill,
-                                            {
-                                                backgroundColor: accentColor,
-                                                width: `${duration > 0 ? Math.min(100, (position / duration) * 100) : 0}%`
-                                            }
-                                        ]}
-                                    >
-                                        <LinearGradient
-                                            colors={[accentColor, accentColor + '80']}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}
-                                            style={{ flex: 1 }}
-                                        />
-                                    </View>
-                                </View>
-                            </View>
+                            <Slider
+                                style={styles.seekSlider}
+                                minimumValue={0}
+                                maximumValue={duration > 0 ? duration : 1}
+                                value={Math.min(position, duration > 0 ? duration : 1)}
+                                minimumTrackTintColor={accentColor}
+                                maximumTrackTintColor={secondaryBg}
+                                thumbTintColor={accentColor}
+                                onSlidingStart={() => { seekingRef.current = true; }}
+                                onValueChange={(v) => { if (seekingRef.current) setPosition(v); }}
+                                onSlidingComplete={(v) => {
+                                    seekingRef.current = false;
+                                    seekTo(v);
+                                }}
+                                accessibilityLabel="Seek position"
+                            />
 
                             <View style={styles.playerMain}>
                                 <View style={styles.playerInfoColumn}>
@@ -463,19 +511,48 @@ export default function AudioPlayerScreen() {
                                     </View>
                                 </View>
 
-                                <TouchableOpacity
-                                    onPress={togglePlayback}
-                                    style={[styles.floatingPlayBtn, { backgroundColor: accentColor }]}
-                                    activeOpacity={0.8}
-                                    accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
-                                    accessibilityRole="button"
-                                >
-                                    {isPlaying ? (
-                                        <Pause size={24} color={accentForeground} fill={accentForeground} />
-                                    ) : (
-                                        <Play size={24} color={accentForeground} fill={accentForeground} style={{ marginLeft: 2 }} />
-                                    )}
-                                </TouchableOpacity>
+                                <View style={styles.playerControls}>
+                                    <TouchableOpacity
+                                        onPress={cyclePlaybackRate}
+                                        style={[styles.rateChip, { backgroundColor: playbackRate !== 1 ? accentColor : secondaryBg }]}
+                                        activeOpacity={0.8}
+                                        accessibilityLabel={`Playback speed ${playbackRate}x`}
+                                        accessibilityRole="button"
+                                    >
+                                        <Text style={[styles.rateChipText, { color: playbackRate !== 1 ? accentForeground : textColor }]}>
+                                            {playbackRate}×
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => skipBy(-15)}
+                                        hitSlop={6}
+                                        accessibilityLabel="Back 15 seconds"
+                                        accessibilityRole="button"
+                                    >
+                                        <Rewind size={24} color={textColor} strokeWidth={2.25} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={togglePlayback}
+                                        style={[styles.floatingPlayBtn, { backgroundColor: accentColor }]}
+                                        activeOpacity={0.8}
+                                        accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
+                                        accessibilityRole="button"
+                                    >
+                                        {isPlaying ? (
+                                            <Pause size={24} color={accentForeground} fill={accentForeground} />
+                                        ) : (
+                                            <Play size={24} color={accentForeground} fill={accentForeground} style={{ marginLeft: 2 }} />
+                                        )}
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => skipBy(15)}
+                                        hitSlop={6}
+                                        accessibilityLabel="Forward 15 seconds"
+                                        accessibilityRole="button"
+                                    >
+                                        <FastForward size={24} color={textColor} strokeWidth={2.25} />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </View>
                     </BlurView>
@@ -946,18 +1023,27 @@ const styles = StyleSheet.create({
         paddingTop: 12,
         borderRadius: 30,
     },
-    progressContainer: {
-        marginBottom: 14,
-    },
-    progressBar: {
-        height: 6,
-        borderRadius: 3,
+    seekSlider: {
         width: '100%',
-        overflow: 'hidden',
+        height: 32,
+        marginBottom: 4,
     },
-    progressFill: {
-        height: '100%',
-        borderRadius: 3,
+    playerControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    rateChip: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+        minWidth: 44,
+        alignItems: 'center',
+    },
+    rateChipText: {
+        fontSize: 13,
+        fontWeight: '800',
+        fontVariant: ['tabular-nums'],
     },
     playerMain: {
         flexDirection: 'row',
@@ -987,9 +1073,9 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     floatingPlayBtn: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
+        width: 52,
+        height: 52,
+        borderRadius: 26,
         alignItems: 'center',
         justifyContent: 'center',
         elevation: 4,

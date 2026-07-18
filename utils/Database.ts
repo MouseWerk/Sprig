@@ -105,6 +105,7 @@ async function initDb(): Promise<SQLite.SQLiteDatabase> {
 
     await addColumnIfMissing(db, 'decks', 'exam_date', 'TEXT');
     await addColumnIfMissing(db, 'audio_files', 'folder_id', 'TEXT');
+    await addColumnIfMissing(db, 'audio_files', 'position', 'REAL');
 
     // Folders are scoped per area (deck / pdf / audio) instead of shared.
     // On upgrade, claim all pre-existing folders for the Home tab and move
