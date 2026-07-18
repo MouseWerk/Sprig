@@ -2,6 +2,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
 import { ConfusionPair, Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getConfusionPairs, getDecks, getExamPlan, importCsvToDeck, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckExamDate, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from '@/utils/AppHaptics';
@@ -206,17 +207,23 @@ export default function DeckDetailsScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
 
-    // Exam countdown: set the date N days from today, shift it, or clear it
-    const setExamInDays = async (days: number | null) => {
+    // Exam countdown: pick a date, shift it, or clear it
+    const [showExamPicker, setShowExamPicker] = useState(false);
+
+    const clearExamDate = async () => {
         if (!id) return;
-        let dateKey: string | null = null;
-        if (days !== null) {
-            const d = new Date();
-            d.setDate(d.getDate() + days);
-            dateKey = d.toISOString().split('T')[0];
-        }
+        await updateDeckExamDate(id, null);
+        setDeck(d => (d ? { ...d, examDate: undefined } : d));
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    };
+
+    const onExamDatePicked = async (event: DateTimePickerEvent, date?: Date) => {
+        setShowExamPicker(false);
+        if (event.type !== 'set' || !date || !id) return;
+        // Format in local time — toISOString would shift the day near midnight
+        const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         await updateDeckExamDate(id, dateKey);
-        setDeck(d => (d ? { ...d, examDate: dateKey ?? undefined } : d));
+        setDeck(d => (d ? { ...d, examDate: dateKey } : d));
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
 
@@ -624,11 +631,6 @@ export default function DeckDetailsScreen() {
                         {(() => {
                             const plan = deck ? getExamPlan(deck) : null;
                             const examSet = !!deck?.examDate;
-                            const presets: { label: string; days: number }[] = [
-                                { label: '1 week', days: 7 },
-                                { label: '2 weeks', days: 14 },
-                                { label: '1 month', days: 30 },
-                            ];
                             return (
                                 <View style={styles.examSection}>
                                     <View style={styles.directionRow}>
@@ -636,21 +638,34 @@ export default function DeckDetailsScreen() {
                                         <View style={styles.directionChips}>
                                             <TouchableOpacity
                                                 style={[styles.filterChip, { backgroundColor: examSet ? cardColor : accentColor }]}
-                                                onPress={() => setExamInDays(null)}
+                                                onPress={clearExamDate}
                                             >
                                                 <Text style={[styles.filterChipText, { color: examSet ? mutedForeground : primaryForeground }]}>Off</Text>
                                             </TouchableOpacity>
-                                            {presets.map(p => (
-                                                <TouchableOpacity
-                                                    key={p.days}
-                                                    style={[styles.filterChip, { backgroundColor: cardColor }]}
-                                                    onPress={() => setExamInDays(p.days)}
-                                                >
-                                                    <Text style={[styles.filterChipText, { color: mutedForeground }]}>{p.label}</Text>
-                                                </TouchableOpacity>
-                                            ))}
+                                            <TouchableOpacity
+                                                style={[styles.filterChip, { backgroundColor: examSet ? accentColor : cardColor }]}
+                                                onPress={() => setShowExamPicker(true)}
+                                                accessibilityLabel="Pick exam date"
+                                                accessibilityRole="button"
+                                            >
+                                                <CalendarDays size={13} color={examSet ? primaryForeground : mutedForeground} strokeWidth={2.5} />
+                                                <Text style={[styles.filterChipText, { color: examSet ? primaryForeground : mutedForeground }]}>
+                                                    {examSet
+                                                        ? new Date(deck!.examDate! + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+                                                        : 'Pick date'}
+                                                </Text>
+                                            </TouchableOpacity>
                                         </View>
                                     </View>
+
+                                    {showExamPicker && (
+                                        <DateTimePicker
+                                            value={deck?.examDate ? new Date(deck.examDate + 'T00:00:00') : new Date()}
+                                            mode="date"
+                                            minimumDate={new Date()}
+                                            onChange={onExamDatePicked}
+                                        />
+                                    )}
 
                                     {plan && (
                                         <View style={[styles.examBanner, { backgroundColor: cardColor }]}>
@@ -995,6 +1010,9 @@ const styles = StyleSheet.create({
         marginTop: 12,
     },
     filterChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: 16,
