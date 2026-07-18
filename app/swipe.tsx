@@ -284,27 +284,27 @@ export default function SwipeScreen() {
                 if (result.freezeUsed) {
                     setTimeout(() => {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        showToast({ message: '🧊 Streak freeze used — your streak is safe!', type: 'info' });
+                        showToast({ message: 'Streak freeze used — your streak is safe!', type: 'info' });
                     }, delay);
                     delay += 600;
                 }
                 if (result.freezeEarned) {
                     setTimeout(() => {
-                        showToast({ message: '🧊 You earned a streak freeze!', type: 'success' });
+                        showToast({ message: 'You earned a streak freeze!', type: 'success' });
                     }, delay);
                     delay += 600;
                 }
                 if (result.leveledUp) {
                     setTimeout(() => {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        showToast({ message: `⭐ Level ${result.newLevel}! You're now a ${result.newRank}`, type: 'success' });
+                        showToast({ message: `Level ${result.newLevel}! You're now a ${result.newRank}`, type: 'success' });
                     }, delay);
                     delay += 600;
                 }
                 result.newAchievements.forEach(a => {
                     setTimeout(() => {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        showToast({ message: `🏆 Achievement unlocked: ${a.title}`, type: 'success' });
+                        showToast({ message: `Achievement unlocked: ${a.title}`, type: 'success' });
                     }, delay);
                     delay += 600;
                 });

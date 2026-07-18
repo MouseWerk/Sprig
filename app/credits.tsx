@@ -80,7 +80,7 @@ export default function CreditsScreen() {
             >
                 <Text style={[styles.intro, { color: mutedForeground }]}>
                     Sprig stands on the shoulders of open-source projects and freely
-                    licensed sounds. Thank you to everyone behind them. 💚
+                    licensed sounds. Thank you to everyone behind them.
                 </Text>
 
                 <Text style={[styles.sectionHeader, { color: mutedForeground }]}>SOUNDS</Text>

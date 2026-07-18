@@ -7,7 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import { FOCUS_MINUTES_OPTIONS, getPrefsSync, setPref } from '@/utils/Preferences';
 import { recordFocusSession } from '@/utils/Storage';
 import { Stack } from 'expo-router';
-import { Music, Pause, Play, RotateCcw, X } from 'lucide-react-native';
+import { Coffee, Flower2, Leaf, LucideIcon, Music, Pause, Play, RotateCcw, Shrub, Sprout, TreeDeciduous, WheatOff, X } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,8 +19,8 @@ const DURATIONS = FOCUS_MINUTES_OPTIONS;
 const BREAK_MINUTES = 5;
 
 // Plant grows through these stages as the session progresses toward bloom.
-const STAGES = ['🌱', '🌿', '🪴', '🌳', '🌸'];
-function plantEmoji(progress: number): string {
+const STAGES: LucideIcon[] = [Sprout, Leaf, Shrub, TreeDeciduous, Flower2];
+function plantIconFor(progress: number): LucideIcon {
     const idx = Math.min(STAGES.length - 1, Math.floor(progress * STAGES.length));
     return STAGES[Math.max(0, idx)];
 }
@@ -163,13 +163,13 @@ export default function FocusScreen() {
         recordFocusSession(minutes)
             .then(result => {
                 let delay = 400;
-                showToast({ message: `🌸 Focus complete · +${result.xpGained} XP`, type: 'success' });
+                showToast({ message: `Focus complete · +${result.xpGained} XP`, type: 'success' });
                 if (result.leveledUp) {
-                    setTimeout(() => showToast({ message: `⭐ Level ${result.newLevel}! You're now a ${result.newRank}`, type: 'success' }), delay);
+                    setTimeout(() => showToast({ message: `Level ${result.newLevel}! You're now a ${result.newRank}`, type: 'success' }), delay);
                     delay += 600;
                 }
                 result.newAchievements.forEach(a => {
-                    setTimeout(() => showToast({ message: `🏆 Achievement unlocked: ${a.title}`, type: 'success' }), delay);
+                    setTimeout(() => showToast({ message: `Achievement unlocked: ${a.title}`, type: 'success' }), delay);
                     delay += 600;
                 });
             })
@@ -209,6 +209,7 @@ export default function FocusScreen() {
 
     const elapsed = totalRef.current - secondsLeft;
     const progress = totalRef.current > 0 ? elapsed / totalRef.current : 0;
+    const PlantIcon = plantIconFor(progress);
 
     return (
         <View style={[styles.container, { backgroundColor, paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
@@ -221,7 +222,9 @@ export default function FocusScreen() {
 
             {phase === 'setup' && (
                 <View style={styles.center}>
-                    <Text style={{ fontSize: 72, marginBottom: 8 }}>🌱</Text>
+                    <View style={{ marginBottom: 16 }}>
+                        <Sprout size={72} color={primaryColor} strokeWidth={2} />
+                    </View>
                     <Text style={[styles.title, { color: textColor }]}>Grow a plant by focusing</Text>
                     <Text style={[styles.subtitle, { color: mutedForeground }]}>
                         Pick a length and stay in the app. Leave for more than 10s and your plant wilts.
@@ -266,7 +269,11 @@ export default function FocusScreen() {
                     <View style={styles.ringWrap}>
                         <Ring size={280} progress={progress} color={phase === 'break' ? '#22c55e' : primaryColor} track={secondaryBg} />
                         <View style={styles.ringInner}>
-                            <Text style={{ fontSize: 64 }}>{phase === 'break' ? '☕' : plantEmoji(progress)}</Text>
+                            <View style={{ marginBottom: 6 }}>
+                                {phase === 'break'
+                                    ? <Coffee size={56} color="#22c55e" strokeWidth={2} />
+                                    : <PlantIcon size={56} color={primaryColor} strokeWidth={2} />}
+                            </View>
                             <Text style={[styles.timer, { color: textColor }]}>{fmt(secondsLeft)}</Text>
                             <Text style={[styles.timerSub, { color: mutedForeground }]}>
                                 {phase === 'paused' ? 'Paused' : phase === 'break' ? 'Relax a moment' : 'Stay focused'}
@@ -309,7 +316,9 @@ export default function FocusScreen() {
 
             {phase === 'done' && (
                 <View style={styles.center}>
-                    <Text style={{ fontSize: 96, marginBottom: 12 }}>🌸</Text>
+                    <View style={{ marginBottom: 20 }}>
+                        <Flower2 size={88} color={primaryColor} strokeWidth={2} />
+                    </View>
                     <Text style={[styles.title, { color: textColor }]}>Your plant bloomed!</Text>
                     <Text style={[styles.subtitle, { color: mutedForeground }]}>
                         {minutes} focused minutes. Nicely done — take a short break or plant another.
@@ -325,7 +334,9 @@ export default function FocusScreen() {
 
             {phase === 'dead' && (
                 <View style={styles.center}>
-                    <Text style={{ fontSize: 96, marginBottom: 12 }}>🥀</Text>
+                    <View style={{ marginBottom: 20 }}>
+                        <WheatOff size={88} color="#ef4444" strokeWidth={2} />
+                    </View>
                     <Text style={[styles.title, { color: '#ef4444' }]}>Your plant wilted</Text>
                     <Text style={[styles.subtitle, { color: mutedForeground }]}>
                         You left the app for too long. Stay focused and try again.

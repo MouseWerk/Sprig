@@ -61,7 +61,7 @@ export async function scheduleFocusWarning(seconds: number): Promise<string | nu
         if (!granted) return null;
         return await Notifications.scheduleNotificationAsync({
             content: {
-                title: '🥀 Your focus plant wilted!',
+                title: 'Your focus plant wilted!',
                 body: 'You left the app during a focus session. Come back to replant and keep studying.',
             },
             trigger: {
@@ -119,7 +119,7 @@ export async function scheduleStreakReminder(): Promise<void> {
 
         const id = await Notifications.scheduleNotificationAsync({
             content: {
-                title: '🔥 Keep your streak alive!',
+                title: 'Keep your streak alive!',
                 body: 'A few cards today keeps your streak growing. Ready for a quick session?',
             },
             trigger: {

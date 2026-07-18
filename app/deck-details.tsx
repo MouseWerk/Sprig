@@ -501,7 +501,7 @@ export default function DeckDetailsScreen() {
                                             {dueCount > 0 ? (
                                                 <Text style={{ color: '#ef4444', fontWeight: '700' }}>{dueCount} due</Text>
                                             ) : (
-                                                <Text style={{ color: '#22c55e', fontWeight: '700' }}>all clear ✓</Text>
+                                                <Text style={{ color: '#22c55e', fontWeight: '700' }}>all clear</Text>
                                             )}
                                         </Text>
                                     );

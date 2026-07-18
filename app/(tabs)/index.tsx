@@ -3,7 +3,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Icons from 'lucide-react-native';
-import { CalendarCheck, ChevronRight, ClipboardPaste, FileUp, Folder as FolderIcon, Leaf, Play, Plus, Search, Trash2, X } from 'lucide-react-native';
+import { CalendarCheck, CalendarDays, ChevronRight, ClipboardPaste, FileUp, Folder as FolderIcon, Leaf, Play, Plus, Search, Trash2, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -281,9 +281,10 @@ export default function HomeScreen() {
             const plan = getExamPlan(item);
             if (!plan || plan.daysLeft < 0) return null;
             return (
-              <View style={[styles.dueBadge, { backgroundColor: plan.daysLeft <= 3 ? '#ef4444' : '#f59e0b' }]}>
+              <View style={[styles.dueBadge, { backgroundColor: plan.daysLeft <= 3 ? '#ef4444' : '#f59e0b', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                {plan.daysLeft > 0 && <CalendarDays size={11} color="#fff" strokeWidth={2.5} />}
                 <Text style={styles.dueText}>
-                  {plan.daysLeft === 0 ? 'EXAM TODAY' : `📅 ${plan.daysLeft}d`}
+                  {plan.daysLeft === 0 ? 'EXAM TODAY' : `${plan.daysLeft}d`}
                 </Text>
               </View>
             );

@@ -88,7 +88,7 @@ export function LevelCard({ stats, displayStreak }: LevelCardProps) {
                             {Math.min(todayCount, dailyGoal)}<Text style={{ color: mutedForeground, fontSize: 13 }}> / {dailyGoal}</Text>
                         </Text>
                         <Text style={[styles.statLabel, { color: mutedForeground }]}>
-                            {goalMet ? 'Goal reached! 🎉' : 'Daily goal'}
+                            {goalMet ? 'Goal reached!' : 'Daily goal'}
                         </Text>
                         <View style={[styles.goalTrack, { backgroundColor: secondaryBg }]}>
                             <View style={[styles.goalFill, { width: `${Math.round(goalProgress * 100)}%`, backgroundColor: goalMet ? '#22c55e' : primaryColor }]} />

@@ -29,15 +29,31 @@ interface PendingUpload {
     name: string;
     kind: Kind;
     total: number;
-    received: number;
-    parts: string[];
+    received: number;   // chunks must arrive strictly in order (the page sends them sequentially)
     bytes: number;
     touched: number;
+    fileUri: string;    // temp file the chunks are streamed into as they arrive
 }
 
 let server: { close: () => void } | null = null;
 const uploads = new Map<string, PendingUpload>();
 let sweepTimer: ReturnType<typeof setInterval> | null = null;
+let tempSeq = 0;
+
+// Screens subscribe here so a finished upload appears in their lists
+// immediately, without waiting for the next tab refocus.
+type SavedListener = (name: string, kind: Kind) => void;
+const savedListeners = new Set<SavedListener>();
+export function subscribeWebServerSaves(listener: SavedListener): () => void {
+    savedListeners.add(listener);
+    return () => { savedListeners.delete(listener); };
+}
+
+function discardUpload(id: string) {
+    const u = uploads.get(id);
+    uploads.delete(id);
+    if (u) FileSystem.deleteAsync(u.fileUri, { idempotent: true }).catch(() => { });
+}
 
 // Small on-device request log so connection problems can be diagnosed from
 // the Settings screen without adb or a debugger.
@@ -187,7 +203,7 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
     sweepTimer = setInterval(() => {
         const now = Date.now();
         for (const [id, u] of uploads) {
-            if (now - u.touched > UPLOAD_TTL_MS) uploads.delete(id);
+            if (now - u.touched > UPLOAD_TTL_MS) discardUpload(id);
         }
     }, 60 * 1000);
 
@@ -208,11 +224,11 @@ export function stopWebServer(): void {
         clearInterval(sweepTimer);
         sweepTimer = null;
     }
-    uploads.clear();
+    for (const id of [...uploads.keys()]) discardUpload(id);
 }
 
 function respond(socket: any, status: number, type: string, body: string) {
-    const statusText = status === 200 ? 'OK' : status === 404 ? 'Not Found' : status === 413 ? 'Payload Too Large' : 'Error';
+    const statusText = status === 200 ? 'OK' : status === 404 ? 'Not Found' : status === 409 ? 'Conflict' : status === 413 ? 'Payload Too Large' : 'Error';
     const payload = Buffer.from(body, 'utf8');
     socket.write(
         `HTTP/1.1 ${status} ${statusText}\r\n` +
@@ -267,20 +283,60 @@ async function handleRequest(
 
         let u = uploads.get(uploadId);
         if (!u) {
-            u = { name: sanitizeName(name), kind, total, received: 0, parts: new Array(total).fill(''), bytes: 0, touched: Date.now() };
+            if (index !== 0) {
+                // The server lost this upload's state (restart, expiry). Tell
+                // the page honestly instead of counting from scratch.
+                respond(socket, 409, 'application/json', '{"error":"upload state lost — please retry the file"}');
+                return;
+            }
+            u = {
+                name: sanitizeName(name),
+                kind,
+                total,
+                received: 0,
+                bytes: 0,
+                touched: Date.now(),
+                fileUri: `${FileSystem.cacheDirectory}webupload_${Date.now()}_${tempSeq++}.bin`,
+            };
             uploads.set(uploadId, u);
         }
         u.touched = Date.now();
 
-        if (u.parts[index] === '') {
-            u.parts[index] = data;
-            u.received++;
-            u.bytes += Math.floor(data.length * 0.75);
-            if (u.bytes > MAX_FILE_BYTES) {
-                uploads.delete(uploadId);
-                respond(socket, 413, 'application/json', '{"error":"file too large"}');
-                return;
+        if (index < u.received) {
+            // Duplicate of a chunk we already streamed to disk — acknowledge.
+            respond(socket, 200, 'application/json', JSON.stringify({ received: u.received, total: u.total }));
+            return;
+        }
+        if (index > u.received) {
+            discardUpload(uploadId);
+            respond(socket, 409, 'application/json', '{"error":"chunk out of order — please retry the file"}');
+            return;
+        }
+
+        u.bytes += Math.floor(data.length * 0.75);
+        if (u.bytes > MAX_FILE_BYTES) {
+            discardUpload(uploadId);
+            respond(socket, 413, 'application/json', '{"error":"file too large"}');
+            return;
+        }
+
+        // Stream the chunk straight to disk. Chunk byte size is a multiple of
+        // 3 (page contract), so each base64 part decodes independently.
+        try {
+            if (index === 0) {
+                await FileSystem.writeAsStringAsync(u.fileUri, data, { encoding: FileSystem.EncodingType.Base64 });
+            } else {
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                const RNBlob = require('react-native-blob-util').default;
+                await RNBlob.fs.appendFile(u.fileUri.replace(/^file:\/\//, ''), data, 'base64');
             }
+            u.received++;
+        } catch (e) {
+            console.error('WebServer chunk write failed:', e);
+            logRequest(`chunk write failed: ${String(e).slice(0, 80)}`);
+            discardUpload(uploadId);
+            respond(socket, 500, 'application/json', '{"error":"could not write chunk"}');
+            return;
         }
 
         if (u.received < u.total) {
@@ -288,23 +344,26 @@ async function handleRequest(
             return;
         }
 
-        // Last chunk in: assemble, hand to the normal ingestion path, clean up.
+        // Last chunk in: hand the assembled file to the normal ingestion path.
         uploads.delete(uploadId);
         try {
-            const tempUri = `${FileSystem.cacheDirectory}webupload_${Date.now()}_${u.name}`;
-            await FileSystem.writeAsStringAsync(tempUri, u.parts.join(''), { encoding: FileSystem.EncodingType.Base64 });
-
             if (u.kind === 'audio') {
-                await saveAudioFile(tempUri, u.name);
+                await saveAudioFile(u.fileUri, u.name);
             } else {
-                await saveDeck(u.name.replace(/\.pdf$/i, '') || 'Document', tempUri, 'FileText', 'pdf', 0, null);
+                await saveDeck(u.name.replace(/\.pdf$/i, '') || 'Document', u.fileUri, 'FileText', 'pdf', 0, null);
             }
-            await FileSystem.deleteAsync(tempUri, { idempotent: true });
+            await FileSystem.deleteAsync(u.fileUri, { idempotent: true });
 
+            logRequest(`saved ${u.kind}: ${u.name}`);
             onFileSaved?.(u.name, u.kind);
+            for (const listener of savedListeners) {
+                try { listener(u.name, u.kind); } catch { /* listener error must not break the server */ }
+            }
             respond(socket, 200, 'application/json', '{"done":true}');
         } catch (e) {
             console.error('WebServer save failed:', e);
+            logRequest(`save failed: ${String(e).slice(0, 80)}`);
+            FileSystem.deleteAsync(u.fileUri, { idempotent: true }).catch(() => { });
             respond(socket, 500, 'application/json', '{"error":"save failed"}');
         }
         return;
@@ -410,6 +469,7 @@ async function upload(file, kind) {
   const id = Date.now() + '-' + Math.random().toString(36).slice(2);
   const total = Math.max(1, Math.ceil(file.size / CHUNK));
   try {
+    let last = null;
     for (let i = 0; i < total; i++) {
       const slice = file.slice(i * CHUNK, (i + 1) * CHUNK);
       const b64 = await toBase64(slice);
@@ -418,13 +478,18 @@ async function upload(file, kind) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uploadId: id, name: file.name, kind, index: i, total, data: b64 })
       });
-      if (!res.ok) throw new Error((await res.json()).error || res.status);
+      let json = null;
+      try { json = await res.json(); } catch (e) { /* non-JSON reply */ }
+      if (!res.ok) throw new Error((json && json.error) || ('HTTP ' + res.status));
+      last = json;
       const pct = Math.round(((i + 1) / total) * 100);
       bar.style.width = pct + '%';
       status.textContent = pct + '%';
     }
+    // Only report success once the phone confirms it stored the file.
+    if (!last || last.done !== true) throw new Error('phone did not confirm the save');
     el.classList.add('done');
-    status.textContent = 'Saved ✓';
+    status.textContent = 'Saved';
   } catch (e) {
     el.classList.add('error');
     status.textContent = 'Failed';

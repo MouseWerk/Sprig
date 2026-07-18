@@ -165,7 +165,7 @@ export default function TypeScreen() {
                 <Text style={[styles.resultScore, { color: textColor }]}>{score} / {total}</Text>
                 <Text style={[styles.resultPct, { color: primaryColor }]}>{pct}% typed correctly</Text>
                 <Text style={[styles.emptyText, { color: mutedForeground }]}>
-                    {pct >= 80 ? 'Excellent recall! 🎉' : pct >= 50 ? 'Solid — typing makes it stick.' : 'Tough round. Try the same deck again.'}
+                    {pct >= 80 ? 'Excellent recall!' : pct >= 50 ? 'Solid — typing makes it stick.' : 'Tough round. Try the same deck again.'}
                 </Text>
                 <View style={{ width: '100%', maxWidth: 300, gap: 12, marginTop: 24 }}>
                     <Button title="Try Again" onPress={restart} style={{ height: 52 }} />

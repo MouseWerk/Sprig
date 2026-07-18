@@ -103,7 +103,7 @@ export default function AchievementsScreen() {
                         <View style={[styles.summaryFill, { width: `${Math.round(overallProgress * 100)}%`, backgroundColor: primaryColor }]} />
                     </View>
                     <Text style={[styles.summaryHint, { color: mutedForeground }]}>
-                        {unlocked === total ? 'You collected them all — legendary! 🎉' : 'Keep studying to unlock them all.'}
+                        {unlocked === total ? 'You collected them all — legendary!' : 'Keep studying to unlock them all.'}
                     </Text>
                 </View>
 

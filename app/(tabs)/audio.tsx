@@ -2,8 +2,9 @@ import { useToast } from '@/components/ui/Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { AudioFile, deleteAudioFile, deleteFolder, Folder, getAudioFiles, getFolders, saveAudioFile, saveFolder, setAudioPosition, updateAudioFile } from '@/utils/Storage';
-import { ensurePlayerSetup, isNativePlayerAvailable, tp } from '@/utils/NativePlayer';
+import { subscribeWebServerSaves } from '@/utils/WebServer';
 import Slider from '@react-native-community/slider';
+import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import { useFocusEffect } from 'expo-router';
@@ -69,6 +70,7 @@ export default function AudioPlayerScreen() {
     const lastSaveRef = useRef(0);
     const seekingRef = useRef(false);
     const switchSeqRef = useRef(0);
+    const playerRef = useRef<AudioPlayer | null>(null);
     const currentAudioRef = useRef<AudioFile | null>(null);
     currentAudioRef.current = currentAudio;
 
@@ -92,49 +94,51 @@ export default function AudioPlayerScreen() {
         }, [])
     );
 
-    // Subscribe to native player state (play/pause from the notification,
-    // lock screen or headset land here too) and poll playback progress.
+    // Audio session: keep playing in silent mode and while backgrounded,
+    // and release the player when the screen unmounts.
     useEffect(() => {
-        if (!isNativePlayerAvailable()) return;
-        const { TrackPlayer, Event, State } = tp();
-
-        const stateSub = TrackPlayer.addEventListener(Event.PlaybackState, ({ state }) => {
-            setIsPlaying(state === State.Playing || state === State.Buffering);
-        });
-        const endSub = TrackPlayer.addEventListener(Event.PlaybackQueueEnded, () => {
-            const audio = currentAudioRef.current;
-            if (audio) setAudioPosition(audio.id, 0);
-            setIsPlaying(false);
-            setPosition(0);
-        });
-
-        const progressTimer = setInterval(async () => {
-            if (!currentAudioRef.current) return;
-            try {
-                const progress = await TrackPlayer.getProgress();
-                if (!seekingRef.current) setPosition(progress.position || 0);
-                setDuration(progress.duration || 0);
-                // Persist the position every few seconds so reopening resumes here
-                const playing = (await TrackPlayer.getPlaybackState()).state === State.Playing;
-                if (playing && Date.now() - lastSaveRef.current > 5000) {
-                    lastSaveRef.current = Date.now();
-                    setAudioPosition(currentAudioRef.current.id, progress.position || 0);
-                }
-            } catch { /* player not ready */ }
-        }, 500);
-
+        setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true }).catch(() => { });
         return () => {
-            stateSub.remove();
-            endSub.remove();
-            clearInterval(progressTimer);
+            try { playerRef.current?.clearLockScreenControls(); } catch { /* not active */ }
+            try { playerRef.current?.remove(); } catch { /* already released */ }
+            playerRef.current = null;
         };
     }, []);
 
-    // Stop playback entirely, remove the media notification, hide the player.
+    // Poll playback progress off the player's synchronous getters.
+    useEffect(() => {
+        const progressTimer = setInterval(() => {
+            const player = playerRef.current;
+            const audio = currentAudioRef.current;
+            if (!player || !audio) return;
+            try {
+                if (!seekingRef.current) setPosition(player.currentTime || 0);
+                if (player.duration > 0) setDuration(player.duration);
+                setIsPlaying(player.playing);
+                // Persist the position every few seconds so reopening resumes here
+                if (player.playing && Date.now() - lastSaveRef.current > 5000) {
+                    lastSaveRef.current = Date.now();
+                    setAudioPosition(audio.id, player.currentTime || 0);
+                }
+            } catch { /* player released mid-tick */ }
+        }, 500);
+        return () => clearInterval(progressTimer);
+    }, []);
+
+    // Live-refresh the list when the WiFi upload server saves an audio file.
+    useEffect(() => {
+        return subscribeWebServerSaves((_name, kind) => {
+            if (kind === 'audio') loadAudios();
+        });
+    }, []);
+
+    // Stop playback entirely, release the player, hide the mini player.
     const stopPlayback = () => {
         switchSeqRef.current++;
         if (currentAudio && position > 0) setAudioPosition(currentAudio.id, position);
-        if (isNativePlayerAvailable()) tp().TrackPlayer.reset().catch(() => { });
+        try { playerRef.current?.clearLockScreenControls(); } catch { /* not active */ }
+        try { playerRef.current?.remove(); } catch { /* already released */ }
+        playerRef.current = null;
         setCurrentAudio(null);
         setIsPlaying(false);
         setPosition(0);
@@ -167,10 +171,6 @@ export default function AudioPlayerScreen() {
     };
 
     const playAudio = async (item: AudioFile) => {
-        if (!isNativePlayerAvailable()) {
-            showToast({ message: 'Audio playback needs the full app build — it isn\'t available in Expo Go', type: 'warning' });
-            return;
-        }
         // Tapping the track that's already loaded toggles play/pause.
         if (currentAudio?.id === item.id) {
             togglePlayback();
@@ -179,23 +179,37 @@ export default function AudioPlayerScreen() {
 
         const seq = ++switchSeqRef.current;
         try {
-            await ensurePlayerSetup();
-            if (seq !== switchSeqRef.current) return; // a newer tap won the race
+            try { playerRef.current?.clearLockScreenControls(); } catch { /* not active */ }
+            try { playerRef.current?.remove(); } catch { /* already released */ }
+            playerRef.current = null;
 
-            const { TrackPlayer } = tp();
             const resume = item.position && item.position > 5 ? item.position : 0;
+            const player = createAudioPlayer({ uri: item.uri });
+            playerRef.current = player;
 
-            await TrackPlayer.reset();
-            await TrackPlayer.add({
-                id: item.id,
-                url: item.uri,
-                title: item.name,
-                artist: 'Sprig',
+            player.addListener('playbackStatusUpdate', (status) => {
+                if (seq !== switchSeqRef.current) return;
+                if (status.didJustFinish) {
+                    const audio = currentAudioRef.current;
+                    if (audio) setAudioPosition(audio.id, 0);
+                    player.pause();
+                    player.seekTo(0).catch(() => { });
+                    setIsPlaying(false);
+                    setPosition(0);
+                }
             });
-            if (seq !== switchSeqRef.current) return;
-            if (playbackRate !== 1) await TrackPlayer.setRate(playbackRate);
-            if (resume > 0) await TrackPlayer.seekTo(resume);
-            await TrackPlayer.play();
+
+            if (playbackRate !== 1) player.setPlaybackRate(playbackRate);
+            if (resume > 0) await player.seekTo(resume);
+            if (seq !== switchSeqRef.current) {
+                try { player.remove(); } catch { /* superseded by a newer tap */ }
+                return;
+            }
+            // Show this track on the lock screen / media notification
+            try {
+                player.setActiveForLockScreen(true, { title: item.name, artist: 'Sprig' }, { showSeekForward: true, showSeekBackward: true });
+            } catch { /* not supported on this platform */ }
+            player.play();
 
             setCurrentAudio(item);
             setPosition(resume);
@@ -207,28 +221,29 @@ export default function AudioPlayerScreen() {
         }
     };
 
-    const togglePlayback = async () => {
-        if (!currentAudio || !isNativePlayerAvailable()) return;
-        const { TrackPlayer } = tp();
+    const togglePlayback = () => {
+        const player = playerRef.current;
+        if (!currentAudio || !player) return;
         if (isPlaying) {
-            await TrackPlayer.pause().catch(() => { });
+            player.pause();
             setIsPlaying(false);
             setAudioPosition(currentAudio.id, position);
         } else {
             // Restart from the top if the track already finished
             if (duration > 0 && position >= duration - 0.25) {
-                await TrackPlayer.seekTo(0).catch(() => { });
+                player.seekTo(0).catch(() => { });
                 setPosition(0);
             }
-            await TrackPlayer.play().catch(() => { });
+            player.play();
             setIsPlaying(true);
         }
     };
 
     const seekTo = (seconds: number) => {
-        if (!currentAudio || !isNativePlayerAvailable()) return;
+        const player = playerRef.current;
+        if (!currentAudio || !player) return;
         const to = Math.max(0, duration > 0 ? Math.min(duration, seconds) : seconds);
-        tp().TrackPlayer.seekTo(to).catch(() => { });
+        player.seekTo(to).catch(() => { });
         setPosition(to);
         setAudioPosition(currentAudio.id, to);
     };
@@ -239,7 +254,7 @@ export default function AudioPlayerScreen() {
     const cyclePlaybackRate = () => {
         const next = PLAYBACK_RATES[(PLAYBACK_RATES.indexOf(playbackRate) + 1) % PLAYBACK_RATES.length];
         setPlaybackRateState(next);
-        if (isNativePlayerAvailable()) tp().TrackPlayer.setRate(next).catch(() => { });
+        try { playerRef.current?.setPlaybackRate(next); } catch { /* no active player */ }
     };
 
     const handleDelete = async (id: string) => {

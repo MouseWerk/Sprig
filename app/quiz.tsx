@@ -183,7 +183,7 @@ export default function QuizScreen() {
                 <Text style={[styles.resultScore, { color: textColor }]}>{score} / {questions.length}</Text>
                 <Text style={[styles.resultPct, { color: primaryColor }]}>{pct}% correct</Text>
                 <Text style={[styles.emptyText, { color: mutedForeground }]}>
-                    {pct >= 80 ? 'Excellent work! 🎉' : pct >= 50 ? 'Nice — keep practicing!' : 'Keep at it, you\'ll get there.'}
+                    {pct >= 80 ? 'Excellent work!' : pct >= 50 ? 'Nice — keep practicing!' : 'Keep at it, you\'ll get there.'}
                 </Text>
                 <View style={{ width: '100%', maxWidth: 300, gap: 12, marginTop: 24 }}>
                     <Button title="Try Again" onPress={restart} style={{ height: 52 }} />

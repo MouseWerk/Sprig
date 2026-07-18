@@ -1,6 +1,6 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from '@/utils/AppHaptics';
-import { RotateCcw } from 'lucide-react-native';
+import { Flower2, Leaf, LucideIcon, RotateCcw, Shrub, Sprout, TreeDeciduous, WheatOff } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, AppState, AppStateStatus, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { cancelNotification, ensureNotificationPermissions, scheduleFocusWarning } from '../utils/Notifications';
@@ -10,17 +10,17 @@ const GRACE_MS = 10_000;
 
 interface Stage {
     min: number;      // focus seconds needed to reach this stage
-    emoji: string;
+    Icon: LucideIcon;
     label: string;
 }
 
 // Growth stages. The plant reaches full bloom after 6 minutes of focus.
 const STAGES: Stage[] = [
-    { min: 0, emoji: '🌱', label: 'Seedling' },
-    { min: 45, emoji: '🌿', label: 'Sprouting' },
-    { min: 120, emoji: '🪴', label: 'Growing' },
-    { min: 240, emoji: '🌳', label: 'Flourishing' },
-    { min: 360, emoji: '🌸', label: 'In bloom' },
+    { min: 0, Icon: Sprout, label: 'Seedling' },
+    { min: 45, Icon: Leaf, label: 'Sprouting' },
+    { min: 120, Icon: Shrub, label: 'Growing' },
+    { min: 240, Icon: TreeDeciduous, label: 'Flourishing' },
+    { min: 360, Icon: Flower2, label: 'In bloom' },
 ];
 
 function stageIndexFor(seconds: number): number {
@@ -194,13 +194,13 @@ export function FocusPlant({ active }: FocusPlantProps) {
 
     // Plant container grows a little with each stage
     const potSize = 46 + stageIndex * 5;
-    const emojiSize = 24 + stageIndex * 4;
+    const plantSize = 24 + stageIndex * 4;
 
     if (dead) {
         return (
             <View style={[styles.container, { backgroundColor: '#ef444415' }]}>
                 <View style={[styles.pot, { width: potSize, height: potSize, backgroundColor: '#ef444420' }]}>
-                    <Text style={{ fontSize: emojiSize }}>🥀</Text>
+                    <WheatOff size={plantSize} color="#ef4444" strokeWidth={2.25} />
                 </View>
                 <View style={styles.info}>
                     <Text style={[styles.title, { color: '#ef4444' }]}>Your plant withered</Text>
@@ -226,7 +226,7 @@ export function FocusPlant({ active }: FocusPlantProps) {
                 styles.pot,
                 { width: potSize, height: potSize, backgroundColor: primaryColor + '18', transform: [{ scale: popAnim }, { rotate }] },
             ]}>
-                <Text style={{ fontSize: emojiSize }}>{stage.emoji}</Text>
+                <stage.Icon size={plantSize} color={primaryColor} strokeWidth={2.25} />
             </Animated.View>
 
             <View style={styles.info}>

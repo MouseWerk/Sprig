@@ -118,7 +118,7 @@ export default function SettingsScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: 'Check out Sprig 🌱 — a calm study companion for flashcards, PDFs and focus sessions!',
+        message: 'Check out Sprig — a calm study companion for flashcards, PDFs and focus sessions!',
       });
     } catch (error) {
       console.error(error);

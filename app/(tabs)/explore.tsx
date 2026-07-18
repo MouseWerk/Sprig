@@ -15,6 +15,7 @@ import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { useToast } from '../../components/ui/Toast';
 import { Deck, deleteDeck, deleteFolder, Folder, getDecks, getFolders, saveDeck, saveFolder, updateDeck } from '../../utils/Storage';
+import { subscribeWebServerSaves } from '../../utils/WebServer';
 
 type SortMode = 'nameAsc' | 'nameDesc' | 'newest' | 'oldest';
 
@@ -99,6 +100,13 @@ export default function LibraryScreen() {
       loadData();
     }, [loadData])
   );
+
+  // Live-refresh the list when the WiFi upload server saves a PDF.
+  useEffect(() => {
+    return subscribeWebServerSaves((_name, kind) => {
+      if (kind === 'pdf') loadData();
+    });
+  }, [loadData]);
 
   useEffect(() => {
     AsyncStorage.getItem(SORT_STORAGE_KEY).then(saved => {
