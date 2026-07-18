@@ -45,6 +45,12 @@ function RootLayoutNav() {
           headerStyle: { backgroundColor },
           headerTitleStyle: { fontWeight: '600' }
         }} />
+        <Stack.Screen name="credits" options={{
+          headerBackTitle: 'Back',
+          headerTintColor: textColor,
+          headerStyle: { backgroundColor },
+          headerTitleStyle: { fontWeight: '600' }
+        }} />
         <Stack.Screen name="quiz" options={{
           headerBackTitle: 'Back',
           headerTintColor: textColor,

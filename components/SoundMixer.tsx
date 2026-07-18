@@ -229,6 +229,7 @@ export function SoundMixer({ visible, onClose }: SoundMixerProps) {
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
     const primaryColor = useThemeColor({}, 'primary');
+    const primaryForeground = useThemeColor({}, 'primaryForeground');
 
     const getEntry = (id: string): MixEntry => mixState.get(id) || { playing: false, volume: 0.6 };
 
@@ -375,8 +376,8 @@ export function SoundMixer({ visible, onClose }: SoundMixerProps) {
                         accessibilityLabel="Stop all ambient sounds"
                         accessibilityRole="button"
                     >
-                        <Square size={16} color={activeCount > 0 ? '#fff' : mutedForeground} fill={activeCount > 0 ? '#fff' : 'none'} strokeWidth={2.5} />
-                        <Text style={[styles.stopText, { color: activeCount > 0 ? '#fff' : mutedForeground }]}>Stop All</Text>
+                        <Square size={16} color={activeCount > 0 ? primaryForeground : mutedForeground} fill={activeCount > 0 ? primaryForeground : 'none'} strokeWidth={2.5} />
+                        <Text style={[styles.stopText, { color: activeCount > 0 ? primaryForeground : mutedForeground }]}>Stop All</Text>
                     </TouchableOpacity>
                 </Animated.View>
             </Animated.View>

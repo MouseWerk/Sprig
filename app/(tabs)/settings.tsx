@@ -12,6 +12,7 @@ import { clearCardCache } from '@/utils/Storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
+import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { Bell, ChevronRight, Clock, Database, DownloadCloud, Github, Info, Monitor, Moon, PlayCircle, ScrollText, ShieldCheck, Smartphone, Sun, Target, Timer, UploadCloud, Vibrate } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
@@ -33,6 +34,7 @@ export default function SettingsScreen() {
   const { showToast } = useToast();
   const confirm = useConfirm();
   const { t } = useLanguage();
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [prefs, setPrefs] = useState<Preferences>(getPrefsSync());
   useEffect(() => subscribePrefs(setPrefs), []);
@@ -327,6 +329,7 @@ export default function SettingsScreen() {
 
         <SectionHeader title="ABOUT" />
         <View style={styles.group}>
+          <SettingItem icon={ScrollText} label="Credits & Licenses" onPress={() => router.push('/credits')} />
           <SettingItem icon={Info} label="Version" value={Constants.expoConfig?.version ?? '1.0.0'} />
         </View>
 

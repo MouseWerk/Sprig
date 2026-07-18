@@ -67,6 +67,7 @@ export function FocusPlant({ active }: FocusPlantProps) {
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
     const primaryColor = useThemeColor({}, 'primary');
+    const primaryForeground = useThemeColor({}, 'primaryForeground');
 
     const stageIndex = stageIndexFor(focusSeconds);
     const stage = STAGES[stageIndex];
@@ -212,8 +213,8 @@ export function FocusPlant({ active }: FocusPlantProps) {
                     onPress={replant}
                     activeOpacity={0.85}
                 >
-                    <RotateCcw size={16} color="#fff" strokeWidth={2.5} />
-                    <Text style={styles.replantText}>Replant</Text>
+                    <RotateCcw size={16} color={primaryForeground} strokeWidth={2.5} />
+                    <Text style={[styles.replantText, { color: primaryForeground }]}>Replant</Text>
                 </TouchableOpacity>
             </View>
         );

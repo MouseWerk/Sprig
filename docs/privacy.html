@@ -1,143 +1,102 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sprig — Privacy Policy</title>
-    <style>
-      :root {
-        color-scheme: light dark;
-      }
-      body {
-        font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-        max-width: 720px;
-        margin: 0 auto;
-        padding: 32px 20px 64px;
-        line-height: 1.6;
-        color: #0f172a;
-        background: #ffffff;
-      }
-      @media (prefers-color-scheme: dark) {
-        body {
-          color: #e2e8f0;
-          background: #0b1120;
-        }
-        .card {
-          background: #16202f !important;
-        }
-      }
-      h1 {
-        letter-spacing: -0.5px;
-        margin-bottom: 4px;
-      }
-      .updated {
-        color: #64748b;
-        font-size: 14px;
-        margin-bottom: 28px;
-      }
-      h2 {
-        margin-top: 32px;
-        letter-spacing: -0.3px;
-      }
-      .card {
-        background: #eaf1ec;
-        border-radius: 14px;
-        padding: 16px 20px;
-        margin: 20px 0;
-      }
-      .logo {
-        font-size: 40px;
-      }
-      a {
-        color: #2e5c4e;
-      }
-      @media (prefers-color-scheme: dark) {
-        a {
-          color: #7fd1b0;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="logo">🌱</div>
-    <h1>Sprig — Privacy Policy</h1>
-    <p class="updated">Last updated: July 18, 2026</p>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprig — Privacy Policy</title>
+<meta name="description" content="Privacy policy for Sprig, the offline CSV flashcard app by Mousewerk.">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sage: #EAF1EC; --sage-deep: #DCE8E0; --ink: #0D1712;
+    --leaf: #2F5D4A; --leaf-soft: #5A7A6B; --paper: #F6FAF7;
+    --display: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Instrument Sans", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --sage: #0D1712; --sage-deep: #14211B; --ink: #EAF1EC;
+      --leaf: #8FB8A5; --leaf-soft: #6E8F80; --paper: #16241D;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--sage); color: var(--ink);
+    font-family: var(--body); font-size: 17px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible { outline: 3px solid var(--leaf); outline-offset: 3px; border-radius: 4px; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px 80px; }
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 22px 0 48px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+  .brand img { width: 34px; height: 34px; border-radius: 9px; }
+  .brand span { font-family: var(--display); font-weight: 800; font-size: 1.25rem; letter-spacing: -0.02em; }
+  nav a.back { color: var(--leaf-soft); text-decoration: none; font-weight: 600; font-size: 0.95rem; }
+  nav a.back:hover { color: var(--ink); }
+  h1 { font-family: var(--display); font-weight: 800; font-size: clamp(2rem, 5vw, 2.8rem); letter-spacing: -0.03em; margin-bottom: 8px; }
+  .updated { color: var(--leaf-soft); font-size: 0.9rem; margin-bottom: 36px; }
+  h2 { font-family: var(--display); font-weight: 700; font-size: 1.3rem; letter-spacing: -0.01em; margin: 36px 0 10px; }
+  p, li { color: var(--leaf-soft); }
+  strong, em { color: var(--ink); font-weight: 600; font-style: normal; }
+  ul { padding-left: 22px; margin: 10px 0; }
+  li { margin-bottom: 6px; }
+  a { color: var(--leaf); }
+  .tldr {
+    background: var(--paper); border: 1px solid var(--sage-deep);
+    border-radius: 20px; padding: 22px 24px; margin-bottom: 8px;
+  }
+  .tldr p { color: var(--ink); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="index.html"><img src="assets/icon.png" alt="" width="34" height="34"><span>Sprig</span></a>
+    <a class="back" href="index.html">← Back to Sprig</a>
+  </nav>
 
-    <div class="card">
-      <strong>The short version:</strong> Sprig stores everything on your
-      device. We do not collect, transmit, sell, or share any personal data.
-      There are no accounts, no analytics, no ads, and no tracking of any kind.
-    </div>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: July 18, 2026 · Applies to the Sprig Android app by Mousewerk</p>
 
-    <h2>What data Sprig handles</h2>
-    <p>
-      Sprig is a study app for flashcards, PDF documents, and focus sessions.
-      The content you add — flashcard decks, PDF files, audio files, study
-      statistics (streaks, experience points, achievements), and app preferences
-      — is stored
-      <strong>only in the app's private storage on your device</strong>. None of
-      it is ever uploaded to a server, because Sprig has no server.
-    </p>
+  <div class="tldr">
+    <p>The short version: Sprig stores everything on your device. We do not collect, transmit, sell, or share any personal data. There are no accounts, no analytics, no ads, and no tracking of any kind.</p>
+  </div>
 
-    <h2>What Sprig does not do</h2>
-    <ul>
-      <li>No user accounts or sign-in</li>
-      <li>No analytics or crash-reporting services</li>
-      <li>No advertising or ad identifiers</li>
-      <li>
-        No transmission of your content or usage data to anyone, including us
-      </li>
-      <li>No third-party data sharing</li>
-    </ul>
+  <h2>What data Sprig handles</h2>
+  <p>Sprig is a study app for flashcards, PDF documents, and focus sessions. The content you add — flashcard decks, PDF files, audio files, study statistics (streaks, experience points, achievements), and app preferences — is stored <strong>only in the app's private storage on your device</strong>. None of it is ever uploaded to a server, because Sprig has no server.</p>
 
-    <h2>Notifications</h2>
-    <p>
-      If you allow notifications, Sprig schedules local reminders (for example a
-      daily study reminder or a focus-session alert) directly on your device.
-      These never leave your phone. You can disable them at any time in the
-      app's settings or in your system settings.
-    </p>
+  <h2>What Sprig does not do</h2>
+  <ul>
+    <li>No user accounts or sign-in</li>
+    <li>No analytics or crash-reporting services</li>
+    <li>No advertising or ad identifiers</li>
+    <li>No transmission of your content or usage data to anyone, including us</li>
+    <li>No third-party data sharing</li>
+  </ul>
 
-    <h2>Files you import</h2>
-    <p>
-      When you import a CSV, PDF, or audio file, Sprig copies it into its own
-      private storage so your decks keep working even if the original file
-      moves. These copies stay on your device and are deleted when you delete
-      the item or uninstall the app.
-    </p>
+  <h2>Notifications</h2>
+  <p>If you allow notifications, Sprig schedules local reminders (for example a daily study reminder or a focus-session alert) directly on your device. These never leave your phone. You can disable them at any time in the app's settings or in your system settings.</p>
 
-    <h2>Backups</h2>
-    <p>
-      The optional backup feature creates a file containing your decks and
-      statistics and hands it to the sharing destination <em>you choose</em>
-      (e.g. your own cloud drive). Sprig never sends backups anywhere on its
-      own.
-    </p>
+  <h2>Files you import</h2>
+  <p>When you import a CSV, PDF, or audio file, Sprig copies it into its own private storage so your decks keep working even if the original file moves. These copies stay on your device and are deleted when you delete the item or uninstall the app.</p>
 
-    <h2>Permissions</h2>
-    <p>
-      Sprig requests only the permissions it needs: network access is required
-      by the underlying framework, vibration powers optional haptic feedback,
-      and notification permission enables the optional reminders described
-      above. Sprig does not use the microphone, camera, or your location.
-    </p>
+  <h2>Backups</h2>
+  <p>The optional backup feature creates a file containing your decks and statistics and hands it to the sharing destination <em>you choose</em> (e.g. your own cloud drive). Sprig never sends backups anywhere on its own.</p>
 
-    <h2>Children</h2>
-    <p>
-      Sprig does not collect data from anyone, including children. The app is
-      intended for general audiences (students aged 13 and up).
-    </p>
+  <h2>Permissions</h2>
+  <p>Sprig requests only the permissions it needs: network access is required by the underlying framework, vibration powers optional haptic feedback, and notification permission enables the optional reminders described above. Sprig does not use the microphone, camera, or your location.</p>
 
-    <h2>Changes to this policy</h2>
-    <p>
-      If this policy ever changes, the updated version will be published at this
-      address and the "last updated" date above will change.
-    </p>
+  <h2>Children</h2>
+  <p>Sprig does not collect data from anyone, including children. The app is intended for general audiences (students aged 13 and up).</p>
 
-    <h2>Contact</h2>
-    <p>
-      Questions about this policy:
-      <a href="mailto:info@mousewerk.de">info@mousewerk.de</a>
-    </p>
-  </body>
+  <h2>Changes to this policy</h2>
+  <p>If this policy ever changes, the updated version will be published at this address and the "last updated" date above will change.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this policy: <a href="mailto:info@mousewerk.de">info@mousewerk.de</a></p>
+</div>
+</body>
 </html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprig — Turn any CSV into flashcards</title>
+<meta name="description" content="Sprig turns any CSV file into a spaced-repetition flashcard deck. Swipe, quiz, focus and grow — free, offline, no account.">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sage: #EAF1EC;
+    --sage-deep: #DCE8E0;
+    --ink: #0D1712;
+    --leaf: #2F5D4A;
+    --leaf-soft: #5A7A6B;
+    --paper: #F6FAF7;
+    --radius: 20px;
+    --display: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Instrument Sans", system-ui, sans-serif;
+    --mono: "Spline Sans Mono", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --sage: #0D1712;
+      --sage-deep: #14211B;
+      --ink: #EAF1EC;
+      --leaf: #8FB8A5;
+      --leaf-soft: #6E8F80;
+      --paper: #16241D;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--sage);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--leaf); outline-offset: 3px; border-radius: 4px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- nav ---------- */
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 0;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .brand img { width: 34px; height: 34px; border-radius: 9px; }
+  .brand span { font-family: var(--display); font-weight: 800; font-size: 1.25rem; letter-spacing: -0.02em; }
+  .nav-links { display: flex; align-items: center; gap: 22px; }
+  .nav-links a { text-decoration: none; font-weight: 600; font-size: 0.95rem; color: var(--leaf-soft); }
+  .nav-links a:hover { color: var(--ink); }
+  .btn {
+    display: inline-block; text-decoration: none; font-weight: 600;
+    background: var(--ink); color: var(--sage) !important;
+    padding: 11px 22px; border-radius: 999px; font-size: 0.95rem;
+    transition: transform 0.15s ease;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn.ghost {
+    background: transparent; color: var(--ink) !important;
+    box-shadow: inset 0 0 0 2px var(--ink);
+  }
+
+  /* ---------- hero ---------- */
+  header.hero {
+    display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px;
+    align-items: center; padding: 64px 0 96px;
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.8rem; color: var(--leaf);
+    letter-spacing: 0.08em; margin-bottom: 18px; display: block;
+  }
+  h1 {
+    font-family: var(--display); font-weight: 800;
+    font-size: clamp(2.6rem, 6vw, 4.2rem);
+    line-height: 1.02; letter-spacing: -0.035em;
+    margin-bottom: 22px;
+  }
+  h1 em { font-style: normal; color: var(--leaf); }
+  .hero p.sub { font-size: 1.15rem; color: var(--leaf-soft); max-width: 34ch; margin-bottom: 32px; }
+  .hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+  .cta-note { font-size: 0.85rem; color: var(--leaf-soft); width: 100%; margin-top: 10px; }
+
+  /* csv → cards visual */
+  .demo { position: relative; min-height: 420px; }
+  .csv-file {
+    background: var(--ink); color: var(--sage);
+    border-radius: var(--radius); padding: 22px 24px 26px;
+    font-family: var(--mono); font-size: 0.85rem; line-height: 2.1;
+    position: absolute; bottom: 0; left: 0; right: 12%;
+    box-shadow: 0 24px 60px -30px rgba(13, 23, 18, 0.55);
+  }
+  .csv-file .filename {
+    display: flex; gap: 8px; align-items: center;
+    color: var(--leaf-soft); font-size: 0.75rem; margin-bottom: 10px;
+    letter-spacing: 0.06em;
+  }
+  .csv-file .filename::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--leaf); }
+  .csv-row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .csv-row .comma { color: var(--leaf); }
+  .card {
+    position: absolute; width: 62%;
+    background: var(--paper); border-radius: var(--radius);
+    padding: 22px 24px;
+    box-shadow: 0 18px 44px -22px rgba(13, 23, 18, 0.4);
+    border: 1px solid var(--sage-deep);
+  }
+  .card .q { font-family: var(--display); font-weight: 700; font-size: 1.05rem; letter-spacing: -0.01em; }
+  .card .a { color: var(--leaf); font-weight: 600; font-size: 0.9rem; margin-top: 6px; }
+  .card .tag {
+    font-family: var(--mono); font-size: 0.65rem; color: var(--leaf-soft);
+    letter-spacing: 0.1em; text-transform: uppercase; display: block; margin-bottom: 8px;
+  }
+  .card1 { top: 4%;  right: 0;   transform: rotate(3deg); }
+  .card2 { top: 30%; right: 9%;  transform: rotate(-2deg); }
+  .card3 { top: 56%; right: 2%;  transform: rotate(1.5deg); }
+  @media (prefers-reduced-motion: no-preference) {
+    .card { opacity: 0; animation: sprout 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.1) forwards; }
+    .card1 { animation-delay: 0.25s; }
+    .card2 { animation-delay: 0.5s; }
+    .card3 { animation-delay: 0.75s; }
+    @keyframes sprout {
+      from { opacity: 0; transform: translateY(60px) rotate(0deg) scale(0.92); }
+      to   { opacity: 1; transform: translateY(0) rotate(var(--tilt, 2deg)) scale(1); }
+    }
+    .card1 { --tilt: 3deg; } .card2 { --tilt: -2deg; } .card3 { --tilt: 1.5deg; }
+  }
+
+  /* ---------- how it works ---------- */
+  section { padding: 72px 0; }
+  h2 {
+    font-family: var(--display); font-weight: 800;
+    font-size: clamp(1.8rem, 4vw, 2.6rem); letter-spacing: -0.03em;
+    margin-bottom: 14px;
+  }
+  .section-sub { color: var(--leaf-soft); max-width: 52ch; margin-bottom: 48px; }
+
+  .steps { position: relative; padding-left: 40px; }
+  .steps::before {
+    content: ""; position: absolute; left: 11px; top: 8px; bottom: 8px;
+    width: 3px; border-radius: 3px;
+    background: linear-gradient(to bottom, var(--leaf-soft), var(--leaf));
+  }
+  .step { position: relative; padding-bottom: 42px; max-width: 60ch; }
+  .step:last-child { padding-bottom: 0; }
+  .step::before {
+    content: ""; position: absolute; left: -37px; top: 6px;
+    width: 16px; height: 16px; border-radius: 50% 50% 50% 0;
+    background: var(--leaf); transform: rotate(-45deg);
+  }
+  .step h3 { font-family: var(--display); font-weight: 700; font-size: 1.25rem; letter-spacing: -0.01em; margin-bottom: 6px; }
+  .step p { color: var(--leaf-soft); }
+  .step code {
+    font-family: var(--mono); font-size: 0.85em;
+    background: var(--sage-deep); padding: 2px 7px; border-radius: 6px;
+  }
+
+  /* ---------- features ---------- */
+  .grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  }
+  .feature {
+    background: var(--paper); border: 1px solid var(--sage-deep);
+    border-radius: var(--radius); padding: 26px 24px;
+  }
+  .feature .glyph { font-size: 1.6rem; display: block; margin-bottom: 14px; }
+  .feature h3 { font-family: var(--display); font-weight: 700; font-size: 1.1rem; letter-spacing: -0.01em; margin-bottom: 6px; }
+  .feature p { color: var(--leaf-soft); font-size: 0.95rem; }
+
+  /* ---------- privacy ---------- */
+  .privacy-band {
+    background: var(--ink); color: var(--sage);
+    border-radius: calc(var(--radius) + 8px);
+    padding: 56px 48px;
+    display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 40px; align-items: center;
+  }
+  .privacy-band h2 { color: var(--sage); }
+  .privacy-band p { color: var(--leaf-soft); }
+  .privacy-band ul { list-style: none; display: grid; gap: 12px; }
+  .privacy-band li { display: flex; gap: 12px; align-items: baseline; font-weight: 500; }
+  .privacy-band li::before { content: "✓"; color: var(--leaf); font-weight: 700; }
+  .privacy-band a.policy { color: var(--leaf); font-weight: 600; }
+
+  /* ---------- download / footer ---------- */
+  .download { text-align: center; }
+  .download .hero-ctas { justify-content: center; }
+  footer {
+    border-top: 1px solid var(--sage-deep);
+    padding: 32px 0 48px; margin-top: 48px;
+    display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+    color: var(--leaf-soft); font-size: 0.9rem;
+  }
+  footer .links { display: flex; gap: 20px; }
+  footer a { color: var(--leaf-soft); }
+  footer a:hover { color: var(--ink); }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 860px) {
+    header.hero { grid-template-columns: 1fr; padding: 40px 0 64px; }
+    .demo { min-height: 380px; margin-top: 8px; }
+    .grid { grid-template-columns: 1fr 1fr; }
+    .privacy-band { grid-template-columns: 1fr; padding: 40px 28px; }
+  }
+  @media (max-width: 560px) {
+    .grid { grid-template-columns: 1fr; }
+    .nav-links a.gh { display: none; }
+    .card { width: 78%; }
+    .csv-file { right: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav>
+    <a class="brand" href="#">
+      <img src="assets/icon.png" alt="" width="34" height="34">
+      <span>Sprig</span>
+    </a>
+    <div class="nav-links">
+      <a class="gh" href="https://github.com/mauricekleindienst/csvtudyapp">GitHub</a>
+      <a class="btn" href="#download">Get the app</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <span class="eyebrow">question,answer — that’s all it takes</span>
+      <h1>Your notes are already <em>flashcards.</em></h1>
+      <p class="sub">Sprig turns any CSV file into a spaced-repetition study deck. Swipe through cards, take quizzes, and grow a plant while you focus.</p>
+      <div class="hero-ctas">
+        <a class="btn" href="#download">Download for Android</a>
+        <a class="btn ghost" href="#how">How it works</a>
+        <span class="cta-note">Free · works offline · no account needed</span>
+      </div>
+    </div>
+    <div class="demo" aria-hidden="true">
+      <div class="card card1"><span class="tag">Card 1 of 3</span><div class="q">mitochondria</div><div class="a">the powerhouse of the cell</div></div>
+      <div class="card card2"><span class="tag">Card 2 of 3</span><div class="q">photosynthesis</div><div class="a">light → glucose + oxygen</div></div>
+      <div class="card card3"><span class="tag">Card 3 of 3</span><div class="q">le chien</div><div class="a">the dog</div></div>
+      <div class="csv-file">
+        <span class="filename">biology_week3.csv</span>
+        <div class="csv-row">mitochondria<span class="comma">,</span>the powerhouse of the cell</div>
+        <div class="csv-row">photosynthesis<span class="comma">,</span>light → glucose + oxygen</div>
+        <div class="csv-row">le chien<span class="comma">,</span>the dog</div>
+      </div>
+    </div>
+  </header>
+
+  <section id="how">
+    <h2>From spreadsheet to studied in three steps</h2>
+    <p class="section-sub">No deck editors, no cloud sync, no signup walls. If you can write two columns, you can study.</p>
+    <div class="steps">
+      <div class="step">
+        <h3>Write a CSV</h3>
+        <p>Export from Excel, Google Sheets, or ask any AI to generate one. Each row is <code>question,answer</code> — that’s the whole format.</p>
+      </div>
+      <div class="step">
+        <h3>Import it into Sprig</h3>
+        <p>Pick the file and it becomes a deck instantly. The CSV stays the source of truth — update the file, and the deck updates too.</p>
+      </div>
+      <div class="step">
+        <h3>Study your way</h3>
+        <p>Swipe with spaced repetition, quiz yourself with multiple choice, or scroll cards like a feed. Sprig schedules reviews so you see the hard cards more and the easy ones less.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <h2>A quiet little study garden</h2>
+    <p class="section-sub">Everything in Sprig is built for one thing: helping you actually sit down and learn.</p>
+    <div class="grid">
+      <div class="feature"><span class="glyph">🃏</span><h3>Swipe to learn</h3><p>SM-2 spaced repetition decides when each card comes back. Right if you knew it, left if you didn’t.</p></div>
+      <div class="feature"><span class="glyph">✅</span><h3>Quiz mode</h3><p>Multiple-choice questions generated from your own deck, with your weak cards showing up more often.</p></div>
+      <div class="feature"><span class="glyph">📱</span><h3>Feed mode</h3><p>Scroll question and answer cards like a social feed — study during the scrolling you were going to do anyway.</p></div>
+      <div class="feature"><span class="glyph">🌱</span><h3>Focus garden</h3><p>Start a focus session and a plant grows while you stay in the app. Leave too long and it wilts. Don’t let it wilt.</p></div>
+      <div class="feature"><span class="glyph">🌧️</span><h3>Ambient sounds</h3><p>Rain, campfire, forest, ocean — mix your own background while you study or focus.</p></div>
+      <div class="feature"><span class="glyph">📈</span><h3>Stats &amp; streaks</h3><p>Daily streaks, levels, and achievements track the habit — not just the hours.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="privacy-band">
+      <div>
+        <h2>Nothing leaves your phone</h2>
+        <p>Sprig has no servers, no accounts, and no analytics. Your decks, stats, and audio live in a local database on your device — delete the app and they’re gone. That’s the whole privacy policy, but you can <a class="policy" href="privacy.html">read the long version</a> too.</p>
+      </div>
+      <ul>
+        <li>Works fully offline</li>
+        <li>No account, ever</li>
+        <li>No tracking or analytics</li>
+        <li>Your files stay your files</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="download" class="download">
+    <h2>Plant your first deck</h2>
+    <p class="section-sub" style="margin-inline:auto">Sprig is free and open source. Coming soon to Google Play — until then, grab the latest APK from GitHub.</p>
+    <div class="hero-ctas">
+      <a class="btn" href="https://github.com/mauricekleindienst/csvtudyapp/releases">Download APK</a>
+      <a class="btn ghost" href="https://github.com/mauricekleindienst/csvtudyapp">View the source</a>
+    </div>
+  </section>
+
+  <footer>
+    <span>© 2026 Mousewerk · Sprig</span>
+    <div class="links">
+      <a href="privacy.html">Privacy policy</a>
+      <a href="https://github.com/mauricekleindienst/csvtudyapp">GitHub</a>
+      <a href="https://github.com/remvze/moodist">Sound credits</a>
+    </div>
+  </footer>
+</div>
+
+</body>
+</html>

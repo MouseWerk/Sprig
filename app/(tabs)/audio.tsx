@@ -46,6 +46,7 @@ export default function AudioPlayerScreen() {
     const textColor = useThemeColor({}, 'text');
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const accentColor = useThemeColor({}, 'primary');
+    const accentForeground = useThemeColor({}, 'primaryForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
 
     useEffect(() => {
@@ -178,11 +179,11 @@ export default function AudioPlayerScreen() {
                     {isCurrent && isPlaying && (
                         <View style={[styles.playingBadge, { backgroundColor: accentColor }]}>
                             <View style={styles.playingIndicator}>
-                                <View style={[styles.playingBar, { backgroundColor: '#fff', height: 8 }]} />
-                                <View style={[styles.playingBar, { backgroundColor: '#fff', height: 14 }]} />
-                                <View style={[styles.playingBar, { backgroundColor: '#fff', height: 10 }]} />
+                                <View style={[styles.playingBar, { backgroundColor: accentForeground, height: 8 }]} />
+                                <View style={[styles.playingBar, { backgroundColor: accentForeground, height: 14 }]} />
+                                <View style={[styles.playingBar, { backgroundColor: accentForeground, height: 10 }]} />
                             </View>
-                            <Text style={[styles.playingText, { color: '#fff' }]}>{t('playing')}</Text>
+                            <Text style={[styles.playingText, { color: accentForeground }]}>{t('playing')}</Text>
                         </View>
                     )}
                 </View>
@@ -218,7 +219,7 @@ export default function AudioPlayerScreen() {
                         accessibilityLabel="Add audio file"
                         accessibilityRole="button"
                     >
-                        <Plus size={24} color="#fff" strokeWidth={3} />
+                        <Plus size={24} color={accentForeground} strokeWidth={3} />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -243,7 +244,7 @@ export default function AudioPlayerScreen() {
                         <Text style={[styles.emptyTitle, { color: textColor }]}>{t('noAudioMessage')}</Text>
                         <Text style={[styles.emptyText, { color: mutedForeground }]}>Upload audio notes or lessons to listen while you learn</Text>
                         <TouchableOpacity style={[styles.emptyButton, { backgroundColor: accentColor }]} onPress={handlePickAudio}>
-                            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>{t('addAudio')}</Text>
+                            <Text style={{ color: accentForeground, fontWeight: '800', fontSize: 15 }}>{t('addAudio')}</Text>
                         </TouchableOpacity>
                     </View>
                 }
@@ -298,9 +299,9 @@ export default function AudioPlayerScreen() {
                                     accessibilityRole="button"
                                 >
                                     {isPlaying ? (
-                                        <Pause size={24} color="#fff" fill="#fff" />
+                                        <Pause size={24} color={accentForeground} fill={accentForeground} />
                                     ) : (
-                                        <Play size={24} color="#fff" fill="#fff" style={{ marginLeft: 2 }} />
+                                        <Play size={24} color={accentForeground} fill={accentForeground} style={{ marginLeft: 2 }} />
                                     )}
                                 </TouchableOpacity>
                             </View>

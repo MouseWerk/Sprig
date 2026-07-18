@@ -71,6 +71,7 @@ export default function FocusScreen() {
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
     const primaryColor = useThemeColor({}, 'primary');
+    const primaryForeground = useThemeColor({}, 'primaryForeground');
 
     // Countdown ticker
     useEffect(() => {
@@ -216,15 +217,15 @@ export default function FocusScreen() {
                                 }}
                                 activeOpacity={0.85}
                             >
-                                <Text style={{ color: minutes === d ? '#fff' : textColor, fontWeight: '900', fontSize: 18 }}>{d}</Text>
-                                <Text style={{ color: minutes === d ? '#fff' : mutedForeground, fontWeight: '700', fontSize: 10 }}>MIN</Text>
+                                <Text style={{ color: minutes === d ? primaryForeground : textColor, fontWeight: '900', fontSize: 18 }}>{d}</Text>
+                                <Text style={{ color: minutes === d ? primaryForeground : mutedForeground, fontWeight: '700', fontSize: 10 }}>MIN</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
 
                     <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: primaryColor }]} onPress={() => startSession(minutes)} activeOpacity={0.9}>
-                        <Play size={20} color="#fff" fill="#fff" />
-                        <Text style={styles.primaryBtnText}>Start Focusing</Text>
+                        <Play size={20} color={primaryForeground} fill={primaryForeground} />
+                        <Text style={[styles.primaryBtnText, { color: primaryForeground }]}>Start Focusing</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.soundLink} onPress={() => setMixerVisible(true)}>
@@ -267,8 +268,8 @@ export default function FocusScreen() {
                                 accessibilityRole="button"
                             >
                                 {phase === 'running'
-                                    ? <Pause size={30} color="#fff" fill="#fff" />
-                                    : <Play size={30} color="#fff" fill="#fff" />}
+                                    ? <Pause size={30} color={primaryForeground} fill={primaryForeground} />
+                                    : <Play size={30} color={primaryForeground} fill={primaryForeground} />}
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.circleBtn, { backgroundColor: soundsOn ? primaryColor : secondaryBg }]}
@@ -276,7 +277,7 @@ export default function FocusScreen() {
                                 accessibilityLabel="Open ambient sound mixer"
                                 accessibilityRole="button"
                             >
-                                <Music size={22} color={soundsOn ? '#fff' : textColor} />
+                                <Music size={22} color={soundsOn ? primaryForeground : textColor} />
                             </TouchableOpacity>
                         </View>
                     )}
@@ -307,8 +308,8 @@ export default function FocusScreen() {
                         You left the app for too long. Stay focused and try again.
                     </Text>
                     <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: primaryColor }]} onPress={replant} activeOpacity={0.9}>
-                        <RotateCcw size={18} color="#fff" strokeWidth={2.5} />
-                        <Text style={styles.primaryBtnText}>Try Again</Text>
+                        <RotateCcw size={18} color={primaryForeground} strokeWidth={2.5} />
+                        <Text style={[styles.primaryBtnText, { color: primaryForeground }]}>Try Again</Text>
                     </TouchableOpacity>
                 </View>
             )}
