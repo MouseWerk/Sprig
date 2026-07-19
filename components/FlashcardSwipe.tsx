@@ -12,6 +12,7 @@ import Animated, {
     useSharedValue,
     withSpring
 } from 'react-native-reanimated';
+import { HighlightableText } from './HighlightableText';
 import MarkdownRenderer from './MarkdownRenderer';
 import { Card, CardContent } from './ui/Card';
 
@@ -70,62 +71,6 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
             stiffness: 90,
             mass: 1
         });
-    };
-
-    const toggleWordHighlight = (text: string, word: string, wordIndex: number, isFront: boolean) => {
-        const words = text.split(/(\s+)/);
-        let actualWordCount = 0;
-
-        const newWords = words.map((w) => {
-            if (w.trim().length === 0) return w;
-            const currentId = actualWordCount++;
-            if (currentId === wordIndex) {
-                if (w.startsWith('==') && w.endsWith('==')) {
-                    return w.slice(2, -2);
-                } else {
-                    return `==${w}==`;
-                }
-            }
-            return w;
-        });
-
-        const newText = newWords.join('');
-        onHighlightChange?.(isFront, newText);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    };
-
-    const WordSplitter = ({ text, isFront, fontSize = 24 }: { text: string, isFront: boolean, fontSize?: number }) => {
-        const words = text.split(/(\s+)/);
-        let actualWordCount = 0;
-
-        return (
-            <View style={styles.clickableTextContainer}>
-                {words.map((w, i) => {
-                    if (w.trim().length === 0) return <Text key={i} style={[styles.wordText, { fontSize }]}>{w}</Text>;
-                    const currentId = actualWordCount++;
-                    const isHighlighted = w.startsWith('==') && w.endsWith('==');
-                    return (
-                        <TouchableOpacity
-                            key={i}
-                            activeOpacity={0.7}
-                            onPress={() => toggleWordHighlight(text, w, currentId, isFront)}
-                            style={[
-                                styles.wordChip,
-                                isHighlighted && styles.wordChipHighlighted
-                            ]}
-                        >
-                            <Text style={[
-                                styles.wordText,
-                                { color: isHighlighted ? '#000' : textColor, fontSize },
-                                isHighlighted && styles.wordTextHighlighted
-                            ]}>
-                                {isHighlighted ? w.slice(2, -2) : w}
-                            </Text>
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
-        );
     };
 
     const panGesture = Gesture.Pan()
@@ -232,7 +177,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
                         <Text style={[styles.label, { color: mutedFg }]} pointerEvents="none">{frontLabel}</Text>
                         <ScrollView centerContent showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
                             {highlightMode ? (
-                                <WordSplitter text={question} isFront={true} fontSize={24} />
+                                <HighlightableText text={question} fontSize={24} onChange={(t) => onHighlightChange?.(true, t)} />
                             ) : (
                                 <MarkdownRenderer content={question} fontSize={24} />
                             )}
@@ -265,7 +210,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
                         <Text style={[styles.label, { color: mutedFg }]} pointerEvents="none">{backLabel}</Text>
                         <ScrollView centerContent showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
                             {highlightMode ? (
-                                <WordSplitter text={answer} isFront={false} fontSize={22} />
+                                <HighlightableText text={answer} fontSize={22} onChange={(t) => onHighlightChange?.(false, t)} />
                             ) : (
                                 <MarkdownRenderer content={answer} fontSize={22} />
                             )}
@@ -365,31 +310,6 @@ const styles = StyleSheet.create({
     overlayRight: { right: 32, borderColor: '#22c55e', borderWidth: 3 },
     overlayLeft: { left: 32, borderColor: '#ef4444', borderWidth: 3 },
     overlayTop: { top: 32, alignSelf: 'center', marginTop: 0, borderColor: '#eab308', borderWidth: 3 },
-    clickableTextContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    wordChip: {
-        borderRadius: 6,
-        paddingHorizontal: 4,
-        paddingVertical: 2,
-        marginHorizontal: 1,
-        marginVertical: 2,
-        backgroundColor: 'transparent',
-    },
-    wordChipHighlighted: {
-        backgroundColor: '#facc15',
-    },
-    wordText: {
-        fontSize: 22,
-        fontWeight: '500',
-        textAlign: 'center',
-    },
-    wordTextHighlighted: {
-        fontWeight: '800',
-    },
     flipBtn: {
         position: 'absolute',
         top: 20,

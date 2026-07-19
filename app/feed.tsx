@@ -1,12 +1,14 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
-import { getCachedData, setCachedData, updateUserStats } from '@/utils/Storage';
+import { getCachedData, setCachedData, updateCardInDeck, updateUserStats } from '@/utils/Storage';
 import * as Haptics from '@/utils/AppHaptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronsDown, Eye, EyeOff, FileWarning, Shuffle } from 'lucide-react-native';
+import { ChevronsDown, Edit3, Eye, EyeOff, FileWarning, Shuffle, Sprout } from 'lucide-react-native';
 import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View, ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FocusPlant } from '../components/FocusPlant';
+import { HighlightableText } from '../components/HighlightableText';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { Button } from '../components/ui/Button';
 
@@ -14,7 +16,11 @@ import { Button } from '../components/ui/Button';
 // together, and you swipe up/down to move through the deck. Great for casual
 // read-through learning before switching to active recall modes.
 
-function shuffleCards(arr: FlashcardData[]): FlashcardData[] {
+// Cards keep their index in the deck file so highlight edits can be
+// persisted even after shuffling.
+type FeedCard = FlashcardData & { originalIndex: number };
+
+function shuffleCards(arr: FeedCard[]): FeedCard[] {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -27,13 +33,15 @@ export default function FeedScreen() {
     const { id, uri, name } = useLocalSearchParams<{ id: string; uri: string; name?: string }>();
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const listRef = useRef<FlatList<FlashcardData>>(null);
+    const listRef = useRef<FlatList<FeedCard>>(null);
 
-    const [cards, setCards] = useState<FlashcardData[] | null>(null);
+    const [cards, setCards] = useState<FeedCard[] | null>(null);
     const [loading, setLoading] = useState(true);
     const [pageHeight, setPageHeight] = useState(0);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [hideAnswers, setHideAnswers] = useState(false);
+    const [focusMode, setFocusMode] = useState(true);
+    const [isHighlightMode, setIsHighlightMode] = useState(false);
     const [revealed, setRevealed] = useState<Set<number>>(new Set());
     const seenRef = useRef<Set<number>>(new Set());
     const lastTickRef = useRef(Date.now());
@@ -54,7 +62,7 @@ export default function FeedScreen() {
                     parsed = await parseFlashcardsCsv(uri);
                     if (parsed.length > 0) await setCachedData(id, parsed);
                 }
-                setCards(parsed || []);
+                setCards((parsed || []).map((c, i) => ({ ...c, originalIndex: i })));
             } catch (e) {
                 console.error('Error loading feed cards:', e);
                 setCards([]);
@@ -106,6 +114,33 @@ export default function FeedScreen() {
         setRevealed(prev => new Set(prev).add(index));
     };
 
+    const toggleFocusMode = () => {
+        Haptics.selectionAsync().catch(() => { });
+        setFocusMode(f => !f);
+    };
+
+    const toggleHighlightMode = () => {
+        Haptics.selectionAsync().catch(() => { });
+        setIsHighlightMode(h => !h);
+    };
+
+    // Persist a ==highlight== edit to the deck file and keep the local list
+    // in sync (HighlightableText hands us the full new text of one side).
+    const handleHighlightChange = async (index: number, field: 'question' | 'answer', newText: string) => {
+        if (!cards || !id) return;
+        const item = cards[index];
+        if (!item) return;
+        const updated = { ...item, [field]: newText };
+        const next = [...cards];
+        next[index] = updated;
+        setCards(next);
+        try {
+            await updateCardInDeck(id, item.originalIndex, { question: updated.question, answer: updated.answer });
+        } catch (e) {
+            console.error('Error saving highlight:', e);
+        }
+    };
+
     const headerOptions = {
         title: name || 'Feed',
         headerStyle: { backgroundColor },
@@ -113,6 +148,12 @@ export default function FeedScreen() {
         headerShadowVisible: false,
         headerRight: () => (
             <View style={{ flexDirection: 'row', gap: 18 }}>
+                <TouchableOpacity onPress={toggleFocusMode} hitSlop={10} accessibilityLabel={focusMode ? 'Disable focus mode' : 'Enable focus mode'} accessibilityRole="button">
+                    <Sprout size={22} color={focusMode ? primaryColor : textColor} strokeWidth={focusMode ? 2.5 : 2} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={toggleHighlightMode} hitSlop={10} accessibilityLabel={isHighlightMode ? 'Exit highlight mode' : 'Enter highlight mode'} accessibilityRole="button">
+                    <Edit3 size={22} color={isHighlightMode ? primaryColor : textColor} strokeWidth={isHighlightMode ? 3 : 2} />
+                </TouchableOpacity>
                 <TouchableOpacity onPress={toggleHideAnswers} hitSlop={10} accessibilityLabel={hideAnswers ? 'Show answers' : 'Hide answers'} accessibilityRole="button">
                     {hideAnswers ? <EyeOff size={22} color={textColor} /> : <Eye size={22} color={textColor} />}
                 </TouchableOpacity>
@@ -146,20 +187,29 @@ export default function FeedScreen() {
         );
     }
 
-    const renderCard = ({ item, index }: { item: FlashcardData; index: number }) => {
+    const renderCard = ({ item, index }: { item: FeedCard; index: number }) => {
         const answerHidden = hideAnswers && !revealed.has(index);
         return (
             <View style={[styles.page, { height: pageHeight, paddingBottom: insets.bottom + 16 }]}>
-                <View style={[styles.card, { backgroundColor: cardColor, borderColor: secondaryBg }]}>
-                    <Text style={[styles.cardLabel, { color: mutedForeground }]}>
-                        CARD {index + 1} / {cards.length}
+                <View style={[styles.card, { backgroundColor: cardColor, borderColor: secondaryBg }, isHighlightMode && { borderColor: primaryColor + '60' }]}>
+                    <Text style={[styles.cardLabel, { color: isHighlightMode ? primaryColor : mutedForeground }]}>
+                        {isHighlightMode ? 'TAP WORDS TO HIGHLIGHT' : `CARD ${index + 1} / ${cards.length}`}
                     </Text>
                     <ScrollView
                         contentContainerStyle={styles.cardScroll}
                         showsVerticalScrollIndicator={false}
                         nestedScrollEnabled
                     >
-                        <MarkdownRenderer content={item.question} fontSize={22} />
+                        {isHighlightMode ? (
+                            <HighlightableText
+                                text={item.question}
+                                fontSize={22}
+                                align="left"
+                                onChange={(t) => handleHighlightChange(index, 'question', t)}
+                            />
+                        ) : (
+                            <MarkdownRenderer content={item.question} fontSize={22} />
+                        )}
 
                         <View style={styles.answerDivider}>
                             <View style={[styles.dividerLine, { backgroundColor: secondaryBg }]} />
@@ -176,6 +226,13 @@ export default function FeedScreen() {
                                 <Eye size={18} color={mutedForeground} />
                                 <Text style={[styles.revealText, { color: mutedForeground }]}>Tap to reveal</Text>
                             </TouchableOpacity>
+                        ) : isHighlightMode ? (
+                            <HighlightableText
+                                text={item.answer}
+                                fontSize={18}
+                                align="left"
+                                onChange={(t) => handleHighlightChange(index, 'answer', t)}
+                            />
                         ) : (
                             <MarkdownRenderer content={item.answer} fontSize={18} />
                         )}
@@ -193,32 +250,36 @@ export default function FeedScreen() {
     };
 
     return (
-        <View
-            style={[styles.container, { backgroundColor }]}
-            onLayout={e => setPageHeight(e.nativeEvent.layout.height)}
-        >
+        <View style={[styles.container, { backgroundColor }]}>
             <Stack.Screen options={headerOptions} />
-            {pageHeight > 0 && (
-                <FlatList
-                    ref={listRef}
-                    data={cards}
-                    renderItem={renderCard}
-                    keyExtractor={(_, i) => String(i)}
-                    pagingEnabled
-                    showsVerticalScrollIndicator={false}
-                    getItemLayout={(_, index) => ({ length: pageHeight, offset: pageHeight * index, index })}
-                    onViewableItemsChanged={onViewableItemsChanged}
-                    viewabilityConfig={viewabilityConfig}
-                    initialNumToRender={2}
-                    maxToRenderPerBatch={3}
-                    windowSize={5}
-                />
-            )}
 
-            <View style={[styles.progressPill, { backgroundColor: cardColor, top: 10 }]}>
-                <Text style={[styles.progressText, { color: textColor }]}>
-                    {currentIndex + 1} / {cards.length}
-                </Text>
+            {focusMode && <FocusPlant active={cards.length > 0} />}
+
+            {/* Page height is measured on this wrapper (not the screen) so the
+                pager stays exact when the focus plant bar is visible. */}
+            <View style={{ flex: 1 }} onLayout={e => setPageHeight(e.nativeEvent.layout.height)}>
+                {pageHeight > 0 && (
+                    <FlatList
+                        ref={listRef}
+                        data={cards}
+                        renderItem={renderCard}
+                        keyExtractor={(item) => String(item.originalIndex)}
+                        pagingEnabled
+                        showsVerticalScrollIndicator={false}
+                        getItemLayout={(_, index) => ({ length: pageHeight, offset: pageHeight * index, index })}
+                        onViewableItemsChanged={onViewableItemsChanged}
+                        viewabilityConfig={viewabilityConfig}
+                        initialNumToRender={2}
+                        maxToRenderPerBatch={3}
+                        windowSize={5}
+                    />
+                )}
+
+                <View style={[styles.progressPill, { backgroundColor: cardColor, top: 10 }]}>
+                    <Text style={[styles.progressText, { color: textColor }]}>
+                        {currentIndex + 1} / {cards.length}
+                    </Text>
+                </View>
             </View>
         </View>
     );

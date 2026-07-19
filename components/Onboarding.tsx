@@ -1,9 +1,26 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BookOpen, FileText, Repeat, Sprout } from 'lucide-react-native';
+import {
+    Check,
+    FileText,
+    Flame,
+    GalleryVerticalEnd,
+    HelpCircle,
+    Keyboard,
+    LucideIcon,
+    Music,
+    Play,
+    Snowflake,
+    Sprout,
+    Trophy,
+    Wifi,
+    X,
+    Zap,
+} from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Dimensions, Modal, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GrowingPlant } from './GrowingPlant';
 import { SprigLogo } from './SprigLogo';
 
 const ONBOARDED_KEY = 'csvtudyapp_onboarded';
@@ -16,39 +33,221 @@ export function replayOnboarding() {
     replayTrigger?.();
 }
 
+// ---------------------------------------------------------------------------
+// Slide vignettes — each one is a miniature of the real app UI, built from
+// the same shapes, colors and icons the screens use, instead of a generic
+// tinted icon. Everything stays in the monochrome slate + forest palette.
+// ---------------------------------------------------------------------------
+
+function Chip({ icon: Icon, label, tint }: { icon: LucideIcon; label: string; tint?: string }) {
+    const textColor = useThemeColor({}, 'text');
+    const secondaryBg = useThemeColor({}, 'secondary');
+    const accent = useThemeColor({}, 'primary');
+    return (
+        <View style={[styles.chip, { backgroundColor: secondaryBg }]}>
+            <Icon size={13} color={tint ?? accent} strokeWidth={2.5} />
+            <Text style={[styles.chipText, { color: textColor }]}>{label}</Text>
+        </View>
+    );
+}
+
+// Skeleton line standing in for text inside the mock UI
+function Bar({ width, color }: { width: number; color: string }) {
+    return <View style={{ width, height: 9, borderRadius: 5, backgroundColor: color }} />;
+}
+
+function WelcomeVignette() {
+    return (
+        <View style={styles.vignette}>
+            <SprigLogo size={128} />
+            <View style={styles.chipRow}>
+                <Chip icon={Zap} label="Cards" />
+                <Chip icon={FileText} label="PDFs" />
+                <Chip icon={Music} label="Audio" />
+                <Chip icon={Sprout} label="Focus" />
+            </View>
+        </View>
+    );
+}
+
+function StudyVignette() {
+    const cardColor = useThemeColor({}, 'card');
+    const secondaryBg = useThemeColor({}, 'secondary');
+    const mutedForeground = useThemeColor({}, 'mutedForeground');
+
+    return (
+        <View style={styles.vignette}>
+            <View style={styles.stackWrap}>
+                <View style={[styles.mockCard, styles.mockCardBehind, { backgroundColor: secondaryBg }]} />
+                <View style={[styles.mockCard, { backgroundColor: cardColor, borderColor: secondaryBg }]}>
+                    <Text style={[styles.mockLabel, { color: mutedForeground }]}>QUESTION</Text>
+                    <View style={{ gap: 8, alignItems: 'center' }}>
+                        <Bar width={150} color={secondaryBg} />
+                        <Bar width={96} color={secondaryBg} />
+                    </View>
+                    <View style={styles.gradeRow}>
+                        <View style={[styles.gradePill, { backgroundColor: '#ef444415' }]}>
+                            <X size={14} color="#ef4444" strokeWidth={3} />
+                            <Text style={[styles.gradeText, { color: '#ef4444' }]}>Again</Text>
+                        </View>
+                        <View style={[styles.gradePill, { backgroundColor: '#22c55e15' }]}>
+                            <Check size={14} color="#22c55e" strokeWidth={3} />
+                            <Text style={[styles.gradeText, { color: '#22c55e' }]}>Got it</Text>
+                        </View>
+                    </View>
+                </View>
+            </View>
+            <View style={styles.chipRow}>
+                <Chip icon={HelpCircle} label="Quiz" />
+                <Chip icon={Keyboard} label="Type" />
+                <Chip icon={GalleryVerticalEnd} label="Feed" />
+            </View>
+        </View>
+    );
+}
+
+function LibraryVignette() {
+    const cardColor = useThemeColor({}, 'card');
+    const secondaryBg = useThemeColor({}, 'secondary');
+    const accent = useThemeColor({}, 'primary');
+    const primaryForeground = useThemeColor({}, 'primaryForeground');
+
+    return (
+        <View style={styles.vignette}>
+            <View style={{ gap: 12, width: 272 }}>
+                <View style={[styles.mockRow, { backgroundColor: cardColor, borderColor: secondaryBg }]}>
+                    <View style={[styles.mockTile, { backgroundColor: accent + '15' }]}>
+                        <FileText size={20} color={accent} strokeWidth={2.5} />
+                    </View>
+                    <View style={{ flex: 1, gap: 7 }}>
+                        <Bar width={120} color={secondaryBg} />
+                        <View style={[styles.mockProgress, { backgroundColor: secondaryBg }]}>
+                            <View style={[styles.mockProgressFill, { width: '62%', backgroundColor: accent }]} />
+                        </View>
+                    </View>
+                </View>
+                <View style={[styles.mockRow, { backgroundColor: cardColor, borderColor: secondaryBg }]}>
+                    <View style={[styles.mockTile, { backgroundColor: accent + '15' }]}>
+                        <Music size={20} color={accent} strokeWidth={2.5} />
+                    </View>
+                    <View style={{ flex: 1, gap: 7 }}>
+                        <Bar width={96} color={secondaryBg} />
+                        <Bar width={64} color={secondaryBg} />
+                    </View>
+                    <View style={[styles.mockPlay, { backgroundColor: accent }]}>
+                        <Play size={13} color={primaryForeground} fill={primaryForeground} style={{ marginLeft: 1 }} />
+                    </View>
+                </View>
+            </View>
+            <View style={styles.chipRow}>
+                <Chip icon={Wifi} label="Drop files from your computer" />
+            </View>
+        </View>
+    );
+}
+
+function FocusVignette() {
+    const textColor = useThemeColor({}, 'text');
+    const secondaryBg = useThemeColor({}, 'secondary');
+    const accent = useThemeColor({}, 'primary');
+
+    // Play the whole session in miniature on a loop: the plant grows to full
+    // bloom while the timer counts a 25-minute session down to zero, holds
+    // the bloom for a moment, then replants.
+    const GROW_MS = 7000;
+    const HOLD_MS = 2600;
+    const SESSION_SECONDS = 25 * 60;
+    const [progress, setProgress] = useState(0);
+
+    useEffect(() => {
+        const start = Date.now();
+        const timer = setInterval(() => {
+            const t = (Date.now() - start) % (GROW_MS + HOLD_MS);
+            setProgress(Math.min(1, t / GROW_MS));
+        }, 60);
+        return () => clearInterval(timer);
+    }, []);
+
+    const secondsLeft = Math.round(SESSION_SECONDS * (1 - progress));
+    const timerLabel = `${Math.floor(secondsLeft / 60)}:${(secondsLeft % 60).toString().padStart(2, '0')}`;
+
+    return (
+        <View style={styles.vignette}>
+            <GrowingPlant progress={progress} size={150} color={accent} soilColor={secondaryBg} sway />
+            <View style={[styles.timerPill, { backgroundColor: secondaryBg }]}>
+                <Text style={[styles.timerText, { color: textColor }]}>{timerLabel}</Text>
+            </View>
+            <View style={styles.chipRow}>
+                <Chip icon={Music} label="Ambient sounds" />
+            </View>
+        </View>
+    );
+}
+
+function ProgressVignette() {
+    const cardColor = useThemeColor({}, 'card');
+    const textColor = useThemeColor({}, 'text');
+    const mutedForeground = useThemeColor({}, 'mutedForeground');
+    const secondaryBg = useThemeColor({}, 'secondary');
+    const accent = useThemeColor({}, 'primary');
+
+    return (
+        <View style={styles.vignette}>
+            <View style={[styles.mockStats, { backgroundColor: cardColor, borderColor: secondaryBg }]}>
+                <View style={styles.statRow}>
+                    <Flame size={18} color="#f97316" strokeWidth={2.5} fill="#f97316" />
+                    <Text style={[styles.statText, { color: textColor }]}>12 day streak</Text>
+                    <View style={{ flex: 1 }} />
+                    <Snowflake size={14} color={mutedForeground} strokeWidth={2.5} />
+                    <Text style={[styles.statSub, { color: mutedForeground }]}>2</Text>
+                </View>
+                <View style={styles.statRow}>
+                    <Zap size={18} color={accent} strokeWidth={2.5} fill={accent} />
+                    <Text style={[styles.statText, { color: textColor }]}>Level 5</Text>
+                    <Text style={[styles.statSub, { color: mutedForeground }]}>Scholar</Text>
+                </View>
+                <View style={[styles.mockProgress, { backgroundColor: secondaryBg }]}>
+                    <View style={[styles.mockProgressFill, { width: '68%', backgroundColor: accent }]} />
+                </View>
+            </View>
+            <View style={styles.chipRow}>
+                <Chip icon={Trophy} label="23 achievements to unlock" />
+            </View>
+        </View>
+    );
+}
+
 interface Slide {
-    icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+    Vignette: React.ComponentType;
     title: string;
     body: string;
-    tint: string;
-    brand?: boolean; // show the Sprig mark instead of a tinted icon
 }
 
 const SLIDES: Slide[] = [
     {
-        icon: BookOpen,
+        Vignette: WelcomeVignette,
         title: 'Welcome to Sprig',
-        body: 'Turn any CSV, TSV or text file into a swipeable flashcard deck in seconds. Your first deck is one tap away.',
-        tint: '#2E5C4E',
-        brand: true,
+        body: 'A calm study companion. Flashcards, PDFs, audio and focus sessions — everything in one quiet place.',
     },
     {
-        icon: Repeat,
-        title: 'Study Smarter',
-        body: 'Swipe to grade each card. Spaced repetition schedules every card for the perfect moment so you remember more with less effort.',
-        tint: '#22c55e',
+        Vignette: StudyVignette,
+        title: 'Study your way',
+        body: 'Swipe to grade each card and spaced repetition schedules the next review for you. Switch to quiz, typing or feed mode whenever it fits.',
     },
     {
-        icon: FileText,
-        title: 'Your PDF Library',
-        body: 'Keep textbooks and notes in the Library tab. The reader remembers your page and lets you jump, zoom and resume right where you left off.',
-        tint: '#f97316',
+        Vignette: LibraryVignette,
+        title: 'Bring all your material',
+        body: 'PDFs reopen exactly where you stopped, lectures play at your pace — and you can drop files straight from your computer over WiFi.',
     },
     {
-        icon: Sprout,
-        title: 'Stay Focused',
-        body: 'Grow a plant while you study. Leave the app for too long and it wilts — a gentle nudge to keep your attention on the cards.',
-        tint: '#10b981',
+        Vignette: FocusVignette,
+        title: 'Grow while you focus',
+        body: 'Your plant grows for every focused minute and wilts if you wander off. Add ambient sounds and take earned breaks.',
+    },
+    {
+        Vignette: ProgressVignette,
+        title: 'Watch yourself grow',
+        body: 'Earn XP, keep your streak alive with freezes, unlock achievements and let exam countdowns pace your reviews.',
     },
 ];
 
@@ -110,6 +309,9 @@ export function Onboarding() {
         <Modal visible={visible} animationType="fade" onRequestClose={finish}>
             <View style={[styles.container, { backgroundColor, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
                 <View style={styles.topBar}>
+                    <Text style={[styles.stepLabel, { color: mutedForeground }]}>
+                        {index + 1} / {SLIDES.length}
+                    </Text>
                     <TouchableOpacity onPress={finish} hitSlop={12} style={{ opacity: isLast ? 0 : 1 }} disabled={isLast}>
                         <Text style={[styles.skip, { color: mutedForeground }]}>Skip</Text>
                     </TouchableOpacity>
@@ -124,24 +326,13 @@ export function Onboarding() {
                     scrollEventThrottle={16}
                     style={{ flex: 1 }}
                 >
-                    {SLIDES.map((slide, i) => {
-                        const Icon = slide.icon;
-                        return (
-                            <View key={i} style={[styles.slide, { width }]}>
-                                {slide.brand ? (
-                                    <View style={styles.brandWrap}>
-                                        <SprigLogo size={132} />
-                                    </View>
-                                ) : (
-                                    <View style={[styles.iconWrap, { backgroundColor: slide.tint + '1A' }]}>
-                                        <Icon size={72} color={slide.tint} strokeWidth={1.75} />
-                                    </View>
-                                )}
-                                <Text style={[styles.title, { color: textColor }]}>{slide.title}</Text>
-                                <Text style={[styles.body, { color: mutedForeground }]}>{slide.body}</Text>
-                            </View>
-                        );
-                    })}
+                    {SLIDES.map((slide, i) => (
+                        <View key={i} style={[styles.slide, { width }]}>
+                            <slide.Vignette />
+                            <Text style={[styles.title, { color: textColor }]}>{slide.title}</Text>
+                            <Text style={[styles.body, { color: mutedForeground }]}>{slide.body}</Text>
+                        </View>
+                    ))}
                 </ScrollView>
 
                 <View style={styles.dots}>
@@ -181,10 +372,17 @@ const styles = StyleSheet.create({
     },
     topBar: {
         flexDirection: 'row',
-        justifyContent: 'flex-end',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         paddingHorizontal: 24,
         paddingTop: 12,
         height: 44,
+    },
+    stepLabel: {
+        fontSize: 13,
+        fontWeight: '800',
+        letterSpacing: 1,
+        fontVariant: ['tabular-nums'],
     },
     skip: {
         fontSize: 15,
@@ -196,29 +394,151 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingHorizontal: 40,
     },
-    iconWrap: {
-        width: 160,
-        height: 160,
-        borderRadius: 44,
+    vignette: {
+        height: 300,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 48,
+        marginBottom: 24,
+        gap: 20,
     },
-    brandWrap: {
-        marginBottom: 48,
+    chipRow: {
+        flexDirection: 'row',
+        gap: 8,
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+    },
+    chip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 14,
+    },
+    chipText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    // Study slide
+    stackWrap: {
+        width: 230,
+        height: 172,
+    },
+    mockCard: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        borderRadius: 24,
+        borderWidth: 1.5,
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 16,
+        paddingHorizontal: 18,
+    },
+    mockCardBehind: {
+        transform: [{ rotate: '5deg' }, { translateX: 8 }],
+        borderWidth: 0,
+    },
+    mockLabel: {
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 1.5,
+    },
+    gradeRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    gradePill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 11,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    gradeText: {
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    // Library slide
+    mockRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        borderRadius: 20,
+        borderWidth: 1.5,
+        padding: 14,
+    },
+    mockTile: {
+        width: 42,
+        height: 42,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    mockProgress: {
+        height: 6,
+        borderRadius: 3,
+        overflow: 'hidden',
+        alignSelf: 'stretch',
+    },
+    mockProgressFill: {
+        height: '100%',
+        borderRadius: 3,
+    },
+    mockPlay: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    // Focus slide
+    timerPill: {
+        paddingHorizontal: 18,
+        paddingVertical: 8,
+        borderRadius: 16,
+    },
+    timerText: {
+        fontSize: 20,
+        fontWeight: '900',
+        letterSpacing: -0.5,
+        fontVariant: ['tabular-nums'],
+    },
+    // Progress slide
+    mockStats: {
+        width: 264,
+        borderRadius: 24,
+        borderWidth: 1.5,
+        padding: 18,
+        gap: 14,
+    },
+    statRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 9,
+    },
+    statText: {
+        fontSize: 15,
+        fontWeight: '800',
+        letterSpacing: -0.2,
+    },
+    statSub: {
+        fontSize: 13,
+        fontWeight: '700',
     },
     title: {
         fontSize: 28,
         fontWeight: '900',
         letterSpacing: -0.6,
         textAlign: 'center',
-        marginBottom: 16,
+        marginBottom: 14,
     },
     body: {
-        fontSize: 16,
-        lineHeight: 24,
+        fontSize: 15.5,
+        lineHeight: 23,
         textAlign: 'center',
         maxWidth: 320,
     },

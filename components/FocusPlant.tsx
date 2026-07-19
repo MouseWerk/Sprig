@@ -1,26 +1,28 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from '@/utils/AppHaptics';
-import { Flower2, Leaf, LucideIcon, RotateCcw, Shrub, Sprout, TreeDeciduous, WheatOff } from 'lucide-react-native';
+import { RotateCcw } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, AppState, AppStateStatus, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { cancelNotification, ensureNotificationPermissions, scheduleFocusWarning } from '../utils/Notifications';
+import { GrowingPlant } from './GrowingPlant';
 
 // Grace period: leave the app for longer than this and the plant withers.
 const GRACE_MS = 10_000;
 
+// The plant reaches full bloom after 6 minutes of focus.
+const BLOOM_SECONDS = 360;
+
 interface Stage {
     min: number;      // focus seconds needed to reach this stage
-    Icon: LucideIcon;
     label: string;
 }
 
-// Growth stages. The plant reaches full bloom after 6 minutes of focus.
 const STAGES: Stage[] = [
-    { min: 0, Icon: Sprout, label: 'Seedling' },
-    { min: 45, Icon: Leaf, label: 'Sprouting' },
-    { min: 120, Icon: Shrub, label: 'Growing' },
-    { min: 240, Icon: TreeDeciduous, label: 'Flourishing' },
-    { min: 360, Icon: Flower2, label: 'In bloom' },
+    { min: 0, label: 'Seedling' },
+    { min: 45, label: 'Sprouting' },
+    { min: 120, label: 'Growing' },
+    { min: 240, label: 'Flourishing' },
+    { min: BLOOM_SECONDS, label: 'In bloom' },
 ];
 
 function stageIndexFor(seconds: number): number {
@@ -194,13 +196,14 @@ export function FocusPlant({ active }: FocusPlantProps) {
 
     // Plant container grows a little with each stage
     const potSize = 46 + stageIndex * 5;
-    const plantSize = 24 + stageIndex * 4;
+    const plantSize = potSize - 8;
+    const growth = Math.min(1, focusSeconds / BLOOM_SECONDS);
 
     if (dead) {
         return (
             <View style={[styles.container, { backgroundColor: '#ef444415' }]}>
                 <View style={[styles.pot, { width: potSize, height: potSize, backgroundColor: '#ef444420' }]}>
-                    <WheatOff size={plantSize} color="#ef4444" strokeWidth={2.25} />
+                    <GrowingPlant wilted progress={1} size={plantSize} color="#a8a29e" soilColor="#ef44442A" />
                 </View>
                 <View style={styles.info}>
                     <Text style={[styles.title, { color: '#ef4444' }]}>Your plant withered</Text>
@@ -226,7 +229,7 @@ export function FocusPlant({ active }: FocusPlantProps) {
                 styles.pot,
                 { width: potSize, height: potSize, backgroundColor: primaryColor + '18', transform: [{ scale: popAnim }, { rotate }] },
             ]}>
-                <stage.Icon size={plantSize} color={primaryColor} strokeWidth={2.25} />
+                <GrowingPlant progress={growth} size={plantSize} color={primaryColor} soilColor={primaryColor + '2A'} />
             </Animated.View>
 
             <View style={styles.info}>

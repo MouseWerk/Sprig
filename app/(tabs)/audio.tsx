@@ -36,6 +36,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { FolderCard } from '@/components/FolderCard';
 import { SoundMixer } from '@/components/SoundMixer';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
@@ -94,15 +95,25 @@ export default function AudioPlayerScreen() {
         }, [])
     );
 
+    // Fully silence and release the active player. Pause explicitly first —
+    // remove() alone frees the native object but doesn't reliably stop the
+    // audio that is already feeding the output.
+    const releasePlayer = () => {
+        const player = playerRef.current;
+        playerRef.current = null;
+        if (!player) return;
+        try { player.pause(); } catch { /* already released */ }
+        try { player.clearLockScreenControls(); } catch { /* not active */ }
+        try { player.remove(); } catch { /* already released */ }
+    };
+    const releasePlayerRef = useRef(releasePlayer);
+    releasePlayerRef.current = releasePlayer;
+
     // Audio session: keep playing in silent mode and while backgrounded,
     // and release the player when the screen unmounts.
     useEffect(() => {
         setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true }).catch(() => { });
-        return () => {
-            try { playerRef.current?.clearLockScreenControls(); } catch { /* not active */ }
-            try { playerRef.current?.remove(); } catch { /* already released */ }
-            playerRef.current = null;
-        };
+        return () => releasePlayerRef.current();
     }, []);
 
     // Poll playback progress off the player's synchronous getters.
@@ -136,9 +147,7 @@ export default function AudioPlayerScreen() {
     const stopPlayback = () => {
         switchSeqRef.current++;
         if (currentAudio && position > 0) setAudioPosition(currentAudio.id, position);
-        try { playerRef.current?.clearLockScreenControls(); } catch { /* not active */ }
-        try { playerRef.current?.remove(); } catch { /* already released */ }
-        playerRef.current = null;
+        releasePlayer();
         setCurrentAudio(null);
         setIsPlaying(false);
         setPosition(0);
@@ -179,9 +188,7 @@ export default function AudioPlayerScreen() {
 
         const seq = ++switchSeqRef.current;
         try {
-            try { playerRef.current?.clearLockScreenControls(); } catch { /* not active */ }
-            try { playerRef.current?.remove(); } catch { /* already released */ }
-            playerRef.current = null;
+            releasePlayer();
 
             const resume = item.position && item.position > 5 ? item.position : 0;
             const player = createAudioPlayer({ uri: item.uri });
@@ -202,6 +209,7 @@ export default function AudioPlayerScreen() {
             if (playbackRate !== 1) player.setPlaybackRate(playbackRate);
             if (resume > 0) await player.seekTo(resume);
             if (seq !== switchSeqRef.current) {
+                try { player.pause(); } catch { /* superseded by a newer tap */ }
                 try { player.remove(); } catch { /* superseded by a newer tap */ }
                 return;
             }
@@ -382,33 +390,11 @@ export default function AudioPlayerScreen() {
     };
 
     const renderFolderItem = (item: Folder) => (
-        <TouchableOpacity
-            style={[styles.audioCard, { backgroundColor: cardColor }]}
-            onPress={() => setCurrentFolderId(item.id)}
-            activeOpacity={0.8}
-        >
-            <View style={styles.cardHeaderAction}>
-                <View style={[styles.audioIconWrapper, { backgroundColor: accentColor + '15' }]}>
-                    <FolderIcon size={28} color={accentColor} fill={accentColor + '30'} />
-                </View>
-                {!selectMode && (
-                    <TouchableOpacity
-                        style={styles.deleteButtonContainer}
-                        onPress={() => handleDeleteFolder(item.id, item.name)}
-                        activeOpacity={0.5}
-                        accessibilityLabel={`Delete folder ${item.name}`}
-                        accessibilityRole="button"
-                    >
-                        <Trash2 size={16} color={mutedForeground} />
-                    </TouchableOpacity>
-                )}
-            </View>
-            <View style={styles.cardTop} />
-            <View style={styles.cardBottom}>
-                <Text style={[styles.audioName, { color: textColor }]} numberOfLines={2}>{item.name}</Text>
-                <Text style={[styles.audioDate, { color: mutedForeground }]}>Folder</Text>
-            </View>
-        </TouchableOpacity>
+        <FolderCard
+            name={item.name}
+            onOpen={() => setCurrentFolderId(item.id)}
+            onDelete={selectMode ? undefined : () => handleDeleteFolder(item.id, item.name)}
+        />
     );
 
     const renderAudioItem = ({ item }: { item: AudioFile }) => {

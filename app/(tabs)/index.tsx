@@ -7,6 +7,7 @@ import { CalendarCheck, CalendarDays, ChevronRight, ClipboardPaste, FileUp, Fold
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FolderCard } from '../../components/FolderCard';
 import { IconPicker } from '../../components/IconPicker';
 import { BottomSheet } from '../../components/ui/BottomSheet';
 import { LevelCard } from '../../components/LevelCard';
@@ -329,29 +330,11 @@ export default function HomeScreen() {
   };
 
   const renderFolderItem = (item: Folder) => (
-    <TouchableOpacity
-      style={[styles.deckCard, { backgroundColor: secondaryBg }]}
-      activeOpacity={0.8}
-      onPress={() => setCurrentFolderId(item.id)}
-    >
-      <View style={styles.cardHeaderAction}>
-        <View style={[styles.deckIconContainer, { backgroundColor: accentColor + '15' }]}>
-          <FolderIcon size={32} color={accentColor} fill={accentColor + '30'} />
-        </View>
-        <TouchableOpacity
-          style={styles.deleteButtonContainer}
-          onPress={() => handleDeleteFolder(item.id, item.name)}
-          accessibilityLabel={`Delete folder ${item.name}`}
-          accessibilityRole="button"
-        >
-          <Trash2 size={16} color={mutedForeground} />
-        </TouchableOpacity>
-      </View>
-      <View style={styles.cardBottom}>
-        <Text style={[styles.deckName, { color: textColor }]} numberOfLines={2}>{item.name}</Text>
-        <Text style={[styles.countLabel, { color: mutedForeground }]}>{t('folder')}</Text>
-      </View>
-    </TouchableOpacity>
+    <FolderCard
+      name={item.name}
+      onOpen={() => setCurrentFolderId(item.id)}
+      onDelete={() => handleDeleteFolder(item.id, item.name)}
+    />
   );
 
   // With an active search, look across all folders; otherwise browse the current folder

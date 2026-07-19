@@ -1,3 +1,4 @@
+import { GrowingPlant } from '@/components/GrowingPlant';
 import { SoundMixer, anySoundPlaying, stopAllSounds } from '@/components/SoundMixer';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/components/ui/Toast';
@@ -7,7 +8,7 @@ import { useNavigation } from '@react-navigation/native';
 import { FOCUS_MINUTES_OPTIONS, getPrefsSync, setPref } from '@/utils/Preferences';
 import { recordFocusSession } from '@/utils/Storage';
 import { Stack } from 'expo-router';
-import { Coffee, Flower2, Leaf, LucideIcon, Music, Pause, Play, RotateCcw, Shrub, Sprout, TreeDeciduous, WheatOff, X } from 'lucide-react-native';
+import { Coffee, Music, Pause, Play, RotateCcw, X } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,13 +18,6 @@ import { cancelNotification, ensureNotificationPermissions, scheduleFocusWarning
 const GRACE_MS = 10_000;
 const DURATIONS = FOCUS_MINUTES_OPTIONS;
 const BREAK_MINUTES = 5;
-
-// Plant grows through these stages as the session progresses toward bloom.
-const STAGES: LucideIcon[] = [Sprout, Leaf, Shrub, TreeDeciduous, Flower2];
-function plantIconFor(progress: number): LucideIcon {
-    const idx = Math.min(STAGES.length - 1, Math.floor(progress * STAGES.length));
-    return STAGES[Math.max(0, idx)];
-}
 
 function fmt(totalSeconds: number): string {
     const m = Math.floor(totalSeconds / 60);
@@ -209,7 +203,6 @@ export default function FocusScreen() {
 
     const elapsed = totalRef.current - secondsLeft;
     const progress = totalRef.current > 0 ? elapsed / totalRef.current : 0;
-    const PlantIcon = plantIconFor(progress);
 
     return (
         <View style={[styles.container, { backgroundColor, paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
@@ -222,8 +215,8 @@ export default function FocusScreen() {
 
             {phase === 'setup' && (
                 <View style={styles.center}>
-                    <View style={{ marginBottom: 16 }}>
-                        <Sprout size={72} color={primaryColor} strokeWidth={2} />
+                    <View style={{ marginBottom: 8 }}>
+                        <GrowingPlant progress={0} size={120} color={primaryColor} soilColor={secondaryBg} sway />
                     </View>
                     <Text style={[styles.title, { color: textColor }]}>Grow a plant by focusing</Text>
                     <Text style={[styles.subtitle, { color: mutedForeground }]}>
@@ -269,10 +262,10 @@ export default function FocusScreen() {
                     <View style={styles.ringWrap}>
                         <Ring size={280} progress={progress} color={phase === 'break' ? '#22c55e' : primaryColor} track={secondaryBg} />
                         <View style={styles.ringInner}>
-                            <View style={{ marginBottom: 6 }}>
+                            <View style={{ marginBottom: 2 }}>
                                 {phase === 'break'
-                                    ? <Coffee size={56} color="#22c55e" strokeWidth={2} />
-                                    : <PlantIcon size={56} color={primaryColor} strokeWidth={2} />}
+                                    ? <View style={{ height: 104, justifyContent: 'center' }}><Coffee size={56} color="#22c55e" strokeWidth={2} /></View>
+                                    : <GrowingPlant progress={progress} size={104} color={primaryColor} soilColor={secondaryBg} sway={phase === 'running'} />}
                             </View>
                             <Text style={[styles.timer, { color: textColor }]}>{fmt(secondsLeft)}</Text>
                             <Text style={[styles.timerSub, { color: mutedForeground }]}>
@@ -316,8 +309,8 @@ export default function FocusScreen() {
 
             {phase === 'done' && (
                 <View style={styles.center}>
-                    <View style={{ marginBottom: 20 }}>
-                        <Flower2 size={88} color={primaryColor} strokeWidth={2} />
+                    <View style={{ marginBottom: 12 }}>
+                        <GrowingPlant progress={1} size={150} color={primaryColor} soilColor={secondaryBg} sway />
                     </View>
                     <Text style={[styles.title, { color: textColor }]}>Your plant bloomed!</Text>
                     <Text style={[styles.subtitle, { color: mutedForeground }]}>
@@ -334,8 +327,8 @@ export default function FocusScreen() {
 
             {phase === 'dead' && (
                 <View style={styles.center}>
-                    <View style={{ marginBottom: 20 }}>
-                        <WheatOff size={88} color="#ef4444" strokeWidth={2} />
+                    <View style={{ marginBottom: 12 }}>
+                        <GrowingPlant progress={1} size={150} color="#a8a29e" soilColor={secondaryBg} wilted />
                     </View>
                     <Text style={[styles.title, { color: '#ef4444' }]}>Your plant wilted</Text>
                     <Text style={[styles.subtitle, { color: mutedForeground }]}>

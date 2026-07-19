@@ -8,6 +8,7 @@ import { ArrowUpDown, Check, CheckCircle2, ChevronRight, Circle, FileText, FileU
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FolderCard } from '../../components/FolderCard';
 import { IconPicker } from '../../components/IconPicker';
 import { BottomSheet } from '../../components/ui/BottomSheet';
 import { Button } from '../../components/ui/Button';
@@ -343,29 +344,12 @@ export default function LibraryScreen() {
   };
 
   const renderFolderItem = (item: Folder) => (
-    <View style={[styles.docCard, { backgroundColor: secondaryBg }]}>
-      <TouchableOpacity
-        style={styles.docContent}
-        onPress={() => setCurrentFolderId(item.id)}
-      >
-        <View style={[styles.docIconContainer, { backgroundColor: accentColor + '15' }]}>
-          <FolderIcon size={24} color={accentColor} fill={accentColor + '30'} />
-        </View>
-        <View style={styles.docInfo}>
-          <Text style={[styles.docName, { color: textColor }]} numberOfLines={1}>{item.name}</Text>
-          <Text style={[styles.docSub, { color: mutedForeground }]}>Folder</Text>
-        </View>
-        <ChevronRight size={18} color={mutedForeground} />
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => handleDeleteFolder(item.id, item.name)}
-        accessibilityLabel={`Delete folder ${item.name}`}
-        accessibilityRole="button"
-      >
-        <Trash2 size={18} color="#ef4444" />
-      </TouchableOpacity>
-    </View>
+    <FolderCard
+      layout="row"
+      name={item.name}
+      onOpen={() => setCurrentFolderId(item.id)}
+      onDelete={() => handleDeleteFolder(item.id, item.name)}
+    />
   );
 
   const currentFolders = sortItems(folders.filter(f => (f.parentId || null) === currentFolderId), sortMode);
