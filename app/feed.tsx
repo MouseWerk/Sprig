@@ -40,11 +40,13 @@ export default function FeedScreen() {
     const [pageHeight, setPageHeight] = useState(0);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [hideAnswers, setHideAnswers] = useState(false);
-    const [focusMode, setFocusMode] = useState(true);
+    const [focusMode, setFocusMode] = useState(false);
     const [isHighlightMode, setIsHighlightMode] = useState(false);
     const [revealed, setRevealed] = useState<Set<number>>(new Set());
     const seenRef = useRef<Set<number>>(new Set());
     const lastTickRef = useRef(Date.now());
+    const currentIndexRef = useRef(0);
+    const pageHeightRef = useRef(0);
 
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
@@ -78,6 +80,7 @@ export default function FeedScreen() {
     const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
         const item = viewableItems[0];
         if (!item || item.index == null) return;
+        currentIndexRef.current = item.index;
         setCurrentIndex(item.index);
         if (!seenRef.current.has(item.index)) {
             seenRef.current.add(item.index);
@@ -99,6 +102,7 @@ export default function FeedScreen() {
         seenRef.current = new Set();
         setRevealed(new Set());
         setCards(shuffleCards(cards));
+        currentIndexRef.current = 0;
         setCurrentIndex(0);
         listRef.current?.scrollToOffset({ offset: 0, animated: false });
     };
@@ -256,8 +260,27 @@ export default function FeedScreen() {
             {focusMode && <FocusPlant active={cards.length > 0} />}
 
             {/* Page height is measured on this wrapper (not the screen) so the
-                pager stays exact when the focus plant bar is visible. */}
-            <View style={{ flex: 1 }} onLayout={e => setPageHeight(e.nativeEvent.layout.height)}>
+                pager stays exact when the focus plant bar is visible. When the
+                height changes (e.g. toggling focus mode), every page offset
+                shifts under the unchanged scroll position — re-snap to the
+                current card so pages stay aligned. */}
+            <View
+                style={{ flex: 1 }}
+                onLayout={e => {
+                    const h = e.nativeEvent.layout.height;
+                    const prev = pageHeightRef.current;
+                    pageHeightRef.current = h;
+                    setPageHeight(h);
+                    if (prev > 0 && prev !== h) {
+                        requestAnimationFrame(() => {
+                            listRef.current?.scrollToOffset({
+                                offset: h * currentIndexRef.current,
+                                animated: false,
+                            });
+                        });
+                    }
+                }}
+            >
                 {pageHeight > 0 && (
                     <FlatList
                         ref={listRef}

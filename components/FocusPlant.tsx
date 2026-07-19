@@ -194,7 +194,9 @@ export function FocusPlant({ active }: FocusPlantProps) {
         outputRange: ['-4deg', '4deg'],
     });
 
-    // Plant container grows a little with each stage
+    // The pot grows a little with each stage, but inside a fixed-size slot so
+    // the bar keeps a constant height — study screens measure their pager
+    // against this bar, and a resizing bar would misalign their pages.
     const potSize = 46 + stageIndex * 5;
     const plantSize = potSize - 8;
     const growth = Math.min(1, focusSeconds / BLOOM_SECONDS);
@@ -202,8 +204,10 @@ export function FocusPlant({ active }: FocusPlantProps) {
     if (dead) {
         return (
             <View style={[styles.container, { backgroundColor: '#ef444415' }]}>
-                <View style={[styles.pot, { width: potSize, height: potSize, backgroundColor: '#ef444420' }]}>
-                    <GrowingPlant wilted progress={1} size={plantSize} color="#a8a29e" soilColor="#ef44442A" />
+                <View style={styles.potSlot}>
+                    <View style={[styles.pot, { width: potSize, height: potSize, backgroundColor: '#ef444420' }]}>
+                        <GrowingPlant wilted progress={1} size={plantSize} color="#a8a29e" soilColor="#ef44442A" />
+                    </View>
                 </View>
                 <View style={styles.info}>
                     <Text style={[styles.title, { color: '#ef4444' }]}>Your plant withered</Text>
@@ -225,12 +229,14 @@ export function FocusPlant({ active }: FocusPlantProps) {
 
     return (
         <View style={[styles.container, { backgroundColor: secondaryBg }]}>
-            <Animated.View style={[
-                styles.pot,
-                { width: potSize, height: potSize, backgroundColor: primaryColor + '18', transform: [{ scale: popAnim }, { rotate }] },
-            ]}>
-                <GrowingPlant progress={growth} size={plantSize} color={primaryColor} soilColor={primaryColor + '2A'} />
-            </Animated.View>
+            <View style={styles.potSlot}>
+                <Animated.View style={[
+                    styles.pot,
+                    { width: potSize, height: potSize, backgroundColor: primaryColor + '18', transform: [{ scale: popAnim }, { rotate }] },
+                ]}>
+                    <GrowingPlant progress={growth} size={plantSize} color={primaryColor} soilColor={primaryColor + '2A'} />
+                </Animated.View>
+            </View>
 
             <View style={styles.info}>
                 <Text style={[styles.title, { color: textColor }]}>{stage.label}</Text>
@@ -258,6 +264,14 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 14,
         borderRadius: 20,
+    },
+    // Sized for the largest pot (46 + 4 stages * 5) so growth never changes
+    // the bar's outer height.
+    potSlot: {
+        width: 66,
+        height: 66,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     pot: {
         borderRadius: 16,

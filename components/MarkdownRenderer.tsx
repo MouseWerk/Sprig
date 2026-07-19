@@ -1,5 +1,5 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { CARD_IMG_DIR } from '@/utils/CardImages';
+import { extractImageFiles, IMAGE_TOKEN_RE, resolveCardImageUri } from '@/utils/CardImages';
 import { Image } from 'expo-image';
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -81,31 +81,28 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                 {children}
             </Text>
         ),
-        // Card images use relative cardimg/ tokens; resolve them to the app's
-        // image store and open a full-screen preview on tap.
-        image: (node: any) => {
-            const src: string = node.attributes?.src || '';
-            const uri = src.startsWith('cardimg/') ? CARD_IMG_DIR + src.slice('cardimg/'.length) : src;
-            if (!uri) return null;
-            return (
-                <TouchableOpacity
-                    key={node.key}
-                    onPress={() => showImagePreview(uri)}
-                    activeOpacity={0.85}
-                    accessibilityLabel="Show enlarged image"
-                    accessibilityRole="imagebutton"
-                >
-                    <Image source={{ uri }} style={markdownStyles.cardImage} contentFit="contain" transition={100} />
-                </TouchableOpacity>
-            );
-        },
+        // The markdown pipeline renders images inside a <Text>, which breaks
+        // their layout — card images are pulled out before parsing and drawn
+        // below the prose instead, so anything left here is dropped.
+        image: () => null,
     }), []);
 
+    // Card images use relative cardimg/ tokens. They are stripped from the
+    // markdown source and rendered as regular views after the text, where
+    // they can size themselves reliably.
+    const imageFiles = useMemo(() => extractImageFiles(content), [content]);
+
     const renderContent = () => {
-        // Pre-process highlight syntax ==text== and legacy <mark>text</mark> into ~~text~~ (strikethrough proxy)
+        // Pre-process: drop image tokens (rendered separately below), then turn
+        // highlight syntax ==text== / legacy <mark>text</mark> into ~~text~~
+        // (strikethrough proxy).
         const processedContent = content
+            .replace(new RegExp(`\\n?${IMAGE_TOKEN_RE.source}`, 'g'), '')
+            .replace(/^\n+/, '')
             .replace(/==([\s\S]+?)==/g, '~~$1~~')
             .replace(/<mark>([\s\S]+?)<\/mark>/g, '~~$1~~');
+
+        if (processedContent.trim().length === 0) return null;
 
         if (!processedContent.includes('$')) {
             return (
@@ -137,6 +134,25 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     return (
         <View style={markdownStyles.container}>
             {renderContent()}
+            {imageFiles.map((file, i) => {
+                const uri = resolveCardImageUri(file);
+                return (
+                    <TouchableOpacity
+                        key={`${file}-${i}`}
+                        onPress={() => showImagePreview(uri)}
+                        activeOpacity={0.85}
+                        accessibilityLabel="Show enlarged image"
+                        accessibilityRole="imagebutton"
+                    >
+                        <Image
+                            source={{ uri }}
+                            style={markdownStyles.cardImage}
+                            contentFit="cover"
+                            transition={100}
+                        />
+                    </TouchableOpacity>
+                );
+            })}
         </View>
     );
 };
@@ -149,7 +165,7 @@ const markdownStyles = StyleSheet.create({
         width: '100%',
         height: 160,
         borderRadius: 14,
-        marginVertical: 8,
+        marginVertical: 6,
     },
 });
 

@@ -14,11 +14,12 @@ import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, T
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { exportSprigDeck } from '@/utils/SprigDeck';
 import { CardImagePicker } from '../components/CardImagePicker';
+import { CardTextInput } from '../components/CardTextInput';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import { isImageToken } from '@/utils/CardImages';
 import { Button } from '../components/ui/Button';
 import { BottomSheet } from '../components/ui/BottomSheet';
 import { useConfirm } from '../components/ui/ConfirmDialog';
-import { Input } from '../components/ui/Input';
 
 export default function DeckDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -308,6 +309,15 @@ export default function DeckDetailsScreen() {
                 {words.map((w, i) => {
                     if (w.trim().length === 0) return <Text key={i} style={[styles.wordText, { fontSize, color: textColor }]}>{w}</Text>;
                     const currentId = actualWordCount++;
+                    // Image tokens aren't prose — show a muted placeholder that
+                    // can't be highlighted (the token survives edits untouched).
+                    if (isImageToken(w)) {
+                        return (
+                            <Text key={i} style={[styles.wordText, styles.imagePlaceholder, { fontSize: fontSize - 4, color: textColor }]}>
+                                [image]
+                            </Text>
+                        );
+                    }
                     const isHighlighted = w.startsWith('==') && w.endsWith('==');
                     return (
                         <TouchableOpacity
@@ -809,7 +819,7 @@ export default function DeckDetailsScreen() {
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <View style={{ gap: 20 }}>
                                 <View style={{ gap: 10 }}>
-                                    <Input
+                                    <CardTextInput
                                         label="Question"
                                         value={newQuestion}
                                         onChangeText={setNewQuestion}
@@ -819,7 +829,7 @@ export default function DeckDetailsScreen() {
                                     <CardImagePicker text={newQuestion} onChangeText={setNewQuestion} />
                                 </View>
                                 <View style={{ gap: 10 }}>
-                                    <Input
+                                    <CardTextInput
                                         label="Answer"
                                         value={newAnswer}
                                         onChangeText={setNewAnswer}
@@ -900,7 +910,7 @@ export default function DeckDetailsScreen() {
                                 ) : (
                                     <>
                                         <View style={{ gap: 10 }}>
-                                            <Input
+                                            <CardTextInput
                                                 label="Question"
                                                 value={editQuestion}
                                                 onChangeText={setEditQuestion}
@@ -909,7 +919,7 @@ export default function DeckDetailsScreen() {
                                             <CardImagePicker text={editQuestion} onChangeText={setEditQuestion} />
                                         </View>
                                         <View style={{ gap: 10 }}>
-                                            <Input
+                                            <CardTextInput
                                                 label="Answer"
                                                 value={editAnswer}
                                                 onChangeText={setEditAnswer}
@@ -1329,6 +1339,10 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: '500',
         textAlign: 'center',
+    },
+    imagePlaceholder: {
+        opacity: 0.45,
+        fontStyle: 'italic',
     },
     wordTextHighlightFront: {
         fontSize: 18,
