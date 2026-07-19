@@ -1,7 +1,8 @@
 import { Buffer } from 'buffer';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as SQLite from 'expo-sqlite';
-import { cleanAnkiHtml, convertCloze, extractZipEntry, imagePlaceholder, isCloze, parseZipEntries, ZipEntry } from './AnkiParse';
+import { cleanAnkiHtml, convertCloze, imagePlaceholder, isCloze } from './AnkiParse';
+import { extractZipEntry, parseZipEntries, ZipEntry } from './Zip';
 import { imageToken, importCardImageBase64 } from './CardImages';
 import { createDeckWithCards, Deck } from './Storage';
 

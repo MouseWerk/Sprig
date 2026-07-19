@@ -1,13 +1,14 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { importSprigDeck, looksLikeZipBase64Head } from './SprigDeck';
 import { createEmptyDeck, deleteDeck, importCsvToDeck, saveDeck } from './Storage';
 
 // Handles files opened *with* Sprig from other apps ("Open with" / share ->
 // view intents deliver a content:// or file:// URI as the launch URL).
-// The file is copied into cache, sniffed (PDF magic bytes vs. text), and
+// The file is copied into cache, sniffed (PDF/ZIP magic bytes vs. text), and
 // imported through the same paths the in-app pickers use.
 
 export interface IncomingImportResult {
-    kind: 'pdf' | 'csv';
+    kind: 'pdf' | 'csv' | 'sprig';
     name: string;
     cards?: number;
 }
@@ -23,7 +24,7 @@ export function isFileUrl(url: string | null): url is string {
 function nameFromUrl(url: string, fallback: string): string {
     try {
         const last = decodeURIComponent(url.split('/').pop() || '');
-        const cleaned = last.replace(/\.(pdf|csv|txt)$/i, '').trim();
+        const cleaned = last.replace(/\.(pdf|csv|txt|sprig)$/i, '').trim();
         if (cleaned.length >= 2 && cleaned.length <= 80 && !cleaned.includes(':')) return cleaned;
     } catch {
         // fall through
@@ -39,15 +40,28 @@ export async function importIncomingFile(url: string): Promise<IncomingImportRes
     const tmp = `${FileSystem.cacheDirectory}incoming_${Date.now()}`;
     await FileSystem.copyAsync({ from: url, to: tmp });
 
-    // Sniff the first bytes: "%PDF" -> base64 "JVBER..."
+    // Sniff the first bytes: "%PDF" -> base64 "JVBER...", ZIP -> "UEsDB..."
     const head = await FileSystem.readAsStringAsync(tmp, { encoding: 'base64', length: 8, position: 0 } as any);
-    const isPdf = head.startsWith('JVBER');
 
-    if (isPdf) {
+    if (head.startsWith('JVBER')) {
         const name = nameFromUrl(url, `Imported PDF ${new Date().toLocaleDateString()}`);
         await saveDeck(name, tmp, 'FileText', 'pdf', 0, null);
         await FileSystem.deleteAsync(tmp, { idempotent: true }).catch(() => { });
         return { kind: 'pdf', name };
+    }
+
+    if (looksLikeZipBase64Head(head)) {
+        // A shared .sprig deck (importSprigDeck rejects other ZIPs cleanly)
+        try {
+            const res = await importSprigDeck(tmp, null);
+            return { kind: 'sprig', name: res.deck.name, cards: res.cardCount };
+        } catch (e: any) {
+            throw new Error(e?.message === 'not-sprig'
+                ? 'This file is not a Sprig deck'
+                : 'Could not import this Sprig deck');
+        } finally {
+            await FileSystem.deleteAsync(tmp, { idempotent: true }).catch(() => { });
+        }
     }
 
     // Treat anything else as CSV/text and run it through the CSV importer

@@ -12,6 +12,7 @@ import { ArrowLeftRight, CalendarDays, CheckCircle2, Circle, Edit2, FileUp, File
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { exportSprigDeck } from '@/utils/SprigDeck';
 import { CardImagePicker } from '../components/CardImagePicker';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { Button } from '../components/ui/Button';
@@ -231,9 +232,19 @@ export default function DeckDetailsScreen() {
     const handleExportDeck = async () => {
         if (!deck?.uri) return;
         try {
-            await Sharing.shareAsync(deck.uri, {
-                mimeType: 'text/csv',
-                dialogTitle: `Export "${deck.name}"`,
+            if (deck.type === 'pdf') {
+                await Sharing.shareAsync(deck.uri, {
+                    mimeType: 'application/pdf',
+                    dialogTitle: `Export "${deck.name}"`,
+                });
+                return;
+            }
+            // Card decks travel as .sprig: name, icon, cards AND images —
+            // the recipient opens the file with Sprig and gets the full deck.
+            const uri = await exportSprigDeck(deck);
+            await Sharing.shareAsync(uri, {
+                mimeType: 'application/octet-stream',
+                dialogTitle: `Share "${deck.name}"`,
             });
         } catch (e) {
             console.error('Error exporting deck:', e);

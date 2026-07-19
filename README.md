@@ -10,7 +10,7 @@ A calm, offline-first study app for Android. Import a `question,answer` file and
 becomes a spaced-repetition deck — swipe through cards, quiz yourself, and grow a
 plant while you focus.
 
-![Version](https://img.shields.io/badge/v1.2.0-2E5C4E)
+![Version](https://img.shields.io/badge/v1.3.0-2E5C4E)
 ![Expo](https://img.shields.io/badge/Expo_SDK_54-000020?logo=expo&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-white?logo=android&logoColor=3ddc84)
 ![Offline first](https://img.shields.io/badge/100%25_offline-no_account_needed-0f172a)

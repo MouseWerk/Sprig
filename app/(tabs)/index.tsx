@@ -19,6 +19,7 @@ import { useToast } from '../../components/ui/Toast';
 import * as FileSystem from 'expo-file-system/legacy';
 import { importApkg } from '../../utils/AnkiImport';
 import { parseFlashcardsText } from '../../utils/CsvParser';
+import { importSprigDeck, isSprigFileName } from '../../utils/SprigDeck';
 import { createEmptyDeck, Deck, deleteDeck, deleteFolder, Folder, getDecks, getExamPlan, getFolders, getUserStats, importCsvToDeck, saveFolder, updateDeck, UserStats } from '../../utils/Storage';
 import { buildTodayPlan, startTodaySession, TodayPlan } from '../../utils/TodayPlan';
 
@@ -112,7 +113,8 @@ export default function HomeScreen() {
   const handleImportFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/vnd.ms-excel', 'text/plain'],
+        // octet-stream/zip so shared .sprig decks are selectable too
+        type: ['text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/vnd.ms-excel', 'text/plain', 'application/octet-stream', 'application/zip'],
         copyToCacheDirectory: true,
       });
 
@@ -123,6 +125,17 @@ export default function HomeScreen() {
       const name = boxName.trim() || fallbackName;
 
       setImporting(true);
+
+      if (isSprigFileName(asset.name)) {
+        const res = await importSprigDeck(asset.uri, currentFolderId, boxName.trim() || undefined);
+        setImportModalVisible(false);
+        setBoxName('');
+        setSelectedIcon('Book');
+        loadData();
+        showToast({ message: `"${res.deck.name}" imported · ${res.cardCount} cards`, type: 'success' });
+        return;
+      }
+
       const newDeck = await createEmptyDeck(name, selectedIcon, currentFolderId);
       await importCsvToDeck(newDeck.id, asset.uri);
 
@@ -131,9 +144,12 @@ export default function HomeScreen() {
       setSelectedIcon('Book');
       loadData();
       showToast({ message: t('deckCreated').replace('{name}', name), type: 'success' });
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error importing file:', e);
-      showToast({ message: t('error'), type: 'error' });
+      showToast({
+        message: e?.message === 'not-sprig' ? 'This file is not a Sprig deck' : t('error'),
+        type: 'error',
+      });
     } finally {
       setImporting(false);
     }
@@ -641,10 +657,10 @@ export default function HomeScreen() {
                     )}
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.pickText, { color: textColor, fontSize: 15 }]}>
-                        {importing ? 'Importing...' : 'Import from CSV / Text File'}
+                        {importing ? 'Importing...' : 'Import File (CSV / Text / .sprig)'}
                       </Text>
                       <Text style={[styles.pickSub, { color: mutedForeground }]}>
-                        Comma, tab or line-separated question/answer pairs
+                        Question/answer pairs or a shared Sprig deck
                       </Text>
                     </View>
                   </TouchableOpacity>
