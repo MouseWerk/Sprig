@@ -1,5 +1,6 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from '@/utils/AppHaptics';
+import { isImageToken } from '@/utils/CardImages';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -39,6 +40,15 @@ export function HighlightableText({ text, fontSize = 22, align = 'center', onCha
                     return <Text key={i} style={[styles.wordText, { fontSize }]}>{w}</Text>;
                 }
                 const currentId = wordId++;
+                // Image tokens aren't prose — show a muted placeholder that
+                // can't be highlighted (the token survives edits untouched).
+                if (isImageToken(w)) {
+                    return (
+                        <Text key={i} style={[styles.wordText, styles.imagePlaceholder, { fontSize: fontSize - 4 }]}>
+                            [image]
+                        </Text>
+                    );
+                }
                 const isHighlighted = w.startsWith('==') && w.endsWith('==');
                 return (
                     <TouchableOpacity
@@ -91,5 +101,9 @@ const styles = StyleSheet.create({
     },
     wordTextHighlighted: {
         fontWeight: '800',
+    },
+    imagePlaceholder: {
+        opacity: 0.45,
+        fontStyle: 'italic',
     },
 });

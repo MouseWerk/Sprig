@@ -1,7 +1,10 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { CARD_IMG_DIR } from '@/utils/CardImages';
+import { Image } from 'expo-image';
 import React, { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Markdown from 'react-native-markdown-display';
+import { showImagePreview } from './ImageViewer';
 import MathView from './MathView';
 
 interface MarkdownRendererProps {
@@ -78,6 +81,24 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                 {children}
             </Text>
         ),
+        // Card images use relative cardimg/ tokens; resolve them to the app's
+        // image store and open a full-screen preview on tap.
+        image: (node: any) => {
+            const src: string = node.attributes?.src || '';
+            const uri = src.startsWith('cardimg/') ? CARD_IMG_DIR + src.slice('cardimg/'.length) : src;
+            if (!uri) return null;
+            return (
+                <TouchableOpacity
+                    key={node.key}
+                    onPress={() => showImagePreview(uri)}
+                    activeOpacity={0.85}
+                    accessibilityLabel="Show enlarged image"
+                    accessibilityRole="imagebutton"
+                >
+                    <Image source={{ uri }} style={markdownStyles.cardImage} contentFit="contain" transition={100} />
+                </TouchableOpacity>
+            );
+        },
     }), []);
 
     const renderContent = () => {
@@ -123,6 +144,12 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 const markdownStyles = StyleSheet.create({
     container: {
         width: '100%',
+    },
+    cardImage: {
+        width: '100%',
+        height: 160,
+        borderRadius: 14,
+        marginVertical: 8,
     },
 });
 

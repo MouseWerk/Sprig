@@ -269,6 +269,22 @@ function cardsToCsv(cards: { question: string; answer: string }[]): string {
     return cards.map(c => `${escapeCsv(c.question)},${escapeCsv(c.answer)}`).join('\n');
 }
 
+// Create a deck pre-filled with already-parsed cards (e.g. an Anki import) —
+// writes the CSV, primes the card cache and sets the count in one go.
+export async function createDeckWithCards(
+    name: string,
+    icon: string,
+    folderId: string | null,
+    cards: { question: string; answer: string }[]
+): Promise<Deck> {
+    const deck = await createEmptyDeck(name, icon, folderId);
+    await FileSystem.writeAsStringAsync(deck.uri, cardsToCsv(cards));
+    await replaceCardCache(deck.id, cards);
+    const db = await getDb();
+    await db.runAsync('UPDATE decks SET total_cards = ? WHERE id = ?', cards.length, deck.id);
+    return { ...deck, totalCards: cards.length };
+}
+
 // Replace a deck's cached cards with a fresh set, inside one transaction
 async function replaceCardCache(deckId: string, cards: { question: string; answer: string }[]): Promise<void> {
     const db = await getDb();
@@ -962,7 +978,7 @@ export async function wipeAllData(): Promise<void> {
             }
         })
     );
-    for (const dir of ['decks/', 'audio/']) {
+    for (const dir of ['decks/', 'audio/', 'cardimg/']) {
         await FileSystem.deleteAsync(`${FileSystem.documentDirectory}${dir}`, { idempotent: true }).catch(() => { });
     }
 }

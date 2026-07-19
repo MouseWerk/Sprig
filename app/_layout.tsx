@@ -1,3 +1,4 @@
+import { ImageViewerHost } from '@/components/ImageViewer';
 import { Onboarding } from '@/components/Onboarding';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
@@ -105,6 +106,7 @@ function RootLayoutNav() {
         }} />
       </Stack>
       <Onboarding />
+      <ImageViewerHost />
     </GestureHandlerRootView>
   );
 }

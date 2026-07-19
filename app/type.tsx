@@ -1,6 +1,7 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from '@/utils/AppHaptics';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
+import { stripImageTokens } from '@/utils/CardImages';
 import { AnswerVerdict, checkAnswer } from '@/utils/Fuzzy';
 import { getCachedData, setCachedData, updateCardSRS, updateUserStats } from '@/utils/Storage';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -86,7 +87,8 @@ export default function TypeScreen() {
 
     const handleCheck = () => {
         if (!current || verdict) return;
-        const v = checkAnswer(typed, current.answer);
+        // Compare against the prose only — attached images can't be typed
+        const v = checkAnswer(typed, stripImageTokens(current.answer));
         setVerdict(v);
         if (v === 'exact' || v === 'close') {
             setScore(s => s + 1);

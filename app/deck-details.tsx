@@ -12,6 +12,7 @@ import { ArrowLeftRight, CalendarDays, CheckCircle2, Circle, Edit2, FileUp, File
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CardImagePicker } from '../components/CardImagePicker';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { Button } from '../components/ui/Button';
 import { BottomSheet } from '../components/ui/BottomSheet';
@@ -796,20 +797,26 @@ export default function DeckDetailsScreen() {
                         </View>
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <View style={{ gap: 20 }}>
-                                <Input
-                                    label="Question"
-                                    value={newQuestion}
-                                    onChangeText={setNewQuestion}
-                                    placeholder="e.g. What is the speed of light?"
-                                    multiline
-                                />
-                                <Input
-                                    label="Answer"
-                                    value={newAnswer}
-                                    onChangeText={setNewAnswer}
-                                    placeholder="e.g. 299,792,458 m/s"
-                                    multiline
-                                />
+                                <View style={{ gap: 10 }}>
+                                    <Input
+                                        label="Question"
+                                        value={newQuestion}
+                                        onChangeText={setNewQuestion}
+                                        placeholder="e.g. What is the speed of light?"
+                                        multiline
+                                    />
+                                    <CardImagePicker text={newQuestion} onChangeText={setNewQuestion} />
+                                </View>
+                                <View style={{ gap: 10 }}>
+                                    <Input
+                                        label="Answer"
+                                        value={newAnswer}
+                                        onChangeText={setNewAnswer}
+                                        placeholder="e.g. 299,792,458 m/s"
+                                        multiline
+                                    />
+                                    <CardImagePicker text={newAnswer} onChangeText={setNewAnswer} />
+                                </View>
                                 <Button
                                     title="Add to Deck"
                                     onPress={handleAddCard}
@@ -881,18 +888,24 @@ export default function DeckDetailsScreen() {
                                     </View>
                                 ) : (
                                     <>
-                                        <Input
-                                            label="Question"
-                                            value={editQuestion}
-                                            onChangeText={setEditQuestion}
-                                            multiline
-                                        />
-                                        <Input
-                                            label="Answer"
-                                            value={editAnswer}
-                                            onChangeText={setEditAnswer}
-                                            multiline
-                                        />
+                                        <View style={{ gap: 10 }}>
+                                            <Input
+                                                label="Question"
+                                                value={editQuestion}
+                                                onChangeText={setEditQuestion}
+                                                multiline
+                                            />
+                                            <CardImagePicker text={editQuestion} onChangeText={setEditQuestion} />
+                                        </View>
+                                        <View style={{ gap: 10 }}>
+                                            <Input
+                                                label="Answer"
+                                                value={editAnswer}
+                                                onChangeText={setEditAnswer}
+                                                multiline
+                                            />
+                                            <CardImagePicker text={editAnswer} onChangeText={setEditAnswer} />
+                                        </View>
                                     </>
                                 )}
                                 <Button

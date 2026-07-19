@@ -3,7 +3,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Icons from 'lucide-react-native';
-import { CalendarCheck, CalendarDays, ChevronRight, ClipboardPaste, FileUp, Folder as FolderIcon, Leaf, Play, Plus, Search, Trash2, X } from 'lucide-react-native';
+import { CalendarCheck, CalendarDays, ChevronRight, ClipboardPaste, FileUp, Folder as FolderIcon, Leaf, Package, Play, Plus, Search, Trash2, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +17,7 @@ import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { useToast } from '../../components/ui/Toast';
 import * as FileSystem from 'expo-file-system/legacy';
+import { importApkg } from '../../utils/AnkiImport';
 import { parseFlashcardsText } from '../../utils/CsvParser';
 import { createEmptyDeck, Deck, deleteDeck, deleteFolder, Folder, getDecks, getExamPlan, getFolders, getUserStats, importCsvToDeck, saveFolder, updateDeck, UserStats } from '../../utils/Storage';
 import { buildTodayPlan, startTodaySession, TodayPlan } from '../../utils/TodayPlan';
@@ -133,6 +134,49 @@ export default function HomeScreen() {
     } catch (e) {
       console.error('Error importing file:', e);
       showToast({ message: t('error'), type: 'error' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleImportAnki = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        // .apkg has no registered MIME type — accept anything, validate below
+        type: '*/*',
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+      const asset = result.assets[0];
+      if (!/\.(apkg|colpkg)$/i.test(asset.name || '')) {
+        showToast({ message: 'Please pick an Anki .apkg file', type: 'warning' });
+        return;
+      }
+
+      const fallbackName = asset.name.replace(/\.(apkg|colpkg)$/i, '') || 'Anki Deck';
+      const name = boxName.trim() || fallbackName;
+
+      setImporting(true);
+      const res = await importApkg(asset.uri, name, selectedIcon, currentFolderId);
+
+      setImportModalVisible(false);
+      setBoxName('');
+      setSelectedIcon('Book');
+      loadData();
+      showToast({
+        message: `"${name}" imported · ${res.cardCount} cards${res.imageCount > 0 ? ` · ${res.imageCount} images` : ''}`,
+        type: 'success',
+      });
+    } catch (e: any) {
+      console.error('Error importing apkg:', e);
+      const message =
+        e?.message === 'new-format'
+          ? 'This deck uses Anki\'s newest format. In Anki, export it again with "Support older Anki versions" enabled.'
+          : e?.message === 'empty'
+            ? 'No cards found in this Anki deck'
+            : 'Could not import this Anki deck';
+      showToast({ message, type: 'error' });
     } finally {
       setImporting(false);
     }
@@ -601,6 +645,23 @@ export default function HomeScreen() {
                       </Text>
                       <Text style={[styles.pickSub, { color: mutedForeground }]}>
                         Comma, tab or line-separated question/answer pairs
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.importZone, { borderColor: accentColor, backgroundColor: secondaryBg }]}
+                    onPress={handleImportAnki}
+                    activeOpacity={0.8}
+                    disabled={importing}
+                    accessibilityLabel="Import Anki deck"
+                    accessibilityRole="button"
+                  >
+                    <Package size={22} color={accentColor} strokeWidth={2.5} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.pickText, { color: textColor, fontSize: 15 }]}>Import Anki Deck (.apkg)</Text>
+                      <Text style={[styles.pickSub, { color: mutedForeground }]}>
+                        Cards and images from an Anki export
                       </Text>
                     </View>
                   </TouchableOpacity>

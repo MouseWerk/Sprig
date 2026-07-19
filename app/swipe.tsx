@@ -363,8 +363,9 @@ export default function SwipeScreen() {
     const speakCurrentCard = () => {
         if (!currentCard) return;
         const raw = isFlipped ? displayAnswer : displayQuestion;
-        // Strip markdown/highlight syntax so TTS reads clean text
+        // Strip markdown/highlight/image syntax so TTS reads clean text
         const text = raw
+            .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
             .replace(/==([^=]+)==/g, '$1')
             .replace(/<[^>]+>/g, ' ')
             .replace(/[*_~#`$]/g, '')
