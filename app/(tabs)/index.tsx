@@ -1,6 +1,7 @@
 import { GroveStrip } from '@/components/GroveStrip';
 import { LevelCard } from '@/components/LevelCard';
 import { SprigLogo } from '@/components/SprigLogo';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { buildGrovePlants, GrovePlant, pendingDew } from '@/utils/Grove';
 import { Deck, getDecks, getGroveEconomy, getUserStats, UserStats } from '@/utils/Storage';
@@ -12,17 +13,18 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
 
-function greeting(): string {
+function greetingKey(): 'greetingLateNight' | 'greetingMorning' | 'greetingAfternoon' | 'greetingEvening' {
   const h = new Date().getHours();
-  if (h < 5) return 'Still up?';
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (h < 5) return 'greetingLateNight';
+  if (h < 12) return 'greetingMorning';
+  if (h < 18) return 'greetingAfternoon';
+  return 'greetingEvening';
 }
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
 
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
@@ -91,7 +93,7 @@ export default function HomeScreen() {
     >
       <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.greeting, { color: mutedForeground }]}>{greeting()}</Text>
+          <Text style={[styles.greeting, { color: mutedForeground }]}>{t(greetingKey())}</Text>
           <Text style={[styles.title, { color: textColor }]}>Sprig</Text>
         </View>
         <SprigLogo size={46} />
@@ -112,15 +114,15 @@ export default function HomeScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.rowTitle, { color: textColor }]}>
-              Your {todayPlan.totalCards} for today
+              {t('homeTodayTitle').replace('{n}', String(todayPlan.totalCards))}
             </Text>
             <Text style={[styles.rowSub, { color: mutedForeground }]} numberOfLines={1}>
               {[
-                todayPlan.dueCount > 0 ? `${todayPlan.dueCount} due` : null,
-                todayPlan.examCount > 0 ? `${todayPlan.examCount} exam prep` : null,
-                todayPlan.trickyCount > 0 ? `${todayPlan.trickyCount} tricky` : null,
-              ].filter(Boolean).join(' · ') || 'Ready when you are'}
-              {todayPlan.entries.length > 1 ? ` · ${todayPlan.entries.length} decks` : ''}
+                todayPlan.dueCount > 0 ? t('homeDueCount').replace('{n}', String(todayPlan.dueCount)) : null,
+                todayPlan.examCount > 0 ? t('homeExamPrepCount').replace('{n}', String(todayPlan.examCount)) : null,
+                todayPlan.trickyCount > 0 ? t('homeTrickyCount').replace('{n}', String(todayPlan.trickyCount)) : null,
+              ].filter(Boolean).join(' · ') || t('homeReadyWhenYouAre')}
+              {todayPlan.entries.length > 1 ? t('homeDecksSuffix').replace('{n}', String(todayPlan.entries.length)) : ''}
             </Text>
           </View>
           <View style={[styles.goButton, { backgroundColor: accentColor }]}>
@@ -139,11 +141,11 @@ export default function HomeScreen() {
             accessibilityRole="button"
           >
             <View style={{ flex: 1 }}>
-              <Text style={[styles.rowTitle, { color: textColor }]}>The Grove</Text>
+              <Text style={[styles.rowTitle, { color: textColor }]}>{t('homeGroveTitle')}</Text>
               <Text style={[styles.rowSub, { color: mutedForeground }]}>
-                {plants.length} {plants.length === 1 ? 'plant' : 'plants'}
-                {dewReady > 0 ? ` · ${dewReady} dew to collect` : ''}
-                {totalDue > 0 ? ` · ${totalDue} cards to water` : ' · all watered'}
+                {plants.length} {plants.length === 1 ? t('homePlant') : t('homePlants')}
+                {dewReady > 0 ? t('homeDewToCollect').replace('{n}', String(dewReady)) : ''}
+                {totalDue > 0 ? t('homeCardsToWater').replace('{n}', String(totalDue)) : t('homeAllWatered')}
               </Text>
             </View>
             <ChevronRight size={20} color={mutedForeground} />
@@ -163,8 +165,8 @@ export default function HomeScreen() {
           <Leaf size={22} color={accentColor} strokeWidth={2.5} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.rowTitle, { color: primaryForeground }]}>Focus Session</Text>
-          <Text style={[styles.rowSub, { color: primaryForeground }]}>Grow a plant while you study</Text>
+          <Text style={[styles.rowTitle, { color: primaryForeground }]}>{t('homeFocusSession')}</Text>
+          <Text style={[styles.rowSub, { color: primaryForeground }]}>{t('homeFocusSub')}</Text>
         </View>
         <ChevronRight size={20} color={primaryForeground} />
       </TouchableOpacity>
@@ -180,11 +182,13 @@ export default function HomeScreen() {
           <Layers size={22} color={accentColor} strokeWidth={2.5} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.rowTitle, { color: textColor }]}>My Decks</Text>
+          <Text style={[styles.rowTitle, { color: textColor }]}>{t('homeMyDecks')}</Text>
           <Text style={[styles.rowSub, { color: mutedForeground }]}>
             {decks.length === 0
-              ? 'Create your first deck'
-              : `${decks.length} ${decks.length === 1 ? 'deck' : 'decks'} · ${decks.reduce((s, d) => s + (d.totalCards || 0), 0)} cards`}
+              ? t('homeCreateFirstDeck')
+              : t('homeDeckCountSummary')
+                .replace('{decks}', `${decks.length} ${decks.length === 1 ? t('homeDeck') : t('homeDecks')}`)
+                .replace('{cards}', String(decks.reduce((s, d) => s + (d.totalCards || 0), 0)))}
           </Text>
         </View>
         <ChevronRight size={20} color={mutedForeground} />
@@ -195,12 +199,12 @@ export default function HomeScreen() {
           <View style={{ marginBottom: 20 }}>
             <SprigLogo size={96} />
           </View>
-          <Text style={[styles.emptyTitle, { color: textColor }]}>Plant your first deck</Text>
+          <Text style={[styles.emptyTitle, { color: textColor }]}>{t('homePlantFirstDeckTitle')}</Text>
           <Text style={[styles.emptyText, { color: mutedForeground }]}>
-            Import a CSV, Anki deck, or paste your cards — every deck you study grows a plant here.
+            {t('homePlantFirstDeckText')}
           </Text>
           <Button
-            title="Create New Deck"
+            title={t('homeCreateNewDeck')}
             onPress={() => router.push('/decks')}
             style={styles.emptyButton}
           />

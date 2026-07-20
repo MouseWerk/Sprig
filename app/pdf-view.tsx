@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useKeepAwake } from 'expo-keep-awake';
 import { Stack, useLocalSearchParams } from 'expo-router';
@@ -114,6 +115,7 @@ const PDFViewScreen = () => {
     const [immersive, setImmersive] = useState(false);
     const pdfRef = useRef<any>(null);
     const { showToast } = useToast();
+    const { t } = useLanguage();
 
     // Reading shouldn't fight the screen timeout
     useKeepAwake();
@@ -180,7 +182,7 @@ const PDFViewScreen = () => {
     if (!uri) {
         return (
             <View style={[styles.container, { backgroundColor, justifyContent: 'center', alignItems: 'center' }]}>
-                <Text style={{ color: textColor }}>No document selected</Text>
+                <Text style={{ color: textColor }}>{t('pdfNoDocumentSelected')}</Text>
             </View>
         );
     }
@@ -190,14 +192,14 @@ const PDFViewScreen = () => {
             await Sharing.shareAsync(uri);
         } catch (e) {
             console.error('Error sharing document:', e);
-            showToast({ message: 'Failed to open document in external app', type: 'error' });
+            showToast({ message: t('pdfShareFailed'), type: 'error' });
         }
     };
 
     return (
         <View style={[styles.container, { backgroundColor }]}>
             <Stack.Screen options={{
-                title: name || 'Document',
+                title: name || t('pdfDocument'),
                 headerShown: !immersive,
                 headerStyle: { backgroundColor },
                 headerTintColor: textColor,
@@ -225,7 +227,7 @@ const PDFViewScreen = () => {
                             if (initialPage > numberOfPages) {
                                 goToPage(numberOfPages);
                             } else if (initialPage > 1) {
-                                showToast({ message: `Resumed on page ${initialPage}`, type: 'info' });
+                                showToast({ message: t('pdfResumedOnPage').replace('{n}', String(initialPage)), type: 'info' });
                             }
                         }}
                         onPageChanged={(page) => {
@@ -235,7 +237,7 @@ const PDFViewScreen = () => {
                         onError={(error) => {
                             console.error('PDF Error:', error);
                             setLoading(false);
-                            showToast({ message: 'Failed to load PDF. Try opening in an external viewer.', type: 'error' });
+                            showToast({ message: t('pdfLoadFailed'), type: 'error' });
                         }}
                         onPageSingleTap={() => setImmersive(v => !v)}
                         enablePaging={false}
@@ -252,7 +254,7 @@ const PDFViewScreen = () => {
                 {loading && (
                     <View style={[StyleSheet.absoluteFill, { backgroundColor, justifyContent: 'center', alignItems: 'center' }]}>
                         <ActivityIndicator size="large" color={accentColor} />
-                        <Text style={{ marginTop: 16, color: mutedForeground, fontWeight: '600' }}>Loading document...</Text>
+                        <Text style={{ marginTop: 16, color: mutedForeground, fontWeight: '600' }}>{t('pdfLoadingDocument')}</Text>
                     </View>
                 )}
             </View>
@@ -287,9 +289,9 @@ const PDFViewScreen = () => {
                         activeOpacity={0.7}
                     >
                         <Text style={[styles.pageText, { color: textColor }]}>
-                            Page <Text style={{ fontWeight: '900', color: accentColor }}>{currentPage}</Text> of {totalPages}
+                            {t('pdfPage')} <Text style={{ fontWeight: '900', color: accentColor }}>{currentPage}</Text> {t('pdfOf')} {totalPages}
                         </Text>
-                        <Text style={[styles.tapHint, { color: mutedForeground }]}>Tap to jump</Text>
+                        <Text style={[styles.tapHint, { color: mutedForeground }]}>{t('pdfTapToJump')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -320,7 +322,7 @@ const PDFViewScreen = () => {
                         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setJumpVisible(false)} />
                         <View style={[styles.modalCard, { backgroundColor }]}>
                             <View style={styles.modalHeader}>
-                                <Text style={[styles.modalTitle, { color: textColor }]}>Jump to Page</Text>
+                                <Text style={[styles.modalTitle, { color: textColor }]}>{t('pdfJumpToPage')}</Text>
                                 <TouchableOpacity onPress={() => setJumpVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
                                     <X size={20} color={textColor} />
                                 </TouchableOpacity>
@@ -336,7 +338,7 @@ const PDFViewScreen = () => {
                                 onSubmitEditing={handleJump}
                                 returnKeyType="go"
                             />
-                            <Button title="Go" onPress={handleJump} style={{ marginTop: 16, height: 52 }} />
+                            <Button title={t('pdfGo')} onPress={handleJump} style={{ marginTop: 16, height: 52 }} />
                         </View>
                     </View>
                 </KeyboardAvoidingView>

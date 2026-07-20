@@ -3,7 +3,7 @@ import { Onboarding } from '@/components/Onboarding';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
 import { ToastProvider, useToast } from '@/components/ui/Toast';
-import { LanguageProvider } from '@/contexts/LanguageContext';
+import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { importIncomingFile, isFileUrl } from '@/utils/IncomingFile';
 import { Stack } from 'expo-router';
@@ -15,6 +15,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 // launch URL (cold start) or a url event (already running).
 function useIncomingFiles() {
   const { showToast } = useToast();
+  const { t } = useLanguage();
 
   useEffect(() => {
     const handle = async (url: string | null) => {
@@ -24,13 +25,13 @@ function useIncomingFiles() {
         if (!result) return; // already handled
         showToast({
           message: result.kind === 'pdf'
-            ? `"${result.name}" added to your Library`
-            : `Deck "${result.name}" imported · ${result.cards} cards`,
+            ? t('layoutPdfAdded').replace('{name}', result.name)
+            : t('layoutDeckImported').replace('{name}', result.name).replace('{n}', String(result.cards)),
           type: 'success',
         });
       } catch (e) {
         console.error('Incoming file import failed:', e);
-        showToast({ message: 'Could not import that file', type: 'error' });
+        showToast({ message: t('layoutImportFailed'), type: 'error' });
       }
     };
 
@@ -42,70 +43,72 @@ function useIncomingFiles() {
 }
 
 function RootLayoutNav() {
+  const { t } = useLanguage();
   const textColor = useThemeColor({}, 'text');
   const backgroundColor = useThemeColor({}, 'background');
   useIncomingFiles();
+  const backTitle = t('layoutBack');
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="swipe" options={{
-          headerBackTitle: 'Back',
+          headerBackTitle: backTitle,
           headerTintColor: textColor,
           headerStyle: { backgroundColor },
           headerTitleStyle: { fontWeight: '600' }
         }} />
         <Stack.Screen name="pdf-view" options={{
-          headerBackTitle: 'Back',
+          headerBackTitle: backTitle,
           headerTintColor: textColor,
           headerStyle: { backgroundColor },
           headerTitleStyle: { fontWeight: '600' }
         }} />
         <Stack.Screen name="deck-details" options={{
-          headerBackTitle: 'Back',
+          headerBackTitle: backTitle,
           headerTintColor: textColor,
           headerStyle: { backgroundColor },
           headerTitleStyle: { fontWeight: '600' }
         }} />
         <Stack.Screen name="achievements" options={{
-          headerBackTitle: 'Back',
+          headerBackTitle: backTitle,
           headerTintColor: textColor,
           headerStyle: { backgroundColor },
           headerTitleStyle: { fontWeight: '600' }
         }} />
         <Stack.Screen name="grove" options={{
-          headerBackTitle: 'Back',
+          headerBackTitle: backTitle,
           headerTintColor: textColor,
           headerStyle: { backgroundColor },
           headerTitleStyle: { fontWeight: '600' }
         }} />
         <Stack.Screen name="focus" options={{
-          headerBackTitle: 'Back',
+          headerBackTitle: backTitle,
           headerTintColor: textColor,
           headerStyle: { backgroundColor },
           headerTitleStyle: { fontWeight: '600' }
         }} />
         <Stack.Screen name="credits" options={{
-          headerBackTitle: 'Back',
+          headerBackTitle: backTitle,
           headerTintColor: textColor,
           headerStyle: { backgroundColor },
           headerTitleStyle: { fontWeight: '600' }
         }} />
         <Stack.Screen name="quiz" options={{
-          headerBackTitle: 'Back',
+          headerBackTitle: backTitle,
           headerTintColor: textColor,
           headerStyle: { backgroundColor },
           headerTitleStyle: { fontWeight: '600' }
         }} />
         <Stack.Screen name="type" options={{
-          headerBackTitle: 'Back',
+          headerBackTitle: backTitle,
           headerTintColor: textColor,
           headerStyle: { backgroundColor },
           headerTitleStyle: { fontWeight: '600' }
         }} />
         <Stack.Screen name="feed" options={{
-          headerBackTitle: 'Back',
+          headerBackTitle: backTitle,
           headerTintColor: textColor,
           headerStyle: { backgroundColor },
           headerTitleStyle: { fontWeight: '600' }

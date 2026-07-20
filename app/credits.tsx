@@ -1,3 +1,5 @@
+import { TranslationKey } from '@/constants/translations';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Stack } from 'expo-router';
 import { ExternalLink } from 'lucide-react-native';
@@ -7,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface CreditEntry {
     name: string;
-    detail: string;
+    detailKey: TranslationKey;
     license: string;
     url?: string;
 }
@@ -15,23 +17,24 @@ interface CreditEntry {
 const SOUND_CREDITS: CreditEntry[] = [
     {
         name: 'Ambient sounds',
-        detail: 'Rain, ocean, campfire, wind, forest, birds, river and thunder loops are sourced from the open-source Moodist project.',
+        detailKey: 'creditsMoodistDetail',
         license: 'Pixabay Content License / CC0',
         url: 'https://github.com/remvze/moodist',
     },
 ];
 
 const SOFTWARE_CREDITS: CreditEntry[] = [
-    { name: 'React Native & Expo', detail: 'The framework Sprig is built with.', license: 'MIT', url: 'https://expo.dev' },
-    { name: 'Lucide Icons', detail: 'Every icon in the app.', license: 'ISC', url: 'https://lucide.dev' },
-    { name: 'react-native-pdf', detail: 'PDF rendering.', license: 'MIT', url: 'https://github.com/wonday/react-native-pdf' },
-    { name: 'PapaParse', detail: 'CSV parsing.', license: 'MIT', url: 'https://www.papaparse.com' },
-    { name: 'react-native-svg', detail: 'Progress rings and the Sprig logo.', license: 'MIT', url: 'https://github.com/software-mansion/react-native-svg' },
-    { name: 'react-native-reanimated & gesture-handler', detail: 'Card swiping and animations.', license: 'MIT', url: 'https://swmansion.com' },
+    { name: 'React Native & Expo', detailKey: 'creditsFrameworkDetail', license: 'MIT', url: 'https://expo.dev' },
+    { name: 'Lucide Icons', detailKey: 'creditsIconsDetail', license: 'ISC', url: 'https://lucide.dev' },
+    { name: 'react-native-pdf', detailKey: 'creditsPdfDetail', license: 'MIT', url: 'https://github.com/wonday/react-native-pdf' },
+    { name: 'PapaParse', detailKey: 'creditsCsvDetail', license: 'MIT', url: 'https://www.papaparse.com' },
+    { name: 'react-native-svg', detailKey: 'creditsSvgDetail', license: 'MIT', url: 'https://github.com/software-mansion/react-native-svg' },
+    { name: 'react-native-reanimated & gesture-handler', detailKey: 'creditsAnimationDetail', license: 'MIT', url: 'https://swmansion.com' },
 ];
 
 export default function CreditsScreen() {
     const insets = useSafeAreaInsets();
+    const { t } = useLanguage();
 
     const backgroundColor = useThemeColor({}, 'background');
     const cardColor = useThemeColor({}, 'card');
@@ -59,7 +62,7 @@ export default function CreditsScreen() {
                         <Text style={[styles.licenseText, { color: mutedForeground }]}>{entry.license}</Text>
                     </View>
                 </View>
-                <Text style={[styles.cardDetail, { color: mutedForeground }]}>{entry.detail}</Text>
+                <Text style={[styles.cardDetail, { color: mutedForeground }]}>{t(entry.detailKey)}</Text>
             </View>
             {entry.url && <ExternalLink size={16} color={mutedForeground} />}
         </TouchableOpacity>
@@ -68,7 +71,7 @@ export default function CreditsScreen() {
     return (
         <View style={[styles.container, { backgroundColor }]}>
             <Stack.Screen options={{
-                title: 'Credits & Licenses',
+                title: t('settingsCreditsLicenses'),
                 headerStyle: { backgroundColor },
                 headerTintColor: textColor,
                 headerShadowVisible: false,
@@ -79,19 +82,17 @@ export default function CreditsScreen() {
                 contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }}
             >
                 <Text style={[styles.intro, { color: mutedForeground }]}>
-                    Sprig stands on the shoulders of open-source projects and freely
-                    licensed sounds. Thank you to everyone behind them.
+                    {t('creditsIntro')}
                 </Text>
 
-                <Text style={[styles.sectionHeader, { color: mutedForeground }]}>SOUNDS</Text>
+                <Text style={[styles.sectionHeader, { color: mutedForeground }]}>{t('creditsSounds')}</Text>
                 {SOUND_CREDITS.map(renderEntry)}
 
-                <Text style={[styles.sectionHeader, { color: mutedForeground }]}>SOFTWARE</Text>
+                <Text style={[styles.sectionHeader, { color: mutedForeground }]}>{t('creditsSoftware')}</Text>
                 {SOFTWARE_CREDITS.map(renderEntry)}
 
                 <Text style={[styles.footnote, { color: mutedForeground }]}>
-                    Full license texts are available from each project&apos;s linked page.
-                    The Sprig logo and name are © Mousewerk. Tap {String.fromCharCode(0x2197)} any entry to visit its project.
+                    {t('creditsFootnote').replace('{arrow}', String.fromCharCode(0x2197))}
                 </Text>
             </ScrollView>
         </View>

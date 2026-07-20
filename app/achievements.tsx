@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { getUserStats, UserStats } from '@/utils/Storage';
 import { Stack, useFocusEffect } from 'expo-router';
@@ -10,6 +11,7 @@ import { ACHIEVEMENTS, achievementProgress, AchievementDef, isUnlocked, progress
 
 export default function AchievementsScreen() {
     const insets = useSafeAreaInsets();
+    const { t } = useLanguage();
     const [stats, setStats] = useState<UserStats | null>(null);
 
     const backgroundColor = useThemeColor({}, 'background');
@@ -57,15 +59,15 @@ export default function AchievementsScreen() {
                     style={[styles.cardTitle, { color: done ? textColor : mutedForeground }]}
                     numberOfLines={1}
                 >
-                    {a.title}
+                    {t(a.titleKey)}
                 </Text>
                 <Text style={[styles.cardDesc, { color: mutedForeground }]} numberOfLines={2}>
-                    {a.description}
+                    {t(a.descriptionKey)}
                 </Text>
 
                 {done ? (
                     <View style={[styles.unlockedPill, { backgroundColor: a.color + '22' }]}>
-                        <Text style={[styles.unlockedText, { color: a.color }]}>Unlocked</Text>
+                        <Text style={[styles.unlockedText, { color: a.color }]}>{t('achvUnlocked')}</Text>
                     </View>
                 ) : (
                     <View style={styles.progressWrap}>
@@ -84,7 +86,7 @@ export default function AchievementsScreen() {
     return (
         <View style={[styles.container, { backgroundColor }]}>
             <Stack.Screen options={{
-                title: 'Achievements',
+                title: t('statsAchievements'),
                 headerStyle: { backgroundColor },
                 headerTintColor: textColor,
                 headerShadowVisible: false,
@@ -97,13 +99,13 @@ export default function AchievementsScreen() {
                 <View style={[styles.summary, { backgroundColor: secondaryBg }]}>
                     <View style={styles.summaryTop}>
                         <Text style={[styles.summaryCount, { color: textColor }]}>{unlocked}</Text>
-                        <Text style={[styles.summaryTotal, { color: mutedForeground }]}>/ {total} unlocked</Text>
+                        <Text style={[styles.summaryTotal, { color: mutedForeground }]}>{t('achvOfUnlocked').replace('{n}', String(total))}</Text>
                     </View>
                     <View style={[styles.summaryTrack, { backgroundColor: primaryColor + '20' }]}>
                         <View style={[styles.summaryFill, { width: `${Math.round(overallProgress * 100)}%`, backgroundColor: primaryColor }]} />
                     </View>
                     <Text style={[styles.summaryHint, { color: mutedForeground }]}>
-                        {unlocked === total ? 'You collected them all — legendary!' : 'Keep studying to unlock them all.'}
+                        {unlocked === total ? t('achvCollectedAll') : t('achvKeepStudying')}
                     </Text>
                 </View>
 

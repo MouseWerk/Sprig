@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from '@/utils/AppHaptics';
@@ -10,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashcardSwipe } from '../components/FlashcardSwipe';
 import { FocusPlant } from '../components/FocusPlant';
 import { GrowingPlant } from '../components/GrowingPlant';
-import { detectStageUps, STAGE_LABELS, StageUp } from '../utils/Grove';
+import { detectStageUps, STAGE_LABEL_KEYS, StageUp } from '../utils/Grove';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast';
 import { FlashcardData, parseFlashcardsCsv } from '../utils/CsvParser';
@@ -37,6 +38,7 @@ export default function SwipeScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { showToast } = useToast();
+    const { t } = useLanguage();
     const { id, uri, name, mode: initialMode, cards: drillParam, today, water } = useLocalSearchParams<{ id: string, uri: string, name?: string, mode?: string, cards?: string, today?: string, water?: string }>();
 
     // Drill mode: a comma-separated list of card indices (e.g. from the
@@ -136,7 +138,7 @@ export default function SwipeScreen() {
                 }
 
                 if (parsedCards && parsedCards.length === 0) {
-                    setError('This CSV file seems to be empty or formatted incorrectly. Expected: Question, Answer.');
+                    setError(t('swipeEmptyCsvError'));
                 } else if (parsedCards) {
                     // Enrich with original index + per-deck study direction
                     const direction = currentDeck?.studyDirection || 'normal';
@@ -148,11 +150,11 @@ export default function SwipeScreen() {
                     setCards(enrichedCards);
                     setShuffledCards(shuffleArray(enrichedCards));
                 } else {
-                    setError('Failed to load cards.');
+                    setError(t('swipeFailedToLoad'));
                 }
             } catch (e) {
                 console.error(e);
-                setError('Failed to read the flashcard file. Ensure it is a valid CSV.');
+                setError(t('swipeFailedToRead'));
             } finally {
                 setLoading(false);
             }
@@ -297,27 +299,27 @@ export default function SwipeScreen() {
                 if (result.freezeUsed) {
                     setTimeout(() => {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        showToast({ message: 'Streak freeze used — your streak is safe!', type: 'info' });
+                        showToast({ message: t('swipeFreezeUsed'), type: 'info' });
                     }, delay);
                     delay += 600;
                 }
                 if (result.freezeEarned) {
                     setTimeout(() => {
-                        showToast({ message: 'You earned a streak freeze!', type: 'success' });
+                        showToast({ message: t('swipeFreezeEarned'), type: 'success' });
                     }, delay);
                     delay += 600;
                 }
                 if (result.leveledUp) {
                     setTimeout(() => {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        showToast({ message: `Level ${result.newLevel}! You're now a ${result.newRank}`, type: 'success' });
+                        showToast({ message: t('focusLevelUp').replace('{level}', String(result.newLevel)).replace('{rank}', result.newRank), type: 'success' });
                     }, delay);
                     delay += 600;
                 }
                 result.newAchievements.forEach(a => {
                     setTimeout(() => {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        showToast({ message: `Achievement unlocked: ${a.title}`, type: 'success' });
+                        showToast({ message: t('focusAchievementUnlocked').replace('{title}', t(a.titleKey)), type: 'success' });
                     }, delay);
                     delay += 600;
                 });
@@ -434,7 +436,7 @@ export default function SwipeScreen() {
         return (
             <View style={[styles.container, { backgroundColor }]}>
                 <ActivityIndicator size="large" color={primaryColor} />
-                <Text style={[styles.loadingText, { color: mutedForeground }]}>Loading your deck...</Text>
+                <Text style={[styles.loadingText, { color: mutedForeground }]}>{t('swipeLoadingDeck')}</Text>
             </View>
         );
     }
@@ -442,13 +444,13 @@ export default function SwipeScreen() {
     if (error) {
         return (
             <View style={[styles.container, { backgroundColor, paddingHorizontal: 24 }]}>
-                <Stack.Screen options={{ title: 'Error' }} />
+                <Stack.Screen options={{ title: t('error') }} />
                 <View style={[styles.errorCard, { backgroundColor: secondaryBg }]}>
                     <FileWarning size={48} color="#ef4444" strokeWidth={2.5} />
-                    <Text style={[styles.errorTitle, { color: textColor }]}>Import Error</Text>
+                    <Text style={[styles.errorTitle, { color: textColor }]}>{t('swipeImportError')}</Text>
                     <Text style={[styles.errorSub, { color: mutedForeground }]}>{error}</Text>
                     <Button
-                        title="Go Back"
+                        title={t('swipeGoBack')}
                         onPress={() => router.back()}
                         style={styles.errorButton}
                     />
@@ -460,16 +462,16 @@ export default function SwipeScreen() {
     if (sessionComplete) {
         return (
             <View style={[styles.container, { backgroundColor, paddingBottom: insets.bottom }]}>
-                <Stack.Screen options={{ title: name || 'Flashcards' }} />
+                <Stack.Screen options={{ title: name || t('swipeFlashcards') }} />
                 <View style={styles.resultsContent}>
                     <View style={[styles.trophyContainer, { backgroundColor: '#facc1520', padding: 24, borderRadius: 100 }]}>
                         <Trophy size={64} color="#eab308" strokeWidth={1.5} />
                     </View>
-                    <Text style={[styles.resultTitle, { color: textColor }]}>Session Complete!</Text>
+                    <Text style={[styles.resultTitle, { color: textColor }]}>{t('swipeSessionComplete')}</Text>
                     <View style={[styles.scoreSummary, { backgroundColor: secondaryBg }]}>
                         <Text style={[styles.resultScore, { color: primaryColor }]}>{accuracy}</Text>
                         <Text style={[styles.scoreDivider, { color: mutedForeground }]}>%</Text>
-                        <Text style={[styles.resultTotal, { color: mutedForeground }]}>correct</Text>
+                        <Text style={[styles.resultTotal, { color: mutedForeground }]}>{t('swipeCorrect')}</Text>
                     </View>
                     {(sessionXp > 0 || sessionDew > 0 || sessionBoosted) && (
                         <View style={styles.earnRow}>
@@ -488,7 +490,7 @@ export default function SwipeScreen() {
                             {sessionBoosted && (
                                 <View style={[styles.xpBadge, { backgroundColor: '#eab30820' }]}>
                                     <Sun size={18} color="#eab308" strokeWidth={2.5} />
-                                    <Text style={[styles.xpBadgeText, { color: '#eab308' }]}>×2 Sunshine</Text>
+                                    <Text style={[styles.xpBadgeText, { color: '#eab308' }]}>{t('swipeSunshineBadge')}</Text>
                                 </View>
                             )}
                         </View>
@@ -504,9 +506,9 @@ export default function SwipeScreen() {
                                 sway
                             />
                             <View style={{ flex: 1 }}>
-                                <Text style={[styles.stageUpTitle, { color: textColor }]}>Your plant grew!</Text>
+                                <Text style={[styles.stageUpTitle, { color: textColor }]}>{t('swipePlantGrew')}</Text>
                                 <Text style={[styles.stageUpSub, { color: mutedForeground }]}>
-                                    {stageUp.deckName} is now a {STAGE_LABELS[stageUp.stage]}
+                                    {t('swipeNowA').replace('{name}', stageUp.deckName).replace('{stage}', t(STAGE_LABEL_KEYS[stageUp.stage]))}
                                 </Text>
                             </View>
                         </View>
@@ -515,36 +517,36 @@ export default function SwipeScreen() {
                         <View style={styles.breakdownItem}>
                             <CheckCircle2 size={20} color="#22c55e" strokeWidth={2.5} />
                             <Text style={[styles.breakdownValue, { color: textColor }]}>{sessionCorrect}</Text>
-                            <Text style={[styles.breakdownLabel, { color: mutedForeground }]}>Good</Text>
+                            <Text style={[styles.breakdownLabel, { color: mutedForeground }]}>{t('swipeGood')}</Text>
                         </View>
                         <View style={styles.breakdownItem}>
                             <HelpCircle size={20} color="#eab308" strokeWidth={2.5} />
                             <Text style={[styles.breakdownValue, { color: textColor }]}>{sessionHard}</Text>
-                            <Text style={[styles.breakdownLabel, { color: mutedForeground }]}>Hard</Text>
+                            <Text style={[styles.breakdownLabel, { color: mutedForeground }]}>{t('swipeHard')}</Text>
                         </View>
                         <View style={styles.breakdownItem}>
                             <XCircle size={20} color="#ef4444" strokeWidth={2.5} />
                             <Text style={[styles.breakdownValue, { color: textColor }]}>{sessionAgain}</Text>
-                            <Text style={[styles.breakdownLabel, { color: mutedForeground }]}>Again</Text>
+                            <Text style={[styles.breakdownLabel, { color: mutedForeground }]}>{t('swipeAgain')}</Text>
                         </View>
                     </View>
                     <Text style={[styles.resultSub, { color: mutedForeground }]}>
-                        You reviewed {sessionReviewed} card{sessionReviewed === 1 ? '' : 's'} this session. Keep it up!
+                        {t(sessionReviewed === 1 ? 'swipeReviewedOne' : 'swipeReviewedMany').replace('{n}', String(sessionReviewed))}
                     </Text>
                     <View style={[styles.buttonGroup, { gap: 12 }]}>
                         {isTodaySession && nextToday ? (
                             <>
                                 <Button
-                                    title={`Next: ${nextToday.deckName} (${nextToday.cardIndices.length})`}
+                                    title={t('swipeNext').replace('{name}', nextToday.deckName).replace('{n}', String(nextToday.cardIndices.length))}
                                     onPress={handleNextTodayDeck}
                                     style={styles.actionButton}
                                 />
-                                <Button title="Stop for Today" variant="secondary" onPress={() => router.back()} style={styles.actionButton} />
+                                <Button title={t('swipeStopForToday')} variant="secondary" onPress={() => router.back()} style={styles.actionButton} />
                             </>
                         ) : (
                             <>
-                                <Button title="Study Again" onPress={handleRestartSession} style={styles.actionButton} />
-                                <Button title="Done" variant="secondary" onPress={() => router.back()} style={styles.actionButton} />
+                                <Button title={t('swipeStudyAgain')} onPress={handleRestartSession} style={styles.actionButton} />
+                                <Button title={t('swipeDone')} variant="secondary" onPress={() => router.back()} style={styles.actionButton} />
                             </>
                         )}
                     </View>
@@ -558,10 +560,10 @@ export default function SwipeScreen() {
             <Stack.Screen
                 options={{
                     title: isTodaySession
-                        ? `Today · ${name || 'Flashcards'}`
+                        ? t('swipeTodayTitle').replace('{name}', name || t('swipeFlashcards'))
                         : water === '1'
-                            ? `Watering · ${name || 'Flashcards'}`
-                            : drillSet ? 'Drill: Tricky Cards' : (name || 'Flashcards'),
+                            ? t('swipeWateringTitle').replace('{name}', name || t('swipeFlashcards'))
+                            : drillSet ? t('swipeDrillTricky') : (name || t('swipeFlashcards')),
                     headerRight: () => (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 }}>
                             <TouchableOpacity
@@ -618,17 +620,17 @@ export default function SwipeScreen() {
                 {filteredCards.length === 0 ? (
                     <View style={styles.emptySession}>
                         <CheckCircle2 size={64} color="#22c55e" strokeWidth={1.5} />
-                        <Text style={[styles.emptyTitle, { color: textColor }]}>{"You're all caught up!"}</Text>
-                        <Text style={[styles.emptySub, { color: mutedForeground }]}>No cards due for review. Come back later or study all cards.</Text>
-                        <Button title="Study All Cards" onPress={() => setStudyMode('all')} style={{ marginTop: 20 }} />
+                        <Text style={[styles.emptyTitle, { color: textColor }]}>{t('swipeAllCaughtUp')}</Text>
+                        <Text style={[styles.emptySub, { color: mutedForeground }]}>{t('swipeNoCardsDue')}</Text>
+                        <Button title={t('swipeStudyAllCards')} onPress={() => setStudyMode('all')} style={{ marginTop: 20 }} />
                     </View>
                 ) : currentCard && (
                     <FlashcardSwipe
                         key={`${currentIndex}-${studyMode}`}
                         question={displayQuestion}
                         answer={displayAnswer}
-                        frontLabel={currentCard.reversed ? 'Answer' : 'Question'}
-                        backLabel={currentCard.reversed ? 'Question' : 'Answer'}
+                        frontLabel={currentCard.reversed ? t('swipeAnswer') : t('swipeQuestion')}
+                        backLabel={currentCard.reversed ? t('swipeQuestion') : t('swipeAnswer')}
                         onSwipeLeft={() => handleSwipe(0)}
                         onSwipeRight={() => handleSwipe(5)}
                         onSwipeTop={() => handleSwipe(3)}
@@ -645,14 +647,14 @@ export default function SwipeScreen() {
                         <View style={[styles.hintIcon, { borderColor: '#ef4444' }]}>
                             <XCircle size={22} color="#ef4444" strokeWidth={2.5} />
                         </View>
-                        <Text style={[styles.footerText, { color: mutedForeground }]}>Again</Text>
+                        <Text style={[styles.footerText, { color: mutedForeground }]}>{t('swipeAgain')}</Text>
                         <Text style={styles.intervalHint}>1d</Text>
                     </View>
                     <View style={styles.hintItem}>
                         <View style={[styles.hintIcon, { borderColor: '#eab308' }]}>
                             <HelpCircle size={22} color="#eab308" strokeWidth={2.5} />
                         </View>
-                        <Text style={[styles.footerText, { color: mutedForeground }]}>Hard</Text>
+                        <Text style={[styles.footerText, { color: mutedForeground }]}>{t('swipeHard')}</Text>
                         <Text style={styles.intervalHint}>
                             {currentCard && srsData[currentCard.originalIndex] ? '2d' : '1d'}
                         </Text>
@@ -661,7 +663,7 @@ export default function SwipeScreen() {
                         <View style={[styles.hintIcon, { borderColor: '#22c55e' }]}>
                             <CheckCircle2 size={22} color="#22c55e" strokeWidth={2.5} />
                         </View>
-                        <Text style={[styles.footerText, { color: mutedForeground }]}>Good</Text>
+                        <Text style={[styles.footerText, { color: mutedForeground }]}>{t('swipeGood')}</Text>
                         <Text style={styles.intervalHint}>
                             {currentCard && srsData[currentCard.originalIndex] ? `${srsData[currentCard.originalIndex].interval * 2}d` : '4d'}
                         </Text>

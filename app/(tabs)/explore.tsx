@@ -164,13 +164,13 @@ export default function LibraryScreen() {
       loadData();
       showToast({
         message: imported === result.assets.length
-          ? `${imported} PDFs imported`
-          : `${imported} of ${result.assets.length} PDFs imported`,
+          ? t('explorePdfsImported').replace('{n}', String(imported))
+          : t('explorePdfsImportedPartial').replace('{n}', String(imported)).replace('{total}', String(result.assets.length)),
         type: imported > 0 ? 'success' : 'error',
       });
     } catch (err) {
       console.error('Error picking PDF:', err);
-      showToast({ message: 'Failed to pick PDF', type: 'error' });
+      showToast({ message: t('explorePickPdfFailed'), type: 'error' });
     }
   };
 
@@ -187,7 +187,7 @@ export default function LibraryScreen() {
       loadData();
     } catch (e) {
       console.error('Error saving document:', e);
-      showToast({ message: 'Failed to save document', type: 'error' });
+      showToast({ message: t('exploreSaveDocFailed'), type: 'error' });
     }
   };
 
@@ -200,34 +200,34 @@ export default function LibraryScreen() {
       loadData();
     } catch (e) {
       console.error('Error creating folder:', e);
-      showToast({ message: 'Failed to create folder', type: 'error' });
+      showToast({ message: t('exploreCreateFolderFailed'), type: 'error' });
     }
   };
 
   const handleDelete = async (id: string, name: string) => {
     const ok = await confirm({
-      title: 'Delete Document',
-      message: `This will permanently remove "${name}" from your library.`,
-      confirmText: 'Delete',
+      title: t('exploreDeleteDocument'),
+      message: t('exploreDeleteDocumentMessage').replace('{name}', name),
+      confirmText: t('delete'),
       destructive: true,
     });
     if (!ok) return;
     await deleteDeck(id);
     loadData();
-    showToast({ message: `"${name}" deleted`, type: 'info' });
+    showToast({ message: t('exploreItemDeleted').replace('{name}', name), type: 'info' });
   };
 
   const handleDeleteFolder = async (id: string, name: string) => {
     const ok = await confirm({
-      title: 'Delete Folder',
-      message: `Delete "${name}"? Documents inside will be moved to root.`,
-      confirmText: 'Delete',
+      title: t('deleteFolder'),
+      message: t('exploreDeleteFolderMessage').replace('{name}', name),
+      confirmText: t('delete'),
       destructive: true,
     });
     if (!ok) return;
     await deleteFolder(id);
     loadData();
-    showToast({ message: `"${name}" deleted`, type: 'info' });
+    showToast({ message: t('exploreItemDeleted').replace('{name}', name), type: 'info' });
   };
 
   const openDocMenu = (item: Deck) => {
@@ -242,10 +242,10 @@ export default function LibraryScreen() {
       await updateDeck(editDoc.id, editDocName.trim(), undefined, editDocFolderId);
       setEditDoc(null);
       loadData();
-      showToast({ message: 'Document updated', type: 'success' });
+      showToast({ message: t('exploreDocUpdated'), type: 'success' });
     } catch (e) {
       console.error('Error updating document:', e);
-      showToast({ message: 'Failed to update document', type: 'error' });
+      showToast({ message: t('exploreDocUpdateFailed'), type: 'error' });
     }
   };
 
@@ -278,19 +278,19 @@ export default function LibraryScreen() {
       }
       exitSelectMode();
       loadData();
-      showToast({ message: `Moved ${count} document${count === 1 ? '' : 's'}`, type: 'success' });
+      showToast({ message: t(count === 1 ? 'exploreMovedOne' : 'exploreMovedMany').replace('{n}', String(count)), type: 'success' });
     } catch (e) {
       console.error('Error moving documents:', e);
-      showToast({ message: 'Failed to move documents', type: 'error' });
+      showToast({ message: t('exploreMoveFailed'), type: 'error' });
     }
   };
 
   const handleDeleteSelected = async () => {
     const count = selectedIds.size;
     const ok = await confirm({
-      title: `Delete ${count} document${count === 1 ? '' : 's'}?`,
-      message: 'This permanently removes the selected documents from your library.',
-      confirmText: 'Delete',
+      title: t(count === 1 ? 'exploreDeleteCountTitleOne' : 'exploreDeleteCountTitleMany').replace('{n}', String(count)),
+      message: t('exploreDeleteSelectedMessage'),
+      confirmText: t('delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -299,7 +299,7 @@ export default function LibraryScreen() {
     }
     exitSelectMode();
     loadData();
-    showToast({ message: `Deleted ${count} document${count === 1 ? '' : 's'}`, type: 'info' });
+    showToast({ message: t(count === 1 ? 'exploreDeletedOne' : 'exploreDeletedMany').replace('{n}', String(count)), type: 'info' });
   };
 
   const renderDocItem = (item: Deck) => {
@@ -332,7 +332,7 @@ export default function LibraryScreen() {
           <View style={styles.docInfo}>
             <Text style={[styles.docName, { color: textColor }]} numberOfLines={1}>{item.name}</Text>
             <Text style={[styles.docSub, { color: mutedForeground }]}>
-              {pct !== null ? `Page ${progress.page} of ${progress.total} · ${pct}%` : t('pdfDocument')}
+              {pct !== null ? t('explorePageOf').replace('{page}', String(progress.page)).replace('{total}', String(progress.total)).replace('{pct}', String(pct)) : t('pdfDocument')}
             </Text>
             {pct !== null && (
               <View style={[styles.docProgressTrack, { backgroundColor: mutedForeground + '25' }]}>
@@ -501,8 +501,8 @@ export default function LibraryScreen() {
                 <Text style={[styles.docName, { color: textColor }]} numberOfLines={1}>{continueDoc.name}</Text>
                 <Text style={[styles.docSub, { color: mutedForeground }]}>
                   {continueProg.total && continueProg.total > 0
-                    ? `Page ${continueProg.page} of ${continueProg.total} · ${Math.min(100, Math.round((continueProg.page / continueProg.total) * 100))}%`
-                    : `Page ${continueProg.page}`}
+                    ? t('explorePageOf').replace('{page}', String(continueProg.page)).replace('{total}', String(continueProg.total)).replace('{pct}', String(Math.min(100, Math.round((continueProg.page / continueProg.total) * 100))))
+                    : t('explorePage').replace('{page}', String(continueProg.page))}
                 </Text>
               </View>
               <ChevronRight size={18} color={accentColor} />
@@ -577,7 +577,7 @@ export default function LibraryScreen() {
                 placeholder={t('folderPlaceholder')}
               />
               <Button
-                title="Create Folder"
+                title={t('createFolder')}
                 onPress={handleCreateFolder}
                 style={{ marginTop: 24 }}
               />
@@ -594,7 +594,7 @@ export default function LibraryScreen() {
       >
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: textColor }]}>
-                  {pickedFile ? 'Document Info' : 'Add to Library'}
+                  {pickedFile ? t('exploreDocumentInfo') : t('exploreAddToLibrary')}
                 </Text>
                 <TouchableOpacity onPress={() => {
                   setImportModalVisible(false);
@@ -613,20 +613,20 @@ export default function LibraryScreen() {
                   <View style={[styles.pickIcon, { backgroundColor: secondaryBg }]}>
                     <FileUp size={32} color={accentColor} strokeWidth={2.5} />
                   </View>
-                  <Text style={[styles.pickText, { color: textColor }]}>Choose PDF File</Text>
-                  <Text style={[styles.pickSub, { color: mutedForeground }]}>Stored locally in your app</Text>
+                  <Text style={[styles.pickText, { color: textColor }]}>{t('exploreChoosePdfFile')}</Text>
+                  <Text style={[styles.pickSub, { color: mutedForeground }]}>{t('exploreStoredLocally')}</Text>
                 </TouchableOpacity>
               ) : (
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.formScroll}>
                   <View style={styles.formSection}>
                     <Input
-                      label="Give it a Name"
+                      label={t('exploreGiveItAName')}
                       value={docName}
                       onChangeText={setDocName}
                       placeholder="e.g. Science Book"
                     />
 
-                    <Text style={[styles.sectionLabel, { color: textColor }]}>Select an Icon</Text>
+                    <Text style={[styles.sectionLabel, { color: textColor }]}>{t('exploreSelectAnIcon')}</Text>
                     <IconPicker selectedIcon={selectedIcon} onSelect={setSelectedIcon} />
 
                     <View style={[styles.pickedFileBadge, { backgroundColor: secondaryBg }]}>
@@ -635,12 +635,12 @@ export default function LibraryScreen() {
                         {pickedFile.name}
                       </Text>
                       <TouchableOpacity onPress={() => setPickedFile(null)}>
-                        <Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 13, marginLeft: 8 }}>Change</Text>
+                        <Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 13, marginLeft: 8 }}>{t('exploreChange')}</Text>
                       </TouchableOpacity>
                     </View>
 
                     <Button
-                      title="Add to Library"
+                      title={t('exploreAddToLibrary')}
                       onPress={handleSaveDoc}
                       style={styles.saveButton}
                     />
@@ -656,7 +656,7 @@ export default function LibraryScreen() {
         sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
       >
               <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: textColor }]}>Edit Document</Text>
+                <Text style={[styles.modalTitle, { color: textColor }]}>{t('exploreEditDocument')}</Text>
                 <TouchableOpacity onPress={() => setEditDoc(null)} accessibilityLabel="Close" accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
@@ -665,13 +665,13 @@ export default function LibraryScreen() {
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.formScroll}>
                 <View style={styles.formSection}>
                   <Input
-                    label="Document Name"
+                    label={t('exploreDocumentName')}
                     value={editDocName}
                     onChangeText={setEditDocName}
                     placeholder="e.g. Science Book"
                   />
 
-                  <Text style={[styles.sectionLabel, { color: textColor, marginTop: 16 }]}>Move to Folder</Text>
+                  <Text style={[styles.sectionLabel, { color: textColor, marginTop: 16 }]}>{t('moveToFolder')}</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.folderPickerContainer}>
                     <TouchableOpacity
                       style={[styles.folderChip, { backgroundColor: editDocFolderId === null ? accentColor : secondaryBg }]}
@@ -696,7 +696,7 @@ export default function LibraryScreen() {
                   </ScrollView>
 
                   <Button
-                    title="Save Changes"
+                    title={t('saveChanges')}
                     onPress={handleSaveDocEdit}
                     style={styles.saveButton}
                   />
@@ -707,7 +707,7 @@ export default function LibraryScreen() {
                     activeOpacity={0.8}
                   >
                     <CheckCircle2 size={18} color={accentColor} strokeWidth={2.5} />
-                    <Text style={[styles.sheetActionText, { color: textColor }]}>Select Multiple</Text>
+                    <Text style={[styles.sheetActionText, { color: textColor }]}>{t('exploreSelectMultiple')}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -720,7 +720,7 @@ export default function LibraryScreen() {
                     activeOpacity={0.8}
                   >
                     <Trash2 size={18} color="#ef4444" strokeWidth={2.5} />
-                    <Text style={[styles.sheetActionText, { color: '#ef4444' }]}>Delete Document</Text>
+                    <Text style={[styles.sheetActionText, { color: '#ef4444' }]}>{t('exploreDeleteDocument')}</Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -734,7 +734,7 @@ export default function LibraryScreen() {
       >
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: textColor }]}>
-                  Move {selectedIds.size} document{selectedIds.size === 1 ? '' : 's'}
+                  {t(selectedIds.size === 1 ? 'exploreMoveCountOne' : 'exploreMoveCountMany').replace('{n}', String(selectedIds.size))}
                 </Text>
                 <TouchableOpacity onPress={() => setMoveSheetVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
                   <X size={20} color={textColor} />
@@ -765,7 +765,7 @@ export default function LibraryScreen() {
       {selectMode && (
         <View style={[styles.selectBar, { backgroundColor: accentColor, bottom: insets.bottom + 16 }]}>
           <Text style={[styles.selectBarCount, { color: primaryForeground }]}>
-            {selectedIds.size} selected
+            {t('audioSelectedCount').replace('{n}', String(selectedIds.size))}
           </Text>
           <View style={styles.selectBarActions}>
             <TouchableOpacity
@@ -776,7 +776,7 @@ export default function LibraryScreen() {
               accessibilityRole="button"
             >
               <FolderInput size={20} color={primaryForeground} strokeWidth={2.5} />
-              <Text style={[styles.selectBarBtnText, { color: primaryForeground }]}>Move</Text>
+              <Text style={[styles.selectBarBtnText, { color: primaryForeground }]}>{t('audioMove')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.selectBarBtn}
@@ -786,7 +786,7 @@ export default function LibraryScreen() {
               accessibilityRole="button"
             >
               <Trash2 size={20} color={primaryForeground} strokeWidth={2.5} />
-              <Text style={[styles.selectBarBtnText, { color: primaryForeground }]}>Delete</Text>
+              <Text style={[styles.selectBarBtnText, { color: primaryForeground }]}>{t('delete')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.selectBarBtn}

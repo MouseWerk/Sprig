@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -17,6 +18,7 @@ const ConfirmContext = createContext<ConfirmFn | undefined>(undefined);
 export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [options, setOptions] = useState<ConfirmOptions | null>(null);
     const resolverRef = useRef<((value: boolean) => void) | null>(null);
+    const { t } = useLanguage();
 
     const cardColor = useThemeColor({}, 'card');
     const textColor = useThemeColor({}, 'text');
@@ -64,7 +66,7 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
                                 activeOpacity={0.7}
                             >
                                 <Text style={[styles.buttonText, { color: textColor }]}>
-                                    {options?.cancelText ?? 'Cancel'}
+                                    {options?.cancelText ?? t('cancel')}
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
@@ -73,7 +75,7 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
                                 activeOpacity={0.7}
                             >
                                 <Text style={[styles.buttonText, { color: options?.destructive ? '#ffffff' : primaryForeground }]}>
-                                    {options?.confirmText ?? 'Confirm'}
+                                    {options?.confirmText ?? t('confirm')}
                                 </Text>
                             </TouchableOpacity>
                         </View>

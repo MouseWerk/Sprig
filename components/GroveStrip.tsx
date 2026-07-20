@@ -1,4 +1,5 @@
 import { GrowingPlant } from '@/components/GrowingPlant';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { GrovePlant } from '@/utils/Grove';
 import React from 'react';
@@ -62,6 +63,7 @@ interface GroveStripProps {
 }
 
 export function GroveStrip({ plants, onPressPlant, large = false, decoration = null }: GroveStripProps) {
+    const { t } = useLanguage();
     const textColor = useThemeColor({}, 'text');
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const accentColor = useThemeColor({}, 'primary');
@@ -109,7 +111,7 @@ export function GroveStrip({ plants, onPressPlant, large = false, decoration = n
                                     {plant.deckName}
                                 </Text>
                                 {plant.dueCards > 0 ? (
-                                    <Text style={[styles.due, { color: mutedForeground }]}>{plant.dueCards} due</Text>
+                                    <Text style={[styles.due, { color: mutedForeground }]}>{t('homeDueCount').replace('{n}', String(plant.dueCards))}</Text>
                                 ) : (
                                     <Text style={[styles.due, { color: 'transparent' }]}> </Text>
                                 )}

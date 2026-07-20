@@ -1,3 +1,4 @@
+import { TranslationKey } from '@/constants/translations';
 import React, { useEffect, useRef } from 'react';
 import { Animated } from 'react-native';
 import Svg, { Circle, Ellipse, G, Path } from 'react-native-svg';
@@ -143,7 +144,12 @@ const SPECIES: SpeciesSpec[] = [
 export const BASE_SPECIES_COUNT = 5;
 export const PLANT_SPECIES_COUNT = SPECIES.length;
 
-export const SPECIES_NAMES: string[] = ['Wildflower', 'Tulip', 'Bellflower', 'Daisy', 'Berry Bush', 'Sunflower', 'Rose'];
+// Display text lives in constants/translations.ts; index into this to get
+// the key, e.g. t(SPECIES_NAME_KEYS[species]).
+export const SPECIES_NAME_KEYS: TranslationKey[] = [
+    'speciesWildflower', 'speciesTulip', 'speciesBellflower', 'speciesDaisy',
+    'speciesBerryBush', 'speciesSunflower', 'speciesRose',
+];
 
 // Planters — a purely cosmetic vessel drawn under the soil, purchased with
 // dew and assigned per deck (see docs/grove-spec.md, phase 4). 'classic' is
@@ -152,12 +158,12 @@ export const SPECIES_NAMES: string[] = ['Wildflower', 'Tulip', 'Bellflower', 'Da
 // its monochrome slate look — no new hues, just shape.
 export const POT_STYLES = ['classic', 'terracotta', 'bowl', 'hex', 'scalloped'] as const;
 export type PotStyle = typeof POT_STYLES[number];
-export const POT_NAMES: Record<PotStyle, string> = {
-    classic: 'Bare Soil',
-    terracotta: 'Terracotta',
-    bowl: 'Round Bowl',
-    hex: 'Hex Planter',
-    scalloped: 'Scalloped',
+export const POT_NAME_KEYS: Record<PotStyle, TranslationKey> = {
+    classic: 'potClassic',
+    terracotta: 'potTerracotta',
+    bowl: 'potBowl',
+    hex: 'potHex',
+    scalloped: 'potScalloped',
 };
 
 function Pot({ style, color }: { style: PotStyle; color: string }) {

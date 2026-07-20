@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from '@/utils/AppHaptics';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
@@ -31,6 +32,7 @@ export default function TypeScreen() {
     const { id, uri, name } = useLocalSearchParams<{ id: string; uri: string; name?: string }>();
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const { t } = useLanguage();
 
     const [cards, setCards] = useState<TypeCard[] | null>(null);
     const [loading, setLoading] = useState(true);
@@ -138,7 +140,7 @@ export default function TypeScreen() {
     if (loading) {
         return (
             <View style={[styles.container, styles.center, { backgroundColor }]}>
-                <Stack.Screen options={{ title: 'Type the Answer', ...screenOpts }} />
+                <Stack.Screen options={{ title: t('typeTitle'), ...screenOpts }} />
                 <ActivityIndicator size="large" color={primaryColor} />
             </View>
         );
@@ -147,11 +149,11 @@ export default function TypeScreen() {
     if (!cards || cards.length === 0) {
         return (
             <View style={[styles.container, styles.center, { backgroundColor, paddingHorizontal: 32 }]}>
-                <Stack.Screen options={{ title: 'Type the Answer', ...screenOpts }} />
+                <Stack.Screen options={{ title: t('typeTitle'), ...screenOpts }} />
                 <FileWarning size={48} color="#ef4444" strokeWidth={2} />
-                <Text style={[styles.emptyTitle, { color: textColor }]}>No cards to practice</Text>
-                <Text style={[styles.emptyText, { color: mutedForeground }]}>Add some cards to this deck first.</Text>
-                <Button title="Go Back" onPress={() => router.back()} style={{ marginTop: 16, width: 200 }} />
+                <Text style={[styles.emptyTitle, { color: textColor }]}>{t('typeNoCards')}</Text>
+                <Text style={[styles.emptyText, { color: mutedForeground }]}>{t('typeAddCardsFirst')}</Text>
+                <Button title={t('swipeGoBack')} onPress={() => router.back()} style={{ marginTop: 16, width: 200 }} />
             </View>
         );
     }
@@ -160,44 +162,44 @@ export default function TypeScreen() {
         const pct = Math.round((score / total) * 100);
         return (
             <View style={[styles.container, styles.center, { backgroundColor, paddingBottom: insets.bottom }]}>
-                <Stack.Screen options={{ title: name || 'Type the Answer', ...screenOpts }} />
+                <Stack.Screen options={{ title: name || t('typeTitle'), ...screenOpts }} />
                 <View style={[styles.trophyWrap, { backgroundColor: '#facc1520' }]}>
                     <Trophy size={56} color="#eab308" strokeWidth={1.5} />
                 </View>
                 <Text style={[styles.resultScore, { color: textColor }]}>{score} / {total}</Text>
-                <Text style={[styles.resultPct, { color: primaryColor }]}>{pct}% typed correctly</Text>
+                <Text style={[styles.resultPct, { color: primaryColor }]}>{t('typePctCorrect').replace('{n}', String(pct))}</Text>
                 <Text style={[styles.emptyText, { color: mutedForeground }]}>
-                    {pct >= 80 ? 'Excellent recall!' : pct >= 50 ? 'Solid — typing makes it stick.' : 'Tough round. Try the same deck again.'}
+                    {pct >= 80 ? t('typeExcellentRecall') : pct >= 50 ? t('typeSolid') : t('typeToughRound')}
                 </Text>
                 <View style={{ width: '100%', maxWidth: 300, gap: 12, marginTop: 24 }}>
-                    <Button title="Try Again" onPress={restart} style={{ height: 52 }} />
-                    <Button title="Done" variant="secondary" onPress={() => router.back()} style={{ height: 52 }} />
+                    <Button title={t('focusTryAgain')} onPress={restart} style={{ height: 52 }} />
+                    <Button title={t('swipeDone')} variant="secondary" onPress={() => router.back()} style={{ height: 52 }} />
                 </View>
             </View>
         );
     }
 
     const banner = verdict === null ? null : verdict === 'exact'
-        ? { color: '#22c55e', label: 'Correct!' }
+        ? { color: '#22c55e', label: t('typeCorrect') }
         : verdict === 'close'
-            ? { color: '#22c55e', label: 'Close enough — counted as correct' }
+            ? { color: '#22c55e', label: t('typeCloseEnough') }
             : overridden
-                ? { color: '#22c55e', label: 'Counted as correct' }
-                : { color: '#ef4444', label: 'Not quite' };
+                ? { color: '#22c55e', label: t('typeCountedCorrect') }
+                : { color: '#ef4444', label: t('typeNotQuite') };
 
     return (
         <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={[styles.container, { backgroundColor }]}
         >
-            <Stack.Screen options={{ title: name || 'Type the Answer', ...screenOpts }} />
+            <Stack.Screen options={{ title: name || t('typeTitle'), ...screenOpts }} />
 
             <View style={styles.progressWrap}>
                 <View style={[styles.progressTrack, { backgroundColor: secondaryBg }]}>
                     <View style={[styles.progressFill, { width: `${(index / total) * 100}%`, backgroundColor: primaryColor }]} />
                 </View>
                 <Text style={[styles.progressText, { color: mutedForeground }]}>
-                    {index + 1} / {total} · Score {score}
+                    {t('quizProgress').replace('{n}', String(index + 1)).replace('{total}', String(total)).replace('{score}', String(score))}
                 </Text>
             </View>
 
@@ -205,7 +207,7 @@ export default function TypeScreen() {
                 <View style={[styles.questionCard, { backgroundColor: cardColor, borderColor: secondaryBg }]}>
                     <View style={styles.qLabelRow}>
                         <Keyboard size={14} color={mutedForeground} strokeWidth={2.5} />
-                        <Text style={[styles.qLabel, { color: mutedForeground }]}>TYPE THE ANSWER</Text>
+                        <Text style={[styles.qLabel, { color: mutedForeground }]}>{t('typeTypeTheAnswer')}</Text>
                     </View>
                     <MarkdownRenderer content={current!.question} fontSize={20} />
                 </View>
@@ -219,7 +221,7 @@ export default function TypeScreen() {
                     }]}
                     value={typed}
                     onChangeText={setTyped}
-                    placeholder="Your answer…"
+                    placeholder={t('typeYourAnswer')}
                     placeholderTextColor={mutedForeground}
                     editable={!verdict}
                     autoFocus
@@ -243,14 +245,14 @@ export default function TypeScreen() {
 
                 {verdict && (
                     <View style={[styles.answerCard, { backgroundColor: secondaryBg }]}>
-                        <Text style={[styles.answerLabel, { color: mutedForeground }]}>CORRECT ANSWER</Text>
+                        <Text style={[styles.answerLabel, { color: mutedForeground }]}>{t('typeCorrectAnswer')}</Text>
                         <MarkdownRenderer content={current!.answer} fontSize={16} />
                     </View>
                 )}
 
                 {verdict === 'wrong' && !overridden && (
                     <TouchableOpacity onPress={handleOverride} style={styles.overrideLink} accessibilityRole="button" accessibilityLabel="Count my answer as correct">
-                        <Text style={[styles.overrideText, { color: mutedForeground }]}>My answer was right — count it</Text>
+                        <Text style={[styles.overrideText, { color: mutedForeground }]}>{t('typeMyAnswerWasRight')}</Text>
                     </TouchableOpacity>
                 )}
             </ScrollView>
@@ -258,14 +260,14 @@ export default function TypeScreen() {
             <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 {verdict === null ? (
                     <Button
-                        title="Check"
+                        title={t('typeCheck')}
                         onPress={handleCheck}
                         style={{ height: 56 }}
                         disabled={typed.trim().length === 0}
                     />
                 ) : (
                     <Button
-                        title={index + 1 >= total ? 'See Results' : 'Next'}
+                        title={index + 1 >= total ? t('quizSeeResults') : t('typeNext')}
                         onPress={handleNext}
                         style={{ height: 56 }}
                     />

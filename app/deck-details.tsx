@@ -1,4 +1,5 @@
 import { useToast } from '@/components/ui/Toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
 import { ConfusionPair, Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getConfusionPairs, getDecks, importCsvToDeck, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckExamDate, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
@@ -28,6 +29,7 @@ export default function DeckDetailsScreen() {
     const insets = useSafeAreaInsets();
     const { showToast } = useToast();
     const confirm = useConfirm();
+    const { t } = useLanguage();
 
     const [deck, setDeck] = useState<Deck | null>(null);
     const [cards, setCards] = useState<FlashcardData[]>([]);
@@ -67,7 +69,7 @@ export default function DeckDetailsScreen() {
                     const currentDeck = decks.find(d => d.id === id);
 
                     if (!currentDeck) {
-                        setError('Deck not found');
+                        setError(t('deckDetailsNotFound'));
                         setLoading(false);
                         return;
                     }
@@ -86,7 +88,7 @@ export default function DeckDetailsScreen() {
                     setConfusions(await getConfusionPairs(id));
                 } catch (e) {
                     console.error('Error loading deck data:', e);
-                    setError('Failed to load cards');
+                    setError(t('deckDetailsLoadFailed'));
                 } finally {
                     setLoading(false);
                 }
@@ -110,10 +112,10 @@ export default function DeckDetailsScreen() {
             const decks = await getDecks();
             const currentDeck = decks.find(d => d.id === id);
             if (currentDeck) setDeck(currentDeck);
-            showToast({ message: 'Card added to deck!', type: 'success' });
+            showToast({ message: t('deckDetailsCardAdded'), type: 'success' });
         } catch (e) {
             console.error('Error adding card:', e);
-            showToast({ message: 'Failed to add card', type: 'error' });
+            showToast({ message: t('deckDetailsAddCardFailed'), type: 'error' });
         }
     };
 
@@ -139,14 +141,14 @@ export default function DeckDetailsScreen() {
 
                 const importedCount = (updatedCards?.length || 0) - beforeCount;
                 if (importedCount > 0) {
-                    showToast({ message: `Imported ${importedCount} card${importedCount === 1 ? '' : 's'}!`, type: 'success' });
+                    showToast({ message: t(importedCount === 1 ? 'deckDetailsImportedOne' : 'deckDetailsImportedMany').replace('{n}', String(importedCount)), type: 'success' });
                 } else {
-                    showToast({ message: 'No question/answer pairs found in that file', type: 'warning' });
+                    showToast({ message: t('deckDetailsNoImportPairs'), type: 'warning' });
                 }
             }
         } catch (e) {
             console.error(e);
-            showToast({ message: 'Failed to import file', type: 'error' });
+            showToast({ message: t('deckDetailsImportFailed'), type: 'error' });
         }
     };
 
@@ -159,18 +161,18 @@ export default function DeckDetailsScreen() {
             // Reload cards from cache/storage
             const updatedCards = await getCachedData<FlashcardData[]>(id);
             if (updatedCards) setCards(updatedCards);
-            showToast({ message: 'Card updated', type: 'success' });
+            showToast({ message: t('deckDetailsCardUpdated'), type: 'success' });
         } catch (e) {
             console.error('Error updating card:', e);
-            showToast({ message: 'Failed to update card', type: 'error' });
+            showToast({ message: t('deckDetailsUpdateCardFailed'), type: 'error' });
         }
     };
 
     const handleDeleteCard = async (index: number) => {
         const ok = await confirm({
-            title: 'Delete Flashcard',
-            message: 'Are you sure you want to remove this card permanently?',
-            confirmText: 'Delete',
+            title: t('deckDetailsDeleteFlashcard'),
+            message: t('deckDetailsDeleteFlashcardMessage'),
+            confirmText: t('delete'),
             destructive: true,
         });
         if (!ok || !id) return;
@@ -181,7 +183,7 @@ export default function DeckDetailsScreen() {
         const decks = await getDecks();
         const currentDeck = decks.find(d => d.id === id);
         if (currentDeck) setDeck(currentDeck);
-        showToast({ message: 'Flashcard deleted', type: 'info' });
+        showToast({ message: t('deckDetailsCardDeleted'), type: 'info' });
     };
 
     const cardQuery = cardSearch.trim().toLowerCase();
@@ -237,7 +239,7 @@ export default function DeckDetailsScreen() {
             if (deck.type === 'pdf') {
                 await Sharing.shareAsync(deck.uri, {
                     mimeType: 'application/pdf',
-                    dialogTitle: `Export "${deck.name}"`,
+                    dialogTitle: t('deckDetailsExportDialog').replace('{name}', deck.name),
                 });
                 return;
             }
@@ -246,19 +248,19 @@ export default function DeckDetailsScreen() {
             const uri = await exportSprigDeck(deck);
             await Sharing.shareAsync(uri, {
                 mimeType: 'application/octet-stream',
-                dialogTitle: `Share "${deck.name}"`,
+                dialogTitle: t('deckDetailsShareDialog').replace('{name}', deck.name),
             });
         } catch (e) {
             console.error('Error exporting deck:', e);
-            showToast({ message: 'Failed to export deck', type: 'error' });
+            showToast({ message: t('deckDetailsExportFailed'), type: 'error' });
         }
     };
 
     const handleResetProgress = async () => {
         const ok = await confirm({
-            title: 'Reset Progress',
-            message: 'This clears all mastery and spaced-repetition data for this deck. Your cards are kept. Continue?',
-            confirmText: 'Reset',
+            title: t('deckDetailsResetProgress'),
+            message: t('deckDetailsResetProgressMessage'),
+            confirmText: t('deckDetailsReset'),
             destructive: true,
         });
         if (!ok || !id) return;
@@ -266,7 +268,7 @@ export default function DeckDetailsScreen() {
         const decks = await getDecks();
         const currentDeck = decks.find(d => d.id === id);
         if (currentDeck) setDeck(currentDeck);
-        showToast({ message: 'Progress reset', type: 'info' });
+        showToast({ message: t('deckDetailsProgressReset'), type: 'info' });
     };
 
     const openEditMenu = (index: number, card: FlashcardData) => {
@@ -315,7 +317,7 @@ export default function DeckDetailsScreen() {
                     if (isImageToken(w)) {
                         return (
                             <Text key={i} style={[styles.wordText, styles.imagePlaceholder, { fontSize: fontSize - 4, color: textColor }]}>
-                                [image]
+                                {t('deckDetailsImagePlaceholder')}
                             </Text>
                         );
                     }
@@ -369,10 +371,10 @@ export default function DeckDetailsScreen() {
         return (
             <View style={[styles.container, { backgroundColor }]}>
                 {/* Simplified placeholder for faster visual feedback */}
-                <Stack.Screen options={{ title: 'Loading...', headerShadowVisible: false, headerStyle: { backgroundColor } }} />
+                <Stack.Screen options={{ title: t('loading'), headerShadowVisible: false, headerStyle: { backgroundColor } }} />
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                     <ActivityIndicator size="large" color={accentColor} />
-                    <Text style={{ marginTop: 12, fontSize: 13, color: mutedForeground, fontWeight: '600' }}>Preparing cards...</Text>
+                    <Text style={{ marginTop: 12, fontSize: 13, color: mutedForeground, fontWeight: '600' }}>{t('deckDetailsPreparingCards')}</Text>
                 </View>
             </View>
         );
@@ -382,8 +384,8 @@ export default function DeckDetailsScreen() {
         return (
             <View style={[styles.container, { backgroundColor, padding: 24 }]}>
                 <FileWarning size={48} color="#ef4444" />
-                <Text style={[styles.errorText, { color: textColor }]}>{error || 'Something went wrong'}</Text>
-                <Button title="Go Back" onPress={() => router.back()} />
+                <Text style={[styles.errorText, { color: textColor }]}>{error || t('deckDetailsSomethingWrong')}</Text>
+                <Button title={t('swipeGoBack')} onPress={() => router.back()} />
             </View>
         );
     }
@@ -398,16 +400,16 @@ export default function DeckDetailsScreen() {
                          '#22c55e';
 
     const filterOptions: { key: typeof filterMode; label: string }[] = [
-        { key: 'all', label: 'All' },
-        { key: 'learned', label: 'Learned' },
-        { key: 'unsure', label: 'Unsure' },
-        { key: 'new', label: 'New' },
+        { key: 'all', label: t('deckDetailsFilterAll') },
+        { key: 'learned', label: t('deckDetailsFilterLearned') },
+        { key: 'unsure', label: t('deckDetailsFilterUnsure') },
+        { key: 'new', label: t('deckDetailsFilterNew') },
     ];
 
     const directionOptions: { key: StudyDirection; label: string }[] = [
-        { key: 'normal', label: 'Q → A' },
-        { key: 'reversed', label: 'A → Q' },
-        { key: 'mixed', label: 'Mixed' },
+        { key: 'normal', label: t('deckDetailsDirectionNormal') },
+        { key: 'reversed', label: t('deckDetailsDirectionReversed') },
+        { key: 'mixed', label: t('deckDetailsDirectionMixed') },
     ];
 
     return (
@@ -451,7 +453,7 @@ export default function DeckDetailsScreen() {
                             <View style={[styles.statusStrip, { backgroundColor: statusColor }]} />
                             <View style={styles.cardMainContent}>
                                 <View style={styles.cardHeaderSmall}>
-                                    <Text style={[styles.cardIndex, { color: mutedForeground }]}>CARD #{originalIndex + 1}</Text>
+                                    <Text style={[styles.cardIndex, { color: mutedForeground }]}>{t('deckDetailsCardHash').replace('{n}', String(originalIndex + 1))}</Text>
                                     {isLearned ? (
                                         <CheckCircle2 size={18} color="#22c55e" strokeWidth={3} />
                                     ) : isUnsure ? (
@@ -517,14 +519,14 @@ export default function DeckDetailsScreen() {
                                     ).length + (cards.length - Object.keys(deck?.srsData || {}).length);
                                     return (
                                         <Text style={[styles.deckSubtitleSmall, { color: mutedForeground }]}>
-                                            {cards.length} cards
+                                            {t('deckDetailsCardsCount').replace('{n}', String(cards.length))}
                                             {'  ·  '}
-                                            <Text style={{ color: cards.length > 0 && learned === cards.length ? '#22c55e' : mutedForeground }}>{learned} learned</Text>
+                                            <Text style={{ color: cards.length > 0 && learned === cards.length ? '#22c55e' : mutedForeground }}>{t('deckDetailsLearnedCount').replace('{n}', String(learned))}</Text>
                                             {'  ·  '}
                                             {dueCount > 0 ? (
-                                                <Text style={{ color: '#ef4444', fontWeight: '700' }}>{dueCount} due</Text>
+                                                <Text style={{ color: '#ef4444', fontWeight: '700' }}>{t('homeDueCount').replace('{n}', String(dueCount))}</Text>
                                             ) : (
-                                                <Text style={{ color: '#22c55e', fontWeight: '700' }}>all clear</Text>
+                                                <Text style={{ color: '#22c55e', fontWeight: '700' }}>{t('deckDetailsAllClear')}</Text>
                                             )}
                                         </Text>
                                     );
@@ -537,10 +539,10 @@ export default function DeckDetailsScreen() {
                             full-width buttons. */}
                         <View style={styles.studyBlock}>
                             <Button
-                                title="Review Due"
+                                title={t('deckDetailsReviewDue')}
                                 onPress={() => {
                                     if (!deck?.uri) {
-                                        showToast({ message: 'This deck has no cards to study', type: 'error' });
+                                        showToast({ message: t('deckDetailsNoCardsToStudy'), type: 'error' });
                                         return;
                                     }
                                     router.push({
@@ -556,7 +558,7 @@ export default function DeckDetailsScreen() {
                                     style={[styles.modeTile, { backgroundColor: secondaryBg }]}
                                     onPress={() => {
                                         if (!deck?.uri) {
-                                            showToast({ message: 'This deck has no cards to study', type: 'error' });
+                                            showToast({ message: t('deckDetailsNoCardsToStudy'), type: 'error' });
                                             return;
                                         }
                                         router.push({ pathname: '/swipe', params: { id, uri: deck.uri, name: deck?.name, mode: 'all' } });
@@ -566,17 +568,17 @@ export default function DeckDetailsScreen() {
                                     accessibilityRole="button"
                                 >
                                     <RotateCcw size={19} color={accentColor} strokeWidth={2.5} />
-                                    <Text style={[styles.modeTileText, { color: textColor }]}>Study All</Text>
+                                    <Text style={[styles.modeTileText, { color: textColor }]}>{t('deckDetailsStudyAll')}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.modeTile, { backgroundColor: secondaryBg }]}
                                     onPress={() => {
                                         if (!deck?.uri) {
-                                            showToast({ message: 'This deck has no cards to study', type: 'error' });
+                                            showToast({ message: t('deckDetailsNoCardsToStudy'), type: 'error' });
                                             return;
                                         }
                                         if (cards.length < 4) {
-                                            showToast({ message: 'Quiz mode needs at least 4 cards', type: 'warning' });
+                                            showToast({ message: t('deckDetailsQuizNeedsFour'), type: 'warning' });
                                             return;
                                         }
                                         router.push({ pathname: '/quiz', params: { id, uri: deck.uri, name: deck?.name } });
@@ -586,13 +588,13 @@ export default function DeckDetailsScreen() {
                                     accessibilityRole="button"
                                 >
                                     <ListChecks size={19} color={accentColor} strokeWidth={2.5} />
-                                    <Text style={[styles.modeTileText, { color: textColor }]}>Quiz</Text>
+                                    <Text style={[styles.modeTileText, { color: textColor }]}>{t('quizTitle')}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.modeTile, { backgroundColor: secondaryBg }]}
                                     onPress={() => {
                                         if (!deck?.uri || cards.length === 0) {
-                                            showToast({ message: 'This deck has no cards to study', type: 'error' });
+                                            showToast({ message: t('deckDetailsNoCardsToStudy'), type: 'error' });
                                             return;
                                         }
                                         router.push({ pathname: '/feed', params: { id, uri: deck.uri, name: deck?.name } });
@@ -602,13 +604,13 @@ export default function DeckDetailsScreen() {
                                     accessibilityRole="button"
                                 >
                                     <GalleryVerticalEnd size={19} color={accentColor} strokeWidth={2.5} />
-                                    <Text style={[styles.modeTileText, { color: textColor }]}>Feed</Text>
+                                    <Text style={[styles.modeTileText, { color: textColor }]}>{t('onboardFeed')}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.modeTile, { backgroundColor: secondaryBg }]}
                                     onPress={() => {
                                         if (!deck?.uri || cards.length === 0) {
-                                            showToast({ message: 'This deck has no cards to study', type: 'error' });
+                                            showToast({ message: t('deckDetailsNoCardsToStudy'), type: 'error' });
                                             return;
                                         }
                                         router.push({ pathname: '/type', params: { id, uri: deck.uri, name: deck?.name } });
@@ -618,7 +620,7 @@ export default function DeckDetailsScreen() {
                                     accessibilityRole="button"
                                 >
                                     <Keyboard size={19} color={accentColor} strokeWidth={2.5} />
-                                    <Text style={[styles.modeTileText, { color: textColor }]}>Type</Text>
+                                    <Text style={[styles.modeTileText, { color: textColor }]}>{t('onboardType')}</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -631,7 +633,7 @@ export default function DeckDetailsScreen() {
                                 <>
                                     <View style={[styles.optionsCard, { backgroundColor: cardColor }]}>
                                         <View style={styles.optionRow}>
-                                            <Text style={[styles.optionLabel, { color: mutedForeground }]}>Direction</Text>
+                                            <Text style={[styles.optionLabel, { color: mutedForeground }]}>{t('deckDetailsDirection')}</Text>
                                             <View style={styles.optionChips}>
                                                 {directionOptions.map(opt => {
                                                     const active = (deck.studyDirection || 'normal') === opt.key;
@@ -657,13 +659,13 @@ export default function DeckDetailsScreen() {
                                         </View>
                                         <View style={[styles.optionDivider, { backgroundColor: secondaryBg }]} />
                                         <View style={styles.optionRow}>
-                                            <Text style={[styles.optionLabel, { color: mutedForeground }]}>Exam</Text>
+                                            <Text style={[styles.optionLabel, { color: mutedForeground }]}>{t('groveExam')}</Text>
                                             <View style={styles.optionChips}>
                                                 <TouchableOpacity
                                                     style={[styles.filterChip, { backgroundColor: examSet ? secondaryBg : accentColor }]}
                                                     onPress={clearExamDate}
                                                 >
-                                                    <Text style={[styles.filterChipText, { color: examSet ? mutedForeground : primaryForeground }]}>Off</Text>
+                                                    <Text style={[styles.filterChipText, { color: examSet ? mutedForeground : primaryForeground }]}>{t('deckDetailsOff')}</Text>
                                                 </TouchableOpacity>
                                                 <TouchableOpacity
                                                     style={[styles.filterChip, { backgroundColor: examSet ? accentColor : secondaryBg }]}
@@ -675,7 +677,7 @@ export default function DeckDetailsScreen() {
                                                     <Text style={[styles.filterChipText, { color: examSet ? primaryForeground : mutedForeground }]}>
                                                         {examSet
                                                             ? new Date(deck.examDate! + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
-                                                            : 'Pick date'}
+                                                            : t('deckDetailsPickDate')}
                                                     </Text>
                                                 </TouchableOpacity>
                                             </View>
@@ -698,7 +700,7 @@ export default function DeckDetailsScreen() {
                             <View style={styles.confusionSection}>
                                 <View style={styles.confusionHeader}>
                                     <ArrowLeftRight size={16} color="#f59e0b" strokeWidth={2.5} />
-                                    <Text style={[styles.confusionTitle, { color: textColor }]}>Often Confused</Text>
+                                    <Text style={[styles.confusionTitle, { color: textColor }]}>{t('deckDetailsOftenConfused')}</Text>
                                     <View style={{ flex: 1 }} />
                                     <TouchableOpacity
                                         style={[styles.drillBtn, { backgroundColor: '#f59e0b' }]}
@@ -718,7 +720,7 @@ export default function DeckDetailsScreen() {
                                         accessibilityRole="button"
                                     >
                                         <Zap size={13} color="#fff" strokeWidth={2.5} fill="#fff" />
-                                        <Text style={styles.drillBtnText}>Drill These</Text>
+                                        <Text style={styles.drillBtnText}>{t('deckDetailsDrillThese')}</Text>
                                     </TouchableOpacity>
                                 </View>
                                 {confusions.map(pair => {
@@ -750,7 +752,7 @@ export default function DeckDetailsScreen() {
                             <Search size={16} color={mutedForeground} />
                             <TextInput
                                 style={[styles.cardSearchInput, { color: textColor }]}
-                                placeholder="Search cards..."
+                                placeholder={t('deckDetailsSearchCards')}
                                 placeholderTextColor={mutedForeground}
                                 value={cardSearch}
                                 onChangeText={setCardSearch}
@@ -784,13 +786,13 @@ export default function DeckDetailsScreen() {
                             ))}
                             <View style={{ flex: 1 }} />
                             <TouchableOpacity onPress={handleResetProgress} hitSlop={8}>
-                                <Text style={[styles.resetLink, { color: mutedForeground }]}>Reset Progress</Text>
+                                <Text style={[styles.resetLink, { color: mutedForeground }]}>{t('deckDetailsResetProgress')}</Text>
                             </TouchableOpacity>
                         </View>
 
                         {(cardQuery.length > 0 || filterMode !== 'all') && (
                             <Text style={[styles.filterResultText, { color: mutedForeground }]}>
-                                {visibleCards.length} of {cards.length} cards shown
+                                {t('deckDetailsCardsShown').replace('{n}', String(visibleCards.length)).replace('{total}', String(cards.length))}
                             </Text>
                         )}
                     </View>
@@ -812,7 +814,7 @@ export default function DeckDetailsScreen() {
                 sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
             >
                         <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: textColor }]}>Add Flashcard</Text>
+                            <Text style={[styles.modalTitle, { color: textColor }]}>{t('deckDetailsAddFlashcard')}</Text>
                             <TouchableOpacity onPress={() => setAddCardModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
                                 <X size={20} color={textColor} />
                             </TouchableOpacity>
@@ -821,26 +823,26 @@ export default function DeckDetailsScreen() {
                             <View style={{ gap: 20 }}>
                                 <View style={{ gap: 10 }}>
                                     <CardTextInput
-                                        label="Question"
+                                        label={t('swipeQuestion')}
                                         value={newQuestion}
                                         onChangeText={setNewQuestion}
-                                        placeholder="e.g. What is the speed of light?"
+                                        placeholder={t('deckDetailsQuestionPlaceholder')}
                                         multiline
                                     />
                                     <CardImagePicker text={newQuestion} onChangeText={setNewQuestion} />
                                 </View>
                                 <View style={{ gap: 10 }}>
                                     <CardTextInput
-                                        label="Answer"
+                                        label={t('swipeAnswer')}
                                         value={newAnswer}
                                         onChangeText={setNewAnswer}
-                                        placeholder="e.g. 299,792,458 m/s"
+                                        placeholder={t('deckDetailsAnswerPlaceholder')}
                                         multiline
                                     />
                                     <CardImagePicker text={newAnswer} onChangeText={setNewAnswer} />
                                 </View>
                                 <Button
-                                    title="Add to Deck"
+                                    title={t('deckDetailsAddToDeck')}
                                     onPress={handleAddCard}
                                     style={{ marginTop: 12, height: 56, borderRadius: 16 }}
                                 />
@@ -856,8 +858,8 @@ export default function DeckDetailsScreen() {
             >
                         <View style={styles.modalHeader}>
                             <View>
-                                <Text style={[styles.modalTitle, { color: textColor }]}>Edit Flashcard</Text>
-                                <Text style={[styles.modalSubtitle, { color: mutedForeground }]}>Long press card in list to open this menu</Text>
+                                <Text style={[styles.modalTitle, { color: textColor }]}>{t('deckDetailsEditFlashcard')}</Text>
+                                <Text style={[styles.modalSubtitle, { color: mutedForeground }]}>{t('deckDetailsLongPressHint')}</Text>
                             </View>
                             <TouchableOpacity onPress={() => setEditModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
                                 <X size={24} color={textColor} />
@@ -870,14 +872,14 @@ export default function DeckDetailsScreen() {
                                 onPress={() => setIsEditHighlightMode(false)}
                             >
                                 <Edit2 size={16} color={!isEditHighlightMode ? primaryForeground : textColor} />
-                                <Text style={[styles.toggleBtnText, { color: !isEditHighlightMode ? primaryForeground : textColor }]}>Text</Text>
+                                <Text style={[styles.toggleBtnText, { color: !isEditHighlightMode ? primaryForeground : textColor }]}>{t('deckDetailsText')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.toggleBtn, isEditHighlightMode && { backgroundColor: accentColor }]}
                                 onPress={() => setIsEditHighlightMode(true)}
                             >
                                 <Play size={16} color={isEditHighlightMode ? primaryForeground : textColor} />
-                                <Text style={[styles.toggleBtnText, { color: isEditHighlightMode ? primaryForeground : textColor }]}>Highlights</Text>
+                                <Text style={[styles.toggleBtnText, { color: isEditHighlightMode ? primaryForeground : textColor }]}>{t('deckDetailsHighlights')}</Text>
                             </TouchableOpacity>
                             <View style={{ flex: 1 }} />
                             <TouchableOpacity
@@ -894,7 +896,7 @@ export default function DeckDetailsScreen() {
                             <View style={{ gap: 20, paddingTop: 10 }}>
                                 {isEditHighlightMode ? (
                                     <View style={[styles.highlightEditor, { backgroundColor: secondaryBg }]}>
-                                        <Text style={[styles.editorLabel, { color: mutedForeground }]}>{editFlipped ? 'ANSWER' : 'QUESTION'}</Text>
+                                        <Text style={[styles.editorLabel, { color: mutedForeground }]}>{editFlipped ? t('feedAnswerChip') : t('deckDetailsQuestionLabel')}</Text>
                                         <WordSplitter
                                             text={editFlipped ? editAnswer : editQuestion}
                                             isFront={!editFlipped}
@@ -905,14 +907,14 @@ export default function DeckDetailsScreen() {
                                             onPress={() => setEditFlipped(!editFlipped)}
                                         >
                                             <RotateCcw size={14} color={textColor} />
-                                            <Text style={[styles.miniFlipText, { color: textColor }]}>Switch Side</Text>
+                                            <Text style={[styles.miniFlipText, { color: textColor }]}>{t('deckDetailsSwitchSide')}</Text>
                                         </TouchableOpacity>
                                     </View>
                                 ) : (
                                     <>
                                         <View style={{ gap: 10 }}>
                                             <CardTextInput
-                                                label="Question"
+                                                label={t('swipeQuestion')}
                                                 value={editQuestion}
                                                 onChangeText={setEditQuestion}
                                                 multiline
@@ -921,7 +923,7 @@ export default function DeckDetailsScreen() {
                                         </View>
                                         <View style={{ gap: 10 }}>
                                             <CardTextInput
-                                                label="Answer"
+                                                label={t('swipeAnswer')}
                                                 value={editAnswer}
                                                 onChangeText={setEditAnswer}
                                                 multiline
@@ -931,7 +933,7 @@ export default function DeckDetailsScreen() {
                                     </>
                                 )}
                                 <Button
-                                    title="Save Changes"
+                                    title={t('saveChanges')}
                                     onPress={handleUpdateCard}
                                     style={{ marginTop: 12, height: 56, borderRadius: 16 }}
                                 />

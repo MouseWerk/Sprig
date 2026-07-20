@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from '@/utils/AppHaptics';
 import { isImageToken } from '@/utils/CardImages';
@@ -15,6 +16,7 @@ interface HighlightableTextProps {
 }
 
 export function HighlightableText({ text, fontSize = 22, align = 'center', onChange }: HighlightableTextProps) {
+    const { t } = useLanguage();
     const textColor = useThemeColor({}, 'text');
 
     const toggleWord = (wordIndex: number) => {
@@ -45,7 +47,7 @@ export function HighlightableText({ text, fontSize = 22, align = 'center', onCha
                 if (isImageToken(w)) {
                     return (
                         <Text key={i} style={[styles.wordText, styles.imagePlaceholder, { fontSize: fontSize - 4 }]}>
-                            [image]
+                            {t('deckDetailsImagePlaceholder')}
                         </Text>
                     );
                 }

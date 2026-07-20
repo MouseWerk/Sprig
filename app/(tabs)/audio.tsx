@@ -298,14 +298,14 @@ export default function AudioPlayerScreen() {
             loadAudios();
         } catch (e) {
             console.error('Error creating folder:', e);
-            showToast({ message: 'Failed to create folder', type: 'error' });
+            showToast({ message: t('audioCreateFolderFailed'), type: 'error' });
         }
     };
 
     const handleDeleteFolder = async (id: string, name: string) => {
         const ok = await confirm({
-            title: 'Delete Folder',
-            message: `Delete "${name}"? Audio files inside will be moved out of the folder.`,
+            title: t('deleteFolder'),
+            message: t('audioDeleteFolderMessage').replace('{name}', name),
             confirmText: t('delete'),
             cancelText: t('cancel'),
             destructive: true,
@@ -314,7 +314,7 @@ export default function AudioPlayerScreen() {
         await deleteFolder(id);
         if (currentFolderId === id) setCurrentFolderId(null);
         loadAudios();
-        showToast({ message: `"${name}" deleted`, type: 'info' });
+        showToast({ message: t('audioFolderDeleted').replace('{name}', name), type: 'info' });
     };
 
     const openAudioMenu = (item: AudioFile) => {
@@ -329,10 +329,10 @@ export default function AudioPlayerScreen() {
             await updateAudioFile(editAudio.id, editAudioName.trim(), editAudioFolderId);
             setEditAudio(null);
             loadAudios();
-            showToast({ message: 'Audio updated', type: 'success' });
+            showToast({ message: t('audioUpdated'), type: 'success' });
         } catch (e) {
             console.error('Error updating audio:', e);
-            showToast({ message: 'Failed to update audio', type: 'error' });
+            showToast({ message: t('audioUpdateFailed'), type: 'error' });
         }
     };
 
@@ -365,17 +365,17 @@ export default function AudioPlayerScreen() {
             }
             exitSelectMode();
             loadAudios();
-            showToast({ message: `Moved ${count} file${count === 1 ? '' : 's'}`, type: 'success' });
+            showToast({ message: t(count === 1 ? 'audioMovedFiles' : 'audioMovedFilesPlural').replace('{n}', String(count)), type: 'success' });
         } catch (e) {
             console.error('Error moving audio:', e);
-            showToast({ message: 'Failed to move files', type: 'error' });
+            showToast({ message: t('audioMoveFilesFailed'), type: 'error' });
         }
     };
 
     const handleDeleteSelected = async () => {
         const count = selectedIds.size;
         const ok = await confirm({
-            title: `Delete ${count} file${count === 1 ? '' : 's'}?`,
+            title: t(count === 1 ? 'audioDeleteCountTitle' : 'audioDeleteCountTitlePlural').replace('{n}', String(count)),
             message: t('areYouSure'),
             confirmText: t('delete'),
             cancelText: t('cancel'),
@@ -388,7 +388,7 @@ export default function AudioPlayerScreen() {
         }
         exitSelectMode();
         loadAudios();
-        showToast({ message: `Deleted ${count} file${count === 1 ? '' : 's'}`, type: 'info' });
+        showToast({ message: t(count === 1 ? 'audioDeletedFiles' : 'audioDeletedFilesPlural').replace('{n}', String(count)), type: 'info' });
     };
 
     const formatTime = (totalSeconds: number) => {
@@ -511,11 +511,11 @@ export default function AudioPlayerScreen() {
             {currentFolderId !== null && (
                 <View style={styles.breadcrumb}>
                     <TouchableOpacity onPress={() => setCurrentFolderId(null)}>
-                        <Text style={[styles.breadcrumbText, { color: mutedForeground }]}>Root</Text>
+                        <Text style={[styles.breadcrumbText, { color: mutedForeground }]}>{t('root')}</Text>
                     </TouchableOpacity>
                     <ChevronRight size={14} color={mutedForeground} />
                     <Text style={[styles.breadcrumbText, { color: textColor, fontWeight: '800' }]}>
-                        {folders.find(f => f.id === currentFolderId)?.name ?? 'Folder'}
+                        {folders.find(f => f.id === currentFolderId)?.name ?? t('folder')}
                     </Text>
                 </View>
             )}
@@ -541,7 +541,7 @@ export default function AudioPlayerScreen() {
                             <FileMusic size={48} color={accentColor} strokeWidth={2.5} />
                         </View>
                         <Text style={[styles.emptyTitle, { color: textColor }]}>{t('noAudioMessage')}</Text>
-                        <Text style={[styles.emptyText, { color: mutedForeground }]}>Upload audio notes or lessons to listen while you learn</Text>
+                        <Text style={[styles.emptyText, { color: mutedForeground }]}>{t('audioEmptyText')}</Text>
                         <TouchableOpacity style={[styles.emptyButton, { backgroundColor: accentColor }]} onPress={handlePickAudio}>
                             <Text style={{ color: accentForeground, fontWeight: '800', fontSize: 15 }}>{t('addAudio')}</Text>
                         </TouchableOpacity>
@@ -646,7 +646,7 @@ export default function AudioPlayerScreen() {
                 sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
             >
                 <View style={styles.modalHeader}>
-                    <Text style={[styles.modalTitle, { color: textColor }]}>Edit Audio</Text>
+                    <Text style={[styles.modalTitle, { color: textColor }]}>{t('audioEditTitle')}</Text>
                     <TouchableOpacity onPress={() => setEditAudio(null)} accessibilityLabel="Close" accessibilityRole="button">
                         <X size={20} color={textColor} />
                     </TouchableOpacity>
@@ -654,19 +654,19 @@ export default function AudioPlayerScreen() {
 
                 <ScrollView showsVerticalScrollIndicator={false}>
                     <Input
-                        label="Audio Name"
+                        label={t('audioName')}
                         value={editAudioName}
                         onChangeText={setEditAudioName}
-                        placeholder="e.g. Biology Lecture 3"
+                        placeholder={t('audioNamePlaceholder')}
                     />
 
-                    <Text style={[styles.sectionLabel, { color: textColor }]}>Move to Folder</Text>
+                    <Text style={[styles.sectionLabel, { color: textColor }]}>{t('moveToFolder')}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.folderPickerContainer}>
                         <TouchableOpacity
                             style={[styles.folderChip, { backgroundColor: editAudioFolderId === null ? accentColor : secondaryBg }]}
                             onPress={() => setEditAudioFolderId(null)}
                         >
-                            <Text style={[styles.folderChipText, { color: editAudioFolderId === null ? accentForeground : textColor }]}>Root</Text>
+                            <Text style={[styles.folderChipText, { color: editAudioFolderId === null ? accentForeground : textColor }]}>{t('root')}</Text>
                         </TouchableOpacity>
                         {folders.map((folder) => (
                             <TouchableOpacity
@@ -683,7 +683,7 @@ export default function AudioPlayerScreen() {
                     </ScrollView>
 
                     <Button
-                        title="Save Changes"
+                        title={t('saveChanges')}
                         onPress={handleSaveAudioEdit}
                         style={styles.saveButton}
                     />
@@ -694,7 +694,7 @@ export default function AudioPlayerScreen() {
                         activeOpacity={0.8}
                     >
                         <CheckCircle2 size={18} color={accentColor} strokeWidth={2.5} />
-                        <Text style={[styles.sheetActionText, { color: textColor }]}>Select Multiple</Text>
+                        <Text style={[styles.sheetActionText, { color: textColor }]}>{t('audioSelectMultiple')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -707,7 +707,7 @@ export default function AudioPlayerScreen() {
                         activeOpacity={0.8}
                     >
                         <Trash2 size={18} color="#ef4444" strokeWidth={2.5} />
-                        <Text style={[styles.sheetActionText, { color: '#ef4444' }]}>Delete Audio</Text>
+                        <Text style={[styles.sheetActionText, { color: '#ef4444' }]}>{t('deleteAudio')}</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </BottomSheet>
@@ -720,7 +720,7 @@ export default function AudioPlayerScreen() {
             >
                 <View style={styles.modalHeader}>
                     <Text style={[styles.modalTitle, { color: textColor }]}>
-                        Move {selectedIds.size} file{selectedIds.size === 1 ? '' : 's'}
+                        {t(selectedIds.size === 1 ? 'audioMoveCountOne' : 'audioMoveCountMany').replace('{n}', String(selectedIds.size))}
                     </Text>
                     <TouchableOpacity onPress={() => setMoveSheetVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
                         <X size={20} color={textColor} />
@@ -732,7 +732,7 @@ export default function AudioPlayerScreen() {
                     activeOpacity={0.8}
                 >
                     <Music size={18} color={accentColor} strokeWidth={2.5} />
-                    <Text style={[styles.sheetActionText, { color: textColor }]}>Root</Text>
+                    <Text style={[styles.sheetActionText, { color: textColor }]}>{t('root')}</Text>
                 </TouchableOpacity>
                 {folders.map(folder => (
                     <TouchableOpacity
@@ -754,19 +754,19 @@ export default function AudioPlayerScreen() {
                 sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
             >
                 <View style={styles.modalHeader}>
-                    <Text style={[styles.modalTitle, { color: textColor }]}>New Folder</Text>
+                    <Text style={[styles.modalTitle, { color: textColor }]}>{t('newFolder')}</Text>
                     <TouchableOpacity onPress={() => setNewFolderSheetVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
                         <X size={20} color={textColor} />
                     </TouchableOpacity>
                 </View>
                 <Input
-                    label="Folder Name"
+                    label={t('folderName')}
                     value={newFolderName}
                     onChangeText={setNewFolderName}
-                    placeholder="e.g. Lectures"
+                    placeholder={t('audioFolderPlaceholder')}
                 />
                 <Button
-                    title="Create Folder"
+                    title={t('createFolder')}
                     onPress={handleCreateFolder}
                     style={{ marginTop: 24 }}
                 />
@@ -776,7 +776,7 @@ export default function AudioPlayerScreen() {
             {selectMode && (
                 <View style={[styles.selectBar, { backgroundColor: accentColor, bottom: insets.bottom + 16 }]}>
                     <Text style={[styles.selectBarCount, { color: accentForeground }]}>
-                        {selectedIds.size} selected
+                        {t('audioSelectedCount').replace('{n}', String(selectedIds.size))}
                     </Text>
                     <View style={styles.selectBarActions}>
                         <TouchableOpacity
@@ -787,7 +787,7 @@ export default function AudioPlayerScreen() {
                             accessibilityRole="button"
                         >
                             <FolderInput size={20} color={accentForeground} strokeWidth={2.5} />
-                            <Text style={[styles.selectBarBtnText, { color: accentForeground }]}>Move</Text>
+                            <Text style={[styles.selectBarBtnText, { color: accentForeground }]}>{t('audioMove')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.selectBarBtn}
@@ -797,7 +797,7 @@ export default function AudioPlayerScreen() {
                             accessibilityRole="button"
                         >
                             <Trash2 size={20} color={accentForeground} strokeWidth={2.5} />
-                            <Text style={[styles.selectBarBtnText, { color: accentForeground }]}>Delete</Text>
+                            <Text style={[styles.selectBarBtnText, { color: accentForeground }]}>{t('delete')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.selectBarBtn}

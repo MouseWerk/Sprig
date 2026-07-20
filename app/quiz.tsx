@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { toDisplayText } from '@/utils/CardText';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
@@ -75,6 +76,7 @@ export default function QuizScreen() {
     const { id, uri, name } = useLocalSearchParams<{ id: string; uri: string; name?: string }>();
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const { t } = useLanguage();
 
     const [cards, setCards] = useState<FlashcardData[] | null>(null);
     const [loading, setLoading] = useState(true);
@@ -156,7 +158,7 @@ export default function QuizScreen() {
     if (loading) {
         return (
             <View style={[styles.container, styles.center, { backgroundColor }]}>
-                <Stack.Screen options={{ title: 'Quiz', headerStyle: { backgroundColor }, headerTintColor: textColor, headerShadowVisible: false }} />
+                <Stack.Screen options={{ title: t('quizTitle'), headerStyle: { backgroundColor }, headerTintColor: textColor, headerShadowVisible: false }} />
                 <ActivityIndicator size="large" color={primaryColor} />
             </View>
         );
@@ -165,13 +167,13 @@ export default function QuizScreen() {
     if (questions.length === 0) {
         return (
             <View style={[styles.container, styles.center, { backgroundColor, paddingHorizontal: 32 }]}>
-                <Stack.Screen options={{ title: 'Quiz', headerStyle: { backgroundColor }, headerTintColor: textColor, headerShadowVisible: false }} />
+                <Stack.Screen options={{ title: t('quizTitle'), headerStyle: { backgroundColor }, headerTintColor: textColor, headerShadowVisible: false }} />
                 <FileWarning size={48} color="#ef4444" strokeWidth={2} />
-                <Text style={[styles.emptyTitle, { color: textColor }]}>Not enough cards</Text>
+                <Text style={[styles.emptyTitle, { color: textColor }]}>{t('quizNotEnoughCards')}</Text>
                 <Text style={[styles.emptyText, { color: mutedForeground }]}>
-                    Quiz mode needs at least 4 cards with distinct answers. Add more cards and try again.
+                    {t('quizNotEnoughCardsText')}
                 </Text>
-                <Button title="Go Back" onPress={() => router.back()} style={{ marginTop: 8, width: 200 }} />
+                <Button title={t('swipeGoBack')} onPress={() => router.back()} style={{ marginTop: 8, width: 200 }} />
             </View>
         );
     }
@@ -180,18 +182,18 @@ export default function QuizScreen() {
         const pct = Math.round((score / questions.length) * 100);
         return (
             <View style={[styles.container, styles.center, { backgroundColor, paddingBottom: insets.bottom }]}>
-                <Stack.Screen options={{ title: name || 'Quiz', headerStyle: { backgroundColor }, headerTintColor: textColor, headerShadowVisible: false }} />
+                <Stack.Screen options={{ title: name || t('quizTitle'), headerStyle: { backgroundColor }, headerTintColor: textColor, headerShadowVisible: false }} />
                 <View style={[styles.trophyWrap, { backgroundColor: '#facc1520' }]}>
                     <Trophy size={56} color="#eab308" strokeWidth={1.5} />
                 </View>
                 <Text style={[styles.resultScore, { color: textColor }]}>{score} / {questions.length}</Text>
-                <Text style={[styles.resultPct, { color: primaryColor }]}>{pct}% correct</Text>
+                <Text style={[styles.resultPct, { color: primaryColor }]}>{t('quizPctCorrect').replace('{n}', String(pct))}</Text>
                 <Text style={[styles.emptyText, { color: mutedForeground }]}>
-                    {pct >= 80 ? 'Excellent work!' : pct >= 50 ? 'Nice — keep practicing!' : 'Keep at it, you\'ll get there.'}
+                    {pct >= 80 ? t('quizExcellent') : pct >= 50 ? t('quizNiceKeepPracticing') : t('quizKeepAtIt')}
                 </Text>
                 <View style={{ width: '100%', maxWidth: 300, gap: 12, marginTop: 24 }}>
-                    <Button title="Try Again" onPress={restart} style={{ height: 52 }} />
-                    <Button title="Done" variant="secondary" onPress={() => router.back()} style={{ height: 52 }} />
+                    <Button title={t('focusTryAgain')} onPress={restart} style={{ height: 52 }} />
+                    <Button title={t('swipeDone')} variant="secondary" onPress={() => router.back()} style={{ height: 52 }} />
                 </View>
             </View>
         );
@@ -201,20 +203,20 @@ export default function QuizScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor, paddingBottom: insets.bottom + 16 }]}>
-            <Stack.Screen options={{ title: name || 'Quiz', headerStyle: { backgroundColor }, headerTintColor: textColor, headerShadowVisible: false }} />
+            <Stack.Screen options={{ title: name || t('quizTitle'), headerStyle: { backgroundColor }, headerTintColor: textColor, headerShadowVisible: false }} />
 
             <View style={styles.progressWrap}>
                 <View style={[styles.progressTrack, { backgroundColor: secondaryBg }]}>
                     <View style={[styles.progressFill, { width: `${((index) / questions.length) * 100}%`, backgroundColor: primaryColor }]} />
                 </View>
                 <Text style={[styles.progressText, { color: mutedForeground }]}>
-                    {index + 1} / {questions.length} · Score {score}
+                    {t('quizProgress').replace('{n}', String(index + 1)).replace('{total}', String(questions.length)).replace('{score}', String(score))}
                 </Text>
             </View>
 
             <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
                 <View style={[styles.questionCard, { backgroundColor: cardColor, borderColor: secondaryBg }]}>
-                    <Text style={[styles.qLabel, { color: mutedForeground }]}>QUESTION {index + 1}</Text>
+                    <Text style={[styles.qLabel, { color: mutedForeground }]}>{t('quizQuestionN').replace('{n}', String(index + 1))}</Text>
                     <MarkdownRenderer content={current.prompt} fontSize={20} />
                 </View>
 
@@ -250,7 +252,7 @@ export default function QuizScreen() {
             {answered && (
                 <View style={styles.footer}>
                     <Button
-                        title={index + 1 >= questions.length ? 'See Results' : 'Next Question'}
+                        title={index + 1 >= questions.length ? t('quizSeeResults') : t('quizNextQuestion')}
                         onPress={handleNext}
                         style={{ height: 56 }}
                     />

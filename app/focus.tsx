@@ -2,6 +2,7 @@ import { GrowingPlant } from '@/components/GrowingPlant';
 import { SoundMixer, anySoundPlaying, stopAllSounds } from '@/components/SoundMixer';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/components/ui/Toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from '@/utils/AppHaptics';
 import { useNavigation } from '@react-navigation/native';
@@ -51,6 +52,7 @@ export default function FocusScreen() {
     const { showToast } = useToast();
     const confirm = useConfirm();
     const navigation = useNavigation();
+    const { t } = useLanguage();
 
     const [phase, setPhase] = useState<Phase>('setup');
     const [minutes, setMinutes] = useState(() => getPrefsSync().defaultFocusMinutes);
@@ -138,9 +140,9 @@ export default function FocusScreen() {
             if (phaseRef.current !== 'running' && phaseRef.current !== 'paused') return;
             e.preventDefault();
             confirm({
-                title: 'Give up this session?',
-                message: 'Your plant won\'t survive if you leave now.',
-                confirmText: 'Give Up',
+                title: t('focusGiveUpTitle'),
+                message: t('focusGiveUpMessage'),
+                confirmText: t('focusGiveUp'),
                 destructive: true,
             }).then(ok => {
                 if (ok) navigation.dispatch(e.data.action);
@@ -166,13 +168,13 @@ export default function FocusScreen() {
         recordFocusSession(minutes)
             .then(result => {
                 let delay = 400;
-                showToast({ message: `Focus complete · +${result.xpGained} XP`, type: 'success' });
+                showToast({ message: t('focusComplete').replace('{xp}', String(result.xpGained)), type: 'success' });
                 if (result.leveledUp) {
-                    setTimeout(() => showToast({ message: `Level ${result.newLevel}! You're now a ${result.newRank}`, type: 'success' }), delay);
+                    setTimeout(() => showToast({ message: t('focusLevelUp').replace('{level}', String(result.newLevel)).replace('{rank}', result.newRank), type: 'success' }), delay);
                     delay += 600;
                 }
                 result.newAchievements.forEach(a => {
-                    setTimeout(() => showToast({ message: `Achievement unlocked: ${a.title}`, type: 'success' }), delay);
+                    setTimeout(() => showToast({ message: t('focusAchievementUnlocked').replace('{title}', t(a.titleKey)), type: 'success' }), delay);
                     delay += 600;
                 });
             })
@@ -216,7 +218,7 @@ export default function FocusScreen() {
     return (
         <View style={[styles.container, { backgroundColor, paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
             <Stack.Screen options={{
-                title: 'Focus Session',
+                title: t('homeFocusSession'),
                 headerStyle: { backgroundColor },
                 headerTintColor: textColor,
                 headerShadowVisible: false,
@@ -227,9 +229,9 @@ export default function FocusScreen() {
                     <View style={{ marginBottom: 8 }}>
                         <GrowingPlant progress={0} size={120} color={primaryColor} soilColor={secondaryBg} sway />
                     </View>
-                    <Text style={[styles.title, { color: textColor }]}>Grow a plant by focusing</Text>
+                    <Text style={[styles.title, { color: textColor }]}>{t('focusSetupTitle')}</Text>
                     <Text style={[styles.subtitle, { color: mutedForeground }]}>
-                        Pick a length and stay in the app. Leave for more than 10s and your plant wilts.
+                        {t('focusSetupSubtitle')}
                     </Text>
 
                     <View style={styles.durationRow}>
@@ -246,20 +248,20 @@ export default function FocusScreen() {
                                 activeOpacity={0.85}
                             >
                                 <Text style={{ color: minutes === d ? primaryForeground : textColor, fontWeight: '900', fontSize: 18 }}>{d}</Text>
-                                <Text style={{ color: minutes === d ? primaryForeground : mutedForeground, fontWeight: '700', fontSize: 10 }}>MIN</Text>
+                                <Text style={{ color: minutes === d ? primaryForeground : mutedForeground, fontWeight: '700', fontSize: 10 }}>{t('focusMin')}</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
 
                     <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: primaryColor }]} onPress={() => startSession(minutes)} activeOpacity={0.9}>
                         <Play size={20} color={primaryForeground} fill={primaryForeground} />
-                        <Text style={[styles.primaryBtnText, { color: primaryForeground }]}>Start Focusing</Text>
+                        <Text style={[styles.primaryBtnText, { color: primaryForeground }]}>{t('focusStartFocusing')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.soundLink} onPress={() => setMixerVisible(true)}>
                         <Music size={16} color={mutedForeground} />
                         <Text style={[styles.soundLinkText, { color: mutedForeground }]}>
-                            {soundsOn ? 'Ambient sounds on' : 'Add ambient sounds'}
+                            {soundsOn ? t('focusAmbientSoundsOn') : t('focusAddAmbientSounds')}
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -267,7 +269,7 @@ export default function FocusScreen() {
 
             {(phase === 'running' || phase === 'paused' || phase === 'break') && (
                 <View style={styles.center}>
-                    {phase === 'break' && <Text style={[styles.breakLabel, { color: primaryColor }]}>BREAK</Text>}
+                    {phase === 'break' && <Text style={[styles.breakLabel, { color: primaryColor }]}>{t('focusBreakLabel')}</Text>}
                     <View style={styles.ringWrap}>
                         <Ring size={280} progress={progress} color={phase === 'break' ? '#22c55e' : primaryColor} track={secondaryBg} />
                         <View style={styles.ringInner}>
@@ -278,7 +280,7 @@ export default function FocusScreen() {
                             </View>
                             <Text style={[styles.timer, { color: textColor }]}>{fmt(secondsLeft)}</Text>
                             <Text style={[styles.timerSub, { color: mutedForeground }]}>
-                                {phase === 'paused' ? 'Paused' : phase === 'break' ? 'Relax a moment' : 'Stay focused'}
+                                {phase === 'paused' ? t('focusPaused') : phase === 'break' ? t('focusRelax') : t('focusStayFocused')}
                             </Text>
                         </View>
                     </View>
@@ -321,15 +323,15 @@ export default function FocusScreen() {
                     <View style={{ marginBottom: 12 }}>
                         <GrowingPlant progress={1} size={150} color={primaryColor} soilColor={secondaryBg} sway />
                     </View>
-                    <Text style={[styles.title, { color: textColor }]}>Your plant bloomed!</Text>
+                    <Text style={[styles.title, { color: textColor }]}>{t('focusBloomed')}</Text>
                     <Text style={[styles.subtitle, { color: mutedForeground }]}>
-                        {minutes} focused minutes. Nicely done — take a short break or plant another.
+                        {t('focusBloomedSubtitle').replace('{n}', String(minutes))}
                     </Text>
                     <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: '#22c55e' }]} onPress={startBreak} activeOpacity={0.9}>
-                        <Text style={styles.primaryBtnText}>Take a {BREAK_MINUTES}-min break</Text>
+                        <Text style={styles.primaryBtnText}>{t('focusTakeBreak').replace('{n}', String(BREAK_MINUTES))}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: secondaryBg }]} onPress={() => setPhase('setup')} activeOpacity={0.9}>
-                        <Text style={[styles.secondaryBtnText, { color: textColor }]}>New session</Text>
+                        <Text style={[styles.secondaryBtnText, { color: textColor }]}>{t('focusNewSession')}</Text>
                     </TouchableOpacity>
                 </View>
             )}
@@ -339,13 +341,13 @@ export default function FocusScreen() {
                     <View style={{ marginBottom: 12 }}>
                         <GrowingPlant progress={1} size={150} color="#a8a29e" soilColor={secondaryBg} wilted />
                     </View>
-                    <Text style={[styles.title, { color: '#ef4444' }]}>Your plant wilted</Text>
+                    <Text style={[styles.title, { color: '#ef4444' }]}>{t('focusWilted')}</Text>
                     <Text style={[styles.subtitle, { color: mutedForeground }]}>
-                        You left the app for too long. Stay focused and try again.
+                        {t('focusWiltedSubtitle')}
                     </Text>
                     <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: primaryColor }]} onPress={replant} activeOpacity={0.9}>
                         <RotateCcw size={18} color={primaryForeground} strokeWidth={2.5} />
-                        <Text style={[styles.primaryBtnText, { color: primaryForeground }]}>Try Again</Text>
+                        <Text style={[styles.primaryBtnText, { color: primaryForeground }]}>{t('focusTryAgain')}</Text>
                     </TouchableOpacity>
                 </View>
             )}
@@ -357,7 +359,7 @@ export default function FocusScreen() {
 
             {soundsOn && !mixerVisible && (
                 <TouchableOpacity style={styles.stopSoundsBar} onPress={stopSounds}>
-                    <Text style={[styles.stopSoundsText, { color: mutedForeground }]}>Stop ambient sounds</Text>
+                    <Text style={[styles.stopSoundsText, { color: mutedForeground }]}>{t('focusStopSounds')}</Text>
                 </TouchableOpacity>
             )}
         </View>

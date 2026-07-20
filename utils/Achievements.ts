@@ -1,3 +1,4 @@
+import { TranslationKey } from '@/constants/translations';
 import { levelForXp } from './Levels';
 import type { UserStats } from './Storage';
 
@@ -5,8 +6,8 @@ export type AchievementMetric = 'cards' | 'streak' | 'time' | 'focus' | 'quiz' |
 
 export interface AchievementDef {
     id: string;
-    title: string;
-    description: string;
+    titleKey: TranslationKey;
+    descriptionKey: TranslationKey;
     icon: string;   // lucide-react-native icon name
     color: string;
     metric: AchievementMetric;
@@ -14,42 +15,43 @@ export interface AchievementDef {
 }
 
 // The full catalog. Unlock state is always recomputed from UserStats, so
-// adding or retuning an achievement here takes effect immediately.
+// adding or retuning an achievement here takes effect immediately. Display
+// text lives in constants/translations.ts under achv<Id>Title/Desc.
 export const ACHIEVEMENTS: AchievementDef[] = [
     // Cards reviewed
-    { id: 'first_steps', title: 'First Steps', description: 'Review your first card', icon: 'Footprints', color: '#6366f1', metric: 'cards', threshold: 1 },
-    { id: 'warming_up', title: 'Warming Up', description: 'Review 10 cards', icon: 'Sparkles', color: '#8b5cf6', metric: 'cards', threshold: 10 },
-    { id: 'century', title: 'Century', description: 'Review 100 cards', icon: 'Award', color: '#3b82f6', metric: 'cards', threshold: 100 },
-    { id: 'scholar', title: 'Scholar', description: 'Review 500 cards', icon: 'GraduationCap', color: '#06b6d4', metric: 'cards', threshold: 500 },
-    { id: 'millennial_mind', title: 'Millennial Mind', description: 'Review 1,000 cards', icon: 'Brain', color: '#10b981', metric: 'cards', threshold: 1000 },
-    { id: 'grandmaster', title: 'Grandmaster', description: 'Review 5,000 cards', icon: 'Crown', color: '#f59e0b', metric: 'cards', threshold: 5000 },
+    { id: 'first_steps', titleKey: 'achvFirstStepsTitle', descriptionKey: 'achvFirstStepsDesc', icon: 'Footprints', color: '#6366f1', metric: 'cards', threshold: 1 },
+    { id: 'warming_up', titleKey: 'achvWarmingUpTitle', descriptionKey: 'achvWarmingUpDesc', icon: 'Sparkles', color: '#8b5cf6', metric: 'cards', threshold: 10 },
+    { id: 'century', titleKey: 'achvCenturyTitle', descriptionKey: 'achvCenturyDesc', icon: 'Award', color: '#3b82f6', metric: 'cards', threshold: 100 },
+    { id: 'scholar', titleKey: 'achvScholarTitle', descriptionKey: 'achvScholarDesc', icon: 'GraduationCap', color: '#06b6d4', metric: 'cards', threshold: 500 },
+    { id: 'millennial_mind', titleKey: 'achvMillennialMindTitle', descriptionKey: 'achvMillennialMindDesc', icon: 'Brain', color: '#10b981', metric: 'cards', threshold: 1000 },
+    { id: 'grandmaster', titleKey: 'achvGrandmasterTitle', descriptionKey: 'achvGrandmasterDesc', icon: 'Crown', color: '#f59e0b', metric: 'cards', threshold: 5000 },
 
     // Daily streak (uses your best-ever streak, so it never re-locks)
-    { id: 'consistent', title: 'Consistent', description: 'Reach a 3-day streak', icon: 'Flame', color: '#f97316', metric: 'streak', threshold: 3 },
-    { id: 'week_warrior', title: 'Week Warrior', description: 'Reach a 7-day streak', icon: 'CalendarCheck', color: '#ef4444', metric: 'streak', threshold: 7 },
-    { id: 'fortnight', title: 'Fortnight', description: 'Reach a 14-day streak', icon: 'CalendarDays', color: '#ec4899', metric: 'streak', threshold: 14 },
-    { id: 'monthly_master', title: 'Monthly Master', description: 'Reach a 30-day streak', icon: 'Trophy', color: '#eab308', metric: 'streak', threshold: 30 },
-    { id: 'unstoppable', title: 'Unstoppable', description: 'Reach a 100-day streak', icon: 'Zap', color: '#a855f7', metric: 'streak', threshold: 100 },
+    { id: 'consistent', titleKey: 'achvConsistentTitle', descriptionKey: 'achvConsistentDesc', icon: 'Flame', color: '#f97316', metric: 'streak', threshold: 3 },
+    { id: 'week_warrior', titleKey: 'achvWeekWarriorTitle', descriptionKey: 'achvWeekWarriorDesc', icon: 'CalendarCheck', color: '#ef4444', metric: 'streak', threshold: 7 },
+    { id: 'fortnight', titleKey: 'achvFortnightTitle', descriptionKey: 'achvFortnightDesc', icon: 'CalendarDays', color: '#ec4899', metric: 'streak', threshold: 14 },
+    { id: 'monthly_master', titleKey: 'achvMonthlyMasterTitle', descriptionKey: 'achvMonthlyMasterDesc', icon: 'Trophy', color: '#eab308', metric: 'streak', threshold: 30 },
+    { id: 'unstoppable', titleKey: 'achvUnstoppableTitle', descriptionKey: 'achvUnstoppableDesc', icon: 'Zap', color: '#a855f7', metric: 'streak', threshold: 100 },
 
     // Time studied
-    { id: 'focused', title: 'Focused', description: 'Study for 1 hour total', icon: 'Clock', color: '#14b8a6', metric: 'time', threshold: 3600 },
-    { id: 'dedicated', title: 'Dedicated', description: 'Study for 10 hours total', icon: 'Hourglass', color: '#0ea5e9', metric: 'time', threshold: 36000 },
-    { id: 'marathoner', title: 'Marathoner', description: 'Study for 50 hours total', icon: 'Timer', color: '#6366f1', metric: 'time', threshold: 180000 },
+    { id: 'focused', titleKey: 'achvFocusedTitle', descriptionKey: 'achvFocusedDesc', icon: 'Clock', color: '#14b8a6', metric: 'time', threshold: 3600 },
+    { id: 'dedicated', titleKey: 'achvDedicatedTitle', descriptionKey: 'achvDedicatedDesc', icon: 'Hourglass', color: '#0ea5e9', metric: 'time', threshold: 36000 },
+    { id: 'marathoner', titleKey: 'achvMarathonerTitle', descriptionKey: 'achvMarathonerDesc', icon: 'Timer', color: '#6366f1', metric: 'time', threshold: 180000 },
 
     // Focus sessions (the plant timer)
-    { id: 'first_sprout', title: 'First Sprout', description: 'Complete a focus session', icon: 'Sprout', color: '#22c55e', metric: 'focus', threshold: 1 },
-    { id: 'green_thumb', title: 'Green Thumb', description: 'Complete 10 focus sessions', icon: 'Leaf', color: '#16a34a', metric: 'focus', threshold: 10 },
-    { id: 'forest_keeper', title: 'Forest Keeper', description: 'Complete 50 focus sessions', icon: 'TreePine', color: '#15803d', metric: 'focus', threshold: 50 },
+    { id: 'first_sprout', titleKey: 'achvFirstSproutTitle', descriptionKey: 'achvFirstSproutDesc', icon: 'Sprout', color: '#22c55e', metric: 'focus', threshold: 1 },
+    { id: 'green_thumb', titleKey: 'achvGreenThumbTitle', descriptionKey: 'achvGreenThumbDesc', icon: 'Leaf', color: '#16a34a', metric: 'focus', threshold: 10 },
+    { id: 'forest_keeper', titleKey: 'achvForestKeeperTitle', descriptionKey: 'achvForestKeeperDesc', icon: 'TreePine', color: '#15803d', metric: 'focus', threshold: 50 },
 
     // Quizzes finished
-    { id: 'quiz_rookie', title: 'Quiz Rookie', description: 'Finish your first quiz', icon: 'CircleQuestionMark', color: '#f43f5e', metric: 'quiz', threshold: 1 },
-    { id: 'quiz_whiz', title: 'Quiz Whiz', description: 'Finish 10 quizzes', icon: 'Lightbulb', color: '#fb7185', metric: 'quiz', threshold: 10 },
-    { id: 'quiz_master', title: 'Quiz Master', description: 'Finish 50 quizzes', icon: 'BadgeCheck', color: '#e11d48', metric: 'quiz', threshold: 50 },
+    { id: 'quiz_rookie', titleKey: 'achvQuizRookieTitle', descriptionKey: 'achvQuizRookieDesc', icon: 'CircleQuestionMark', color: '#f43f5e', metric: 'quiz', threshold: 1 },
+    { id: 'quiz_whiz', titleKey: 'achvQuizWhizTitle', descriptionKey: 'achvQuizWhizDesc', icon: 'Lightbulb', color: '#fb7185', metric: 'quiz', threshold: 10 },
+    { id: 'quiz_master', titleKey: 'achvQuizMasterTitle', descriptionKey: 'achvQuizMasterDesc', icon: 'BadgeCheck', color: '#e11d48', metric: 'quiz', threshold: 50 },
 
     // Level milestones
-    { id: 'level_5', title: 'Apprentice', description: 'Reach level 5', icon: 'Star', color: '#f59e0b', metric: 'level', threshold: 5 },
-    { id: 'level_10', title: 'Rising Scholar', description: 'Reach level 10', icon: 'Sparkles', color: '#d97706', metric: 'level', threshold: 10 },
-    { id: 'level_25', title: 'Luminary', description: 'Reach level 25', icon: 'Sun', color: '#b45309', metric: 'level', threshold: 25 },
+    { id: 'level_5', titleKey: 'achvLevel5Title', descriptionKey: 'achvLevel5Desc', icon: 'Star', color: '#f59e0b', metric: 'level', threshold: 5 },
+    { id: 'level_10', titleKey: 'achvLevel10Title', descriptionKey: 'achvLevel10Desc', icon: 'Sparkles', color: '#d97706', metric: 'level', threshold: 10 },
+    { id: 'level_25', titleKey: 'achvLevel25Title', descriptionKey: 'achvLevel25Desc', icon: 'Sun', color: '#b45309', metric: 'level', threshold: 25 },
 ];
 
 export function metricValue(stats: UserStats, metric: AchievementMetric): number {

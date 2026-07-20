@@ -128,7 +128,7 @@ export default function DecksScreen() {
     } catch (e: any) {
       console.error('Error importing file:', e);
       showToast({
-        message: e?.message === 'not-sprig' ? 'This file is not a Sprig deck' : t('error'),
+        message: e?.message === 'not-sprig' ? t('decksNotSprigFile') : t('error'),
         type: 'error',
       });
     } finally {
@@ -147,7 +147,7 @@ export default function DecksScreen() {
 
       const asset = result.assets[0];
       if (!/\.(apkg|colpkg)$/i.test(asset.name || '')) {
-        showToast({ message: 'Please pick an Anki .apkg file', type: 'warning' });
+        showToast({ message: t('decksPickAnkiFile'), type: 'warning' });
         return;
       }
 
@@ -169,10 +169,10 @@ export default function DecksScreen() {
       console.error('Error importing apkg:', e);
       const message =
         e?.message === 'new-format'
-          ? 'This deck uses Anki\'s newest format. In Anki, export it again with "Support older Anki versions" enabled.'
+          ? t('decksAnkiNewFormat')
           : e?.message === 'empty'
-            ? 'No cards found in this Anki deck'
-            : 'Could not import this Anki deck';
+            ? t('decksAnkiEmpty')
+            : t('decksAnkiFailed');
       showToast({ message, type: 'error' });
     } finally {
       setImporting(false);
@@ -184,7 +184,7 @@ export default function DecksScreen() {
     if (!text) return;
     const parsed = parseFlashcardsText(text);
     if (parsed.length === 0) {
-      showToast({ message: 'No question/answer pairs found in the pasted text', type: 'warning' });
+      showToast({ message: t('decksNoPastedPairs'), type: 'warning' });
       return;
     }
     setImporting(true);
@@ -251,7 +251,7 @@ export default function DecksScreen() {
       type: 'info',
       duration: UNDO_WINDOW_MS,
       action: {
-        label: 'Undo',
+        label: t('undo'),
         onPress: () => {
           const timer = pendingDeleteRef.current[id];
           if (timer) {
@@ -303,7 +303,7 @@ export default function DecksScreen() {
       setEditDeckModalVisible(false);
       setEditingDeck(null);
       loadData();
-      showToast({ message: 'Deck updated successfully', type: 'success' });
+      showToast({ message: t('decksDeckUpdated'), type: 'success' });
     } catch (e: any) {
       console.error('Error updating deck:', e);
       showToast({ message: e?.message || t('error'), type: 'error' });
@@ -360,7 +360,7 @@ export default function DecksScreen() {
               <View style={[styles.dueBadge, { backgroundColor: plan.daysLeft <= 3 ? '#ef4444' : '#f59e0b', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
                 {plan.daysLeft > 0 && <CalendarDays size={11} color="#fff" strokeWidth={2.5} />}
                 <Text style={styles.dueText}>
-                  {plan.daysLeft === 0 ? 'EXAM TODAY' : `${plan.daysLeft}d`}
+                  {plan.daysLeft === 0 ? t('decksExamToday') : `${plan.daysLeft}d`}
                 </Text>
               </View>
             );
@@ -467,7 +467,7 @@ export default function DecksScreen() {
         <Search size={18} color={mutedForeground} />
         <TextInput
           style={[styles.searchInput, { color: textColor }]}
-          placeholder="Search decks and folders..."
+          placeholder={t('decksSearchPlaceholder')}
           placeholderTextColor={mutedForeground}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -520,9 +520,9 @@ export default function DecksScreen() {
               <View style={[styles.emptyIcon, { backgroundColor: secondaryBg }]}>
                 <Search size={48} color={accentColor} strokeWidth={2.5} />
               </View>
-              <Text style={[styles.emptyTitle, { color: textColor }]}>No results</Text>
+              <Text style={[styles.emptyTitle, { color: textColor }]}>{t('decksNoResultsTitle')}</Text>
               <Text style={[styles.emptyText, { color: mutedForeground }]}>
-                Nothing matches {'"'}{searchQuery.trim()}{'"'}. Try a different search.
+                {t('decksNoResultsText').replace('{query}', searchQuery.trim())}
               </Text>
             </View>
           ) : (
@@ -530,12 +530,12 @@ export default function DecksScreen() {
               <View style={{ marginBottom: 24 }}>
                 <SprigLogo size={108} />
               </View>
-              <Text style={[styles.emptyTitle, { color: textColor }]}>{currentFolderId ? 'Folder is empty' : 'Plant your first deck'}</Text>
+              <Text style={[styles.emptyTitle, { color: textColor }]}>{currentFolderId ? t('decksFolderEmptyTitle') : t('homePlantFirstDeckTitle')}</Text>
               <Text style={[styles.emptyText, { color: mutedForeground }]}>
-                {currentFolderId ? 'Create a subfolder or import a CSV deck here.' : 'Import a CSV file to create your first study deck.'}
+                {currentFolderId ? t('decksFolderEmptyText') : t('decksImportCsvText')}
               </Text>
               <Button
-                title="Create New Deck"
+                title={t('homeCreateNewDeck')}
                 onPress={() => setImportModalVisible(true)}
                 style={styles.emptyButton}
               />
@@ -551,19 +551,19 @@ export default function DecksScreen() {
         sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
       >
               <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: textColor }]}>New Folder</Text>
+                <Text style={[styles.modalTitle, { color: textColor }]}>{t('newFolder')}</Text>
                 <TouchableOpacity onPress={() => setNewFolderModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>
               <Input
-                label="Folder Name"
+                label={t('folderName')}
                 value={newFolderName}
                 onChangeText={setNewFolderName}
-                placeholder="e.g. Science"
+                placeholder={t('folderPlaceholder')}
               />
               <Button
-                title="Create Folder"
+                title={t('createFolder')}
                 onPress={handleCreateFolder}
                 style={{ marginTop: 24 }}
               />
@@ -577,7 +577,7 @@ export default function DecksScreen() {
       >
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: textColor }]}>
-                  Create New Deck
+                  {t('decksNewDeckTitle')}
                 </Text>
                 <TouchableOpacity onPress={() => {
                   setImportModalVisible(false);
@@ -589,13 +589,13 @@ export default function DecksScreen() {
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.formScroll}>
                 <View style={styles.formSection}>
                   <Input
-                    label="Deck Name"
+                    label={t('decksDeckName')}
                     value={boxName}
                     onChangeText={setBoxName}
-                    placeholder="e.g. History Facts"
+                    placeholder={t('decksDeckNamePlaceholder')}
                   />
 
-                  <Text style={[styles.sectionLabel, { color: textColor }]}>Pick an Icon</Text>
+                  <Text style={[styles.sectionLabel, { color: textColor }]}>{t('pickAnIcon')}</Text>
                   <IconPicker selectedIcon={selectedIcon} onSelect={setSelectedIcon} />
 
                   <TouchableOpacity
@@ -611,10 +611,10 @@ export default function DecksScreen() {
                     )}
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.pickText, { color: textColor, fontSize: 15 }]}>
-                        {importing ? 'Importing...' : 'Import File (CSV / Text / .sprig)'}
+                        {importing ? t('decksImporting') : t('decksImportFile')}
                       </Text>
                       <Text style={[styles.pickSub, { color: mutedForeground }]}>
-                        Question/answer pairs or a shared Sprig deck
+                        {t('decksImportFileSub')}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -629,9 +629,9 @@ export default function DecksScreen() {
                   >
                     <Package size={22} color={accentColor} strokeWidth={2.5} />
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.pickText, { color: textColor, fontSize: 15 }]}>Import Anki Deck (.apkg)</Text>
+                      <Text style={[styles.pickText, { color: textColor, fontSize: 15 }]}>{t('decksImportAnki')}</Text>
                       <Text style={[styles.pickSub, { color: mutedForeground }]}>
-                        Cards and images from an Anki export
+                        {t('decksImportAnkiSub')}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -645,9 +645,9 @@ export default function DecksScreen() {
                   >
                     <ClipboardPaste size={22} color={accentColor} strokeWidth={2.5} />
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.pickText, { color: textColor, fontSize: 15 }]}>Paste Cards as Text</Text>
+                      <Text style={[styles.pickText, { color: textColor, fontSize: 15 }]}>{t('decksPasteCards')}</Text>
                       <Text style={[styles.pickSub, { color: mutedForeground }]}>
-                        One card per line: question, answer
+                        {t('decksPasteCardsSub')}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -658,14 +658,14 @@ export default function DecksScreen() {
                         style={[styles.pasteInput, { color: textColor, backgroundColor: secondaryBg, borderColor: accentColor + '40' }]}
                         value={pasteText}
                         onChangeText={setPasteText}
-                        placeholder={'What is H2O?, Water\nCapital of France - Paris\n…'}
+                        placeholder={t('decksPastePlaceholder')}
                         placeholderTextColor={mutedForeground}
                         multiline
                         autoCorrect={false}
                         accessibilityLabel="Pasted cards text"
                       />
                       <Button
-                        title={importing ? 'Importing…' : 'Import Pasted Cards'}
+                        title={importing ? t('decksImportingEllipsis') : t('decksImportPastedCards')}
                         onPress={handleImportPasted}
                         disabled={importing || pasteText.trim().length === 0}
                         style={{ height: 52 }}
@@ -674,7 +674,7 @@ export default function DecksScreen() {
                   )}
 
                   <Button
-                    title="Start Building"
+                    title={t('decksStartBuilding')}
                     onPress={handleCreateDeck}
                     style={styles.saveButton}
                   />
@@ -690,7 +690,7 @@ export default function DecksScreen() {
       >
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: textColor }]}>
-                  Edit Deck
+                  {t('decksEditDeckTitle')}
                 </Text>
                 <TouchableOpacity onPress={() => setEditDeckModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
                   <X size={20} color={textColor} />
@@ -700,16 +700,16 @@ export default function DecksScreen() {
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.formScroll}>
                 <View style={styles.formSection}>
                   <Input
-                    label="Deck Name"
+                    label={t('decksDeckName')}
                     value={editDeckName}
                     onChangeText={setEditDeckName}
-                    placeholder="e.g. History Facts"
+                    placeholder={t('decksDeckNamePlaceholder')}
                   />
 
-                  <Text style={[styles.sectionLabel, { color: textColor }]}>Pick an Icon</Text>
+                  <Text style={[styles.sectionLabel, { color: textColor }]}>{t('pickAnIcon')}</Text>
                   <IconPicker selectedIcon={editDeckIcon} onSelect={setEditDeckIcon} />
 
-                  <Text style={[styles.sectionLabel, { color: textColor, marginTop: 16 }]}>Move to Folder</Text>
+                  <Text style={[styles.sectionLabel, { color: textColor, marginTop: 16 }]}>{t('moveToFolder')}</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.folderPickerContainer}>
                     <TouchableOpacity
                       style={[
@@ -722,7 +722,7 @@ export default function DecksScreen() {
                         styles.folderChipText,
                         { color: editDeckFolderId === null ? primaryForeground : textColor }
                       ]}>
-                        Root
+                        {t('root')}
                       </Text>
                     </TouchableOpacity>
                     {folders.map((folder) => (
@@ -746,7 +746,7 @@ export default function DecksScreen() {
                   </ScrollView>
 
                   <Button
-                    title="Save Changes"
+                    title={t('saveChanges')}
                     onPress={handleSaveEditDeck}
                     style={styles.saveButton}
                   />

@@ -1,13 +1,14 @@
-import { GrowingPlant, POT_NAMES, POT_STYLES, SPECIES_NAMES } from '@/components/GrowingPlant';
+import { GrowingPlant, POT_NAME_KEYS, POT_STYLES, SPECIES_NAME_KEYS } from '@/components/GrowingPlant';
 import { GroveStrip } from '@/components/GroveStrip';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import {
     buildGrovePlants, canHarvest, collectDew, detectStageUps, dewRatePerHour,
     GrovePlant, harvestCooldownDays, harvestPlant, MAX_IDLE_HOURS, pendingDew,
-    plantSeed, RARE_SPECIES, STAGE_DEW_RATE, STAGE_LABELS, streakMultiplier,
+    plantSeed, RARE_SPECIES, STAGE_DEW_RATE, STAGE_LABEL_KEYS, streakMultiplier,
 } from '@/utils/Grove';
 import {
     buyDecoration, buyPlanter, buySunshineBoost, buyStreakFreezeWithDew,
@@ -31,6 +32,7 @@ export default function GroveScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { showToast } = useToast();
+    const { t } = useLanguage();
 
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
@@ -59,12 +61,12 @@ export default function GroveScreen() {
             .then(ups => {
                 (ups || []).slice(0, 3).forEach((up, i) => {
                     setTimeout(() => {
-                        showToast({ message: `${up.deckName} grew into a ${STAGE_LABELS[up.stage]}!`, type: 'success' });
+                        showToast({ message: t('groveGrewInto').replace('{name}', up.deckName).replace('{stage}', t(STAGE_LABEL_KEYS[up.stage])), type: 'success' });
                     }, i * 700);
                 });
             })
             .catch(() => { });
-    }, [showToast]);
+    }, [showToast, t]);
 
     useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
@@ -82,7 +84,7 @@ export default function GroveScreen() {
         if (pending <= 0) return;
         const result = await collectDew(plants);
         setEcon(prev => prev ? { ...prev, dew: result.balance, lastCollectedAt: Date.now() } : prev);
-        showToast({ message: `Collected ${result.collected} dew`, type: 'success' });
+        showToast({ message: t('groveCollected').replace('{n}', String(result.collected)), type: 'success' });
     };
 
     const handleBuyFreeze = async () => {
@@ -90,10 +92,10 @@ export default function GroveScreen() {
         if (result.ok) {
             setFreezes(result.streakFreezes);
             setEcon(prev => prev ? { ...prev, dew: result.dew } : prev);
-            showToast({ message: 'Streak freeze banked', type: 'success' });
+            showToast({ message: t('groveFreezeBanked'), type: 'success' });
         } else {
             showToast({
-                message: result.reason === 'max' ? 'Freezes are full (3/3)' : 'Not enough dew yet',
+                message: result.reason === 'max' ? t('groveFreezesFull') : t('groveNotEnoughDew'),
                 type: 'info',
             });
         }
@@ -103,10 +105,10 @@ export default function GroveScreen() {
         const result = await buySunshineBoost();
         if (result.ok) {
             setEcon(prev => prev ? { ...prev, dew: result.dew, boostUntil: result.boostUntil } : prev);
-            showToast({ message: 'Sunshine! 2× XP for 30 minutes', type: 'success' });
+            showToast({ message: t('groveSunshineActivated'), type: 'success' });
         } else {
             showToast({
-                message: result.reason === 'active' ? 'Sunshine is already shining' : 'Not enough dew yet',
+                message: result.reason === 'active' ? t('groveSunshineAlreadyShining') : t('groveNotEnoughDew'),
                 type: 'info',
             });
         }
@@ -117,7 +119,7 @@ export default function GroveScreen() {
         const result = await harvestPlant(selected);
         if (!result.ok) return;
         setEcon(prev => prev ? { ...prev, seeds: result.seeds, harvests: { ...prev.harvests, [selected.deckId]: Date.now() } } : prev);
-        showToast({ message: 'Harvested a seed!', type: 'success' });
+        showToast({ message: t('groveHarvestedSeed'), type: 'success' });
     };
 
     const handlePlantSeed = async (species: number) => {
@@ -132,7 +134,7 @@ export default function GroveScreen() {
         } : prev);
         setSelected(prev => prev ? { ...prev, species } : prev);
         setPlants(prev => prev.map(p => p.deckId === deckId ? { ...p, species } : p));
-        showToast({ message: `A ${SPECIES_NAMES[species]} takes root!`, type: 'success' });
+        showToast({ message: t('groveTakesRoot').replace('{name}', t(SPECIES_NAME_KEYS[species])), type: 'success' });
     };
 
     const handleBuyPlanter = async (potId: string) => {
@@ -140,23 +142,23 @@ export default function GroveScreen() {
         const deckId = selected.deckId;
         const result = await buyPlanter(deckId, potId);
         if (!result.ok) {
-            showToast({ message: 'Not enough dew yet', type: 'info' });
+            showToast({ message: t('groveNotEnoughDew'), type: 'info' });
             return;
         }
         setEcon(prev => prev ? { ...prev, dew: result.dew, planters: result.planters } : prev);
         setSelected(prev => prev ? { ...prev, potStyle: potId as GrovePlant['potStyle'] } : prev);
         setPlants(prev => prev.map(p => p.deckId === deckId ? { ...p, potStyle: potId as GrovePlant['potStyle'] } : p));
-        showToast({ message: `${POT_NAMES[potId as keyof typeof POT_NAMES]} potted!`, type: 'success' });
+        showToast({ message: t('grovePotted').replace('{name}', t(POT_NAME_KEYS[potId as keyof typeof POT_NAME_KEYS])), type: 'success' });
     };
 
     const handleBuyDecoration = async (decorationId: string) => {
         const result = await buyDecoration(decorationId);
         if (!result.ok) {
-            showToast({ message: 'Not enough dew yet', type: 'info' });
+            showToast({ message: t('groveNotEnoughDew'), type: 'info' });
             return;
         }
         setEcon(prev => prev ? { ...prev, dew: result.dew, ownedDecorations: result.ownedDecorations, equippedDecoration: decorationId } : prev);
-        showToast({ message: 'Decoration added to the grove', type: 'success' });
+        showToast({ message: t('groveDecorationAdded'), type: 'success' });
     };
 
     const handleEquipDecoration = async (decorationId: string) => {
@@ -203,21 +205,21 @@ export default function GroveScreen() {
             activeOpacity={0.85}
             onPress={() => setSelected(item)}
             accessibilityRole="button"
-            accessibilityLabel={`${item.deckName}, ${STAGE_LABELS[item.stage]}${item.resting ? ', resting' : ''}${item.dueCards > 0 ? `, ${item.dueCards} cards due` : ''}`}
+            accessibilityLabel={`${item.deckName}, ${t(STAGE_LABEL_KEYS[item.stage])}${item.resting ? ', resting' : ''}${item.dueCards > 0 ? `, ${item.dueCards} cards due` : ''}`}
         >
             <View style={styles.badgeRow}>
                 {item.examPlan && item.examPlan.daysLeft >= 0 ? (
                     <View style={[styles.badge, { backgroundColor: accentColor }]}>
                         <CalendarDays size={11} color={backgroundColor} strokeWidth={2.5} />
                         <Text style={[styles.badgeText, { color: backgroundColor }]}>
-                            {item.examPlan.daysLeft === 0 ? 'Today' : `${item.examPlan.daysLeft}d`}
+                            {item.examPlan.daysLeft === 0 ? t('groveToday') : `${item.examPlan.daysLeft}d`}
                         </Text>
                     </View>
                 ) : <View />}
                 {item.resting ? (
                     <View style={[styles.badge, { backgroundColor: backgroundColor }]}>
                         <Moon size={11} color={mutedForeground} strokeWidth={2.5} />
-                        <Text style={[styles.badgeText, { color: mutedForeground }]}>Resting</Text>
+                        <Text style={[styles.badgeText, { color: mutedForeground }]}>{t('groveResting')}</Text>
                     </View>
                 ) : item.dueCards > 0 ? (
                     <View style={[styles.badge, { backgroundColor: backgroundColor }]}>
@@ -241,7 +243,7 @@ export default function GroveScreen() {
             <Text style={[styles.plantName, { color: textColor }]} numberOfLines={1}>{item.deckName}</Text>
             <View style={styles.chipRow}>
                 <View style={[styles.stageChip, { backgroundColor: backgroundColor }]}>
-                    <Text style={[styles.stageChipText, { color: mutedForeground }]}>{STAGE_LABELS[item.stage]}</Text>
+                    <Text style={[styles.stageChipText, { color: mutedForeground }]}>{t(STAGE_LABEL_KEYS[item.stage])}</Text>
                 </View>
                 {!item.resting && STAGE_DEW_RATE[item.stage] > 0 && (
                     <View style={[styles.stageChip, { backgroundColor: backgroundColor }]}>
@@ -268,7 +270,7 @@ export default function GroveScreen() {
     return (
         <View style={[styles.container, { backgroundColor }]}>
             <Stack.Screen options={{
-                title: 'The Grove',
+                title: t('homeGroveTitle'),
                 headerStyle: { backgroundColor },
                 headerTintColor: textColor,
                 headerShadowVisible: false,
@@ -293,10 +295,10 @@ export default function GroveScreen() {
                                 <View style={{ flex: 1 }}>
                                     <Text style={[styles.dewBalance, { color: textColor }]}>{econ?.dew ?? 0}</Text>
                                     <Text style={[styles.dewLabel, { color: mutedForeground }]}>
-                                        dew · +{Math.round(rate * 10) / 10}/h
-                                        {multiplier > 1 ? ` · ×${multiplier} streak` : ''}
-                                        {boostActive ? ` · Sun ${boostMinutesLeft}m` : ''}
-                                        {(econ?.seeds ?? 0) > 0 ? ` · ${econ!.seeds} ${econ!.seeds === 1 ? 'seed' : 'seeds'}` : ''}
+                                        {t('groveDewPerHour').replace('{n}', String(Math.round(rate * 10) / 10))}
+                                        {multiplier > 1 ? t('groveStreakMultiplier').replace('{n}', String(multiplier)) : ''}
+                                        {boostActive ? t('groveSunMinutesLeft').replace('{n}', String(boostMinutesLeft)) : ''}
+                                        {(econ?.seeds ?? 0) > 0 ? t(econ!.seeds === 1 ? 'groveSeedCountOne' : 'groveSeedCountMany').replace('{n}', String(econ!.seeds)) : ''}
                                     </Text>
                                 </View>
                                 {pending > 0 ? (
@@ -311,7 +313,7 @@ export default function GroveScreen() {
                                         <Text style={[styles.collectText, { color: primaryForeground }]}>+{pending}</Text>
                                     </TouchableOpacity>
                                 ) : (
-                                    <Text style={[styles.collectedHint, { color: mutedForeground }]}>collected</Text>
+                                    <Text style={[styles.collectedHint, { color: mutedForeground }]}>{t('groveCollectedHint')}</Text>
                                 )}
                             </View>
 
@@ -320,11 +322,11 @@ export default function GroveScreen() {
                             </View>
 
                             <View style={styles.statRowContainer}>
-                                {statPill(<Sprout size={14} color={accentColor} strokeWidth={2.5} />, plants.length, plants.length === 1 ? 'plant' : 'plants')}
-                                {statPill(<Flower2 size={14} color={accentColor} strokeWidth={2.5} />, blossoming, 'blossoming')}
+                                {statPill(<Sprout size={14} color={accentColor} strokeWidth={2.5} />, plants.length, plants.length === 1 ? t('homePlant') : t('homePlants'))}
+                                {statPill(<Flower2 size={14} color={accentColor} strokeWidth={2.5} />, blossoming, t('groveBlossoming'))}
                                 {resting > 0
-                                    ? statPill(<Moon size={14} color={mutedForeground} strokeWidth={2.5} />, resting, 'resting')
-                                    : statPill(<Droplets size={14} color={accentColor} strokeWidth={2.5} />, totalDue, 'to water')}
+                                    ? statPill(<Moon size={14} color={mutedForeground} strokeWidth={2.5} />, resting, t('groveResting'))
+                                    : statPill(<Droplets size={14} color={accentColor} strokeWidth={2.5} />, totalDue, t('groveToWater'))}
                             </View>
                         </View>
                     ) : null
@@ -332,7 +334,7 @@ export default function GroveScreen() {
                 ListFooterComponent={
                     plants.length > 0 ? (
                         <View>
-                            <Text style={[styles.sectionTitle, { color: textColor }]}>Grove Shop</Text>
+                            <Text style={[styles.sectionTitle, { color: textColor }]}>{t('groveShop')}</Text>
 
                             <TouchableOpacity
                                 style={[styles.shopCard, { backgroundColor: secondaryBg, opacity: freezes >= MAX_STREAK_FREEZES ? 0.55 : 1 }]}
@@ -346,9 +348,9 @@ export default function GroveScreen() {
                                     <Snowflake size={20} color={accentColor} strokeWidth={2.5} />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={[styles.shopTitle, { color: textColor }]}>Streak Freeze</Text>
+                                    <Text style={[styles.shopTitle, { color: textColor }]}>{t('groveStreakFreeze')}</Text>
                                     <Text style={[styles.shopSub, { color: mutedForeground }]}>
-                                        Auto-repairs one missed day · {freezes}/{MAX_STREAK_FREEZES} banked
+                                        {t('groveFreezeSub').replace('{n}', String(freezes)).replace('{max}', String(MAX_STREAK_FREEZES))}
                                     </Text>
                                 </View>
                                 <View style={[styles.priceChip, { backgroundColor: backgroundColor }]}>
@@ -371,9 +373,9 @@ export default function GroveScreen() {
                                     <Sun size={20} color={accentColor} strokeWidth={2.5} />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={[styles.shopTitle, { color: textColor }]}>Sunshine</Text>
+                                    <Text style={[styles.shopTitle, { color: textColor }]}>{t('groveSunshine')}</Text>
                                     <Text style={[styles.shopSub, { color: mutedForeground }]}>
-                                        {boostActive ? `Shining · ${boostMinutesLeft}m left` : '2× XP for the next 30 minutes'}
+                                        {boostActive ? t('groveShining').replace('{n}', String(boostMinutesLeft)) : t('groveSunshineSub')}
                                     </Text>
                                 </View>
                                 <View style={[styles.priceChip, { backgroundColor: backgroundColor }]}>
@@ -384,27 +386,28 @@ export default function GroveScreen() {
                                 </View>
                             </TouchableOpacity>
 
-                            <Text style={[styles.subsectionTitle, { color: mutedForeground }]}>Decorations for the shelf</Text>
+                            <Text style={[styles.subsectionTitle, { color: mutedForeground }]}>{t('groveDecorationsHeader')}</Text>
                             {DECORATION_CATALOG.map(dec => {
                                 const owned = econ?.ownedDecorations.includes(dec.id) ?? false;
                                 const equipped = econ?.equippedDecoration === dec.id;
                                 const Icon = DECORATION_ICONS[dec.id] || Fence;
+                                const decName = t(dec.nameKey);
                                 return (
                                     <TouchableOpacity
                                         key={dec.id}
                                         style={[styles.shopCard, { backgroundColor: secondaryBg, opacity: !owned && (econ?.dew ?? 0) < dec.price ? 0.55 : 1 }]}
                                         onPress={() => owned ? handleEquipDecoration(dec.id) : handleBuyDecoration(dec.id)}
                                         activeOpacity={0.85}
-                                        accessibilityLabel={owned ? `${equipped ? 'Remove' : 'Show'} ${dec.name}` : `Buy ${dec.name} for ${dec.price} dew`}
+                                        accessibilityLabel={owned ? `${equipped ? 'Remove' : 'Show'} ${decName}` : `Buy ${decName} for ${dec.price} dew`}
                                         accessibilityRole="button"
                                     >
                                         <View style={[styles.dewIcon, { backgroundColor: accentColor + '15' }]}>
                                             <Icon size={20} color={accentColor} strokeWidth={2.5} />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={[styles.shopTitle, { color: textColor }]}>{dec.name}</Text>
+                                            <Text style={[styles.shopTitle, { color: textColor }]}>{decName}</Text>
                                             <Text style={[styles.shopSub, { color: mutedForeground }]}>
-                                                {owned ? (equipped ? 'Shown on the shelf · tap to remove' : 'Owned · tap to show') : 'Grove-wide backdrop'}
+                                                {owned ? (equipped ? t('groveShownOnShelf') : t('groveOwnedTapToShow')) : t('groveGroveWideBackdrop')}
                                             </Text>
                                         </View>
                                         {owned ? (
@@ -422,8 +425,7 @@ export default function GroveScreen() {
                             })}
 
                             <Text style={[styles.footnote, { color: mutedForeground }]}>
-                                Growing plants make dew while you{'’'}re away (up to {MAX_IDLE_HOURS}h). Studying adds 1 dew per card,
-                                up to {DEW_BURST_DAILY_CAP} a day. A 7-day streak earns ×1.25, a 30-day streak ×1.5.
+                                {t('groveFootnote').replace('{idle}', String(MAX_IDLE_HOURS)).replace('{burst}', String(DEW_BURST_DAILY_CAP))}
                             </Text>
                         </View>
                     ) : null
@@ -433,9 +435,9 @@ export default function GroveScreen() {
                         <View style={[styles.emptyIcon, { backgroundColor: secondaryBg }]}>
                             <Sprout size={44} color={accentColor} strokeWidth={2} />
                         </View>
-                        <Text style={[styles.emptyTitle, { color: textColor }]}>Nothing planted yet</Text>
+                        <Text style={[styles.emptyTitle, { color: textColor }]}>{t('groveEmptyTitle')}</Text>
                         <Text style={[styles.emptyText, { color: mutedForeground }]}>
-                            Every deck you study grows here. Create a deck and review a few cards to sprout your first plant.
+                            {t('groveEmptyText')}
                         </Text>
                     </View>
                 }
@@ -466,49 +468,49 @@ export default function GroveScreen() {
                                 species={selected.species}
                                 potStyle={selected.potStyle}
                             />
-                            <Text style={[styles.sheetStage, { color: textColor }]}>{STAGE_LABELS[selected.stage]}</Text>
+                            <Text style={[styles.sheetStage, { color: textColor }]}>{t(STAGE_LABEL_KEYS[selected.stage])}</Text>
                             {selected.resting ? (
                                 <Text style={[styles.sheetHint, { color: mutedForeground }]}>
-                                    This plant is resting until its due cards are cleared — it makes no dew while it rests.
-                                    Growth never goes backwards.
+                                    {t('groveRestingHint')}
                                 </Text>
                             ) : selected.stage === 'blossoming' ? (
                                 <Text style={[styles.sheetHint, { color: mutedForeground }]}>
-                                    Fully mature — every card has a long review interval.
+                                    {t('groveFullyMatureHint')}
                                 </Text>
                             ) : null}
                         </View>
 
                         <View style={[styles.detailRow, { borderColor }]}>
-                            <Text style={[styles.detailLabel, { color: mutedForeground }]}>Maturity</Text>
+                            <Text style={[styles.detailLabel, { color: mutedForeground }]}>{t('groveMaturity')}</Text>
                             <Text style={[styles.detailValue, { color: textColor }]}>
-                                {Math.round(selected.maturity * 100)}% · {selected.matureCards}/{selected.totalCards} cards
+                                {t('groveMaturityValue').replace('{pct}', String(Math.round(selected.maturity * 100))).replace('{mature}', String(selected.matureCards)).replace('{total}', String(selected.totalCards))}
                             </Text>
                         </View>
                         <View style={[styles.detailRow, { borderColor }]}>
-                            <Text style={[styles.detailLabel, { color: mutedForeground }]}>Reviewed</Text>
-                            <Text style={[styles.detailValue, { color: textColor }]}>{selected.reviewed}/{selected.totalCards} cards</Text>
+                            <Text style={[styles.detailLabel, { color: mutedForeground }]}>{t('groveReviewed')}</Text>
+                            <Text style={[styles.detailValue, { color: textColor }]}>{t('groveCardsOfTotal').replace('{n}', String(selected.reviewed)).replace('{total}', String(selected.totalCards))}</Text>
                         </View>
                         <View style={[styles.detailRow, { borderColor }]}>
-                            <Text style={[styles.detailLabel, { color: mutedForeground }]}>Due now</Text>
-                            <Text style={[styles.detailValue, { color: textColor }]}>{selected.dueCards} cards</Text>
+                            <Text style={[styles.detailLabel, { color: mutedForeground }]}>{t('groveDueNow')}</Text>
+                            <Text style={[styles.detailValue, { color: textColor }]}>{t('groveCardsCount').replace('{n}', String(selected.dueCards))}</Text>
                         </View>
                         {selected.examPlan && selected.examPlan.daysLeft >= 0 && (
                             <View style={[styles.detailRow, { borderColor }]}>
-                                <Text style={[styles.detailLabel, { color: mutedForeground }]}>Exam</Text>
+                                <Text style={[styles.detailLabel, { color: mutedForeground }]}>{t('groveExam')}</Text>
                                 <Text style={[styles.detailValue, { color: textColor }]}>
-                                    {selected.examPlan.daysLeft === 0 ? 'Today' : `in ${selected.examPlan.daysLeft} days`}
+                                    {selected.examPlan.daysLeft === 0 ? t('groveToday') : t('groveInDays').replace('{n}', String(selected.examPlan.daysLeft))}
                                 </Text>
                             </View>
                         )}
 
                         <View style={styles.seedSection}>
-                            <Text style={[styles.seedLabel, { color: mutedForeground }]}>Planter</Text>
+                            <Text style={[styles.seedLabel, { color: mutedForeground }]}>{t('grovePlanter')}</Text>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.potChipRow}>
                                 {POT_STYLES.map(pot => {
                                     const active = selected.potStyle === pot;
                                     const price = POT_PRICES[pot] || 0;
                                     const affordable = active || price === 0 || (econ?.dew ?? 0) >= price;
+                                    const potName = t(POT_NAME_KEYS[pot]);
                                     return (
                                         <TouchableOpacity
                                             key={pot}
@@ -516,11 +518,11 @@ export default function GroveScreen() {
                                             onPress={() => !active && handleBuyPlanter(pot)}
                                             disabled={active}
                                             activeOpacity={0.85}
-                                            accessibilityLabel={active ? `${POT_NAMES[pot]}, current planter` : `Switch to ${POT_NAMES[pot]}${price > 0 ? ` for ${price} dew` : ''}`}
+                                            accessibilityLabel={active ? `${potName}, current planter` : `Switch to ${potName}${price > 0 ? ` for ${price} dew` : ''}`}
                                             accessibilityRole="button"
                                         >
                                             <GrowingPlant progress={0.5} size={44} color={accentColor} soilColor={borderColor} potStyle={pot} />
-                                            <Text style={[styles.potChipText, { color: textColor }]} numberOfLines={1}>{POT_NAMES[pot]}</Text>
+                                            <Text style={[styles.potChipText, { color: textColor }]} numberOfLines={1}>{potName}</Text>
                                             {active ? (
                                                 <Check size={12} color={accentColor} strokeWidth={3} />
                                             ) : price > 0 ? (
@@ -529,7 +531,7 @@ export default function GroveScreen() {
                                                     <Text style={[styles.potPriceText, { color: mutedForeground }]}>{price}</Text>
                                                 </View>
                                             ) : (
-                                                <Text style={[styles.potPriceText, { color: mutedForeground }]}>Free</Text>
+                                                <Text style={[styles.potPriceText, { color: mutedForeground }]}>{t('groveFree')}</Text>
                                             )}
                                         </TouchableOpacity>
                                     );
@@ -547,11 +549,11 @@ export default function GroveScreen() {
                                     accessibilityRole="button"
                                 >
                                     <Flower2 size={18} color={accentColor} strokeWidth={2.5} />
-                                    <Text style={[styles.harvestText, { color: textColor }]}>Harvest a seed</Text>
+                                    <Text style={[styles.harvestText, { color: textColor }]}>{t('groveHarvestSeed')}</Text>
                                 </TouchableOpacity>
                             ) : (
                                 <Text style={[styles.harvestHint, { color: mutedForeground }]}>
-                                    Harvested — next seed in {harvestCooldownDays(selected, econ)} days
+                                    {t('groveHarvestedNextIn').replace('{n}', String(harvestCooldownDays(selected, econ)))}
                                 </Text>
                             )
                         )}
@@ -559,7 +561,7 @@ export default function GroveScreen() {
                         {(econ?.seeds ?? 0) > 0 && (
                             <View style={styles.seedSection}>
                                 <Text style={[styles.seedLabel, { color: mutedForeground }]}>
-                                    Plant a seed ({econ!.seeds} left):
+                                    {t('grovePlantASeed').replace('{n}', String(econ!.seeds))}
                                 </Text>
                                 <View style={styles.seedChipRow}>
                                     {RARE_SPECIES.filter(s => s !== selected.species).map(s => (
@@ -568,11 +570,11 @@ export default function GroveScreen() {
                                             style={[styles.seedChip, { backgroundColor: secondaryBg }]}
                                             onPress={() => handlePlantSeed(s)}
                                             activeOpacity={0.85}
-                                            accessibilityLabel={`Plant a ${SPECIES_NAMES[s]}`}
+                                            accessibilityLabel={`Plant a ${t(SPECIES_NAME_KEYS[s])}`}
                                             accessibilityRole="button"
                                         >
                                             <GrowingPlant progress={1} size={34} color={accentColor} soilColor={borderColor} species={s} />
-                                            <Text style={[styles.seedChipText, { color: textColor }]}>{SPECIES_NAMES[s]}</Text>
+                                            <Text style={[styles.seedChipText, { color: textColor }]}>{t(SPECIES_NAME_KEYS[s])}</Text>
                                         </TouchableOpacity>
                                     ))}
                                 </View>
@@ -580,12 +582,12 @@ export default function GroveScreen() {
                         )}
 
                         <Button
-                            title={selected.dueCards > 0 ? `Water it — study ${selected.dueCards} due` : 'Study'}
+                            title={selected.dueCards > 0 ? t('groveWaterIt').replace('{n}', String(selected.dueCards)) : t('groveStudy')}
                             onPress={() => startStudy(selected)}
                             style={styles.sheetButton}
                         />
                         <Button
-                            title="Open deck"
+                            title={t('groveOpenDeck')}
                             variant="secondary"
                             onPress={() => {
                                 const id = selected.deckId;

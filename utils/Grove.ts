@@ -3,6 +3,7 @@
 // nothing is stored. See docs/grove-spec.md for the full design.
 
 import { BASE_SPECIES_COUNT, PLANT_SPECIES_COUNT, PotStyle } from '@/components/GrowingPlant';
+import { TranslationKey } from '@/constants/translations';
 import { Deck, ExamPlan, getDecks, getExamPlan, getGroveEconomy, getUserStats, GroveEconomy, saveGroveEconomy } from './Storage';
 
 // A card counts as mature once its SM-2 interval reaches 21 days (Anki convention).
@@ -15,13 +16,15 @@ const REST_MIN_DUE = 10;
 
 export type GroveStage = 'seed' | 'sprout' | 'sapling' | 'youngTree' | 'flourishing' | 'blossoming';
 
-export const STAGE_LABELS: Record<GroveStage, string> = {
-    seed: 'Seed',
-    sprout: 'Sprout',
-    sapling: 'Sapling',
-    youngTree: 'Young Tree',
-    flourishing: 'Flourishing',
-    blossoming: 'Blossoming',
+// Display text lives in constants/translations.ts; this only maps a stage to
+// the key so callers do `t(STAGE_LABEL_KEYS[stage])`.
+export const STAGE_LABEL_KEYS: Record<GroveStage, TranslationKey> = {
+    seed: 'groveStageSeed',
+    sprout: 'groveStageSprout',
+    sapling: 'groveStageSapling',
+    youngTree: 'groveStageYoungTree',
+    flourishing: 'groveStageFlourishing',
+    blossoming: 'groveStageBlossoming',
 };
 
 // How tall/blooming each stage renders. GrowingPlant swells its bud from

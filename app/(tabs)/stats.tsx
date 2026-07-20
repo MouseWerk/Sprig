@@ -1,5 +1,6 @@
 import { ReviewHeatmap } from '@/components/ReviewHeatmap';
 import { LevelCard } from '@/components/LevelCard';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { ACHIEVEMENTS, unlockedCount } from '@/utils/Achievements';
 import { toDisplayText } from '@/utils/CardText';
@@ -12,12 +13,12 @@ import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAY_NAME_KEYS = ['statsSun', 'statsMon', 'statsTue', 'statsWed', 'statsThu', 'statsFri', 'statsSat'] as const;
 
 interface WeekRecap {
     thisWeek: number;
     activeDays: number;
-    bestDay: string | null;
+    bestDayIndex: number | null;
     bestCount: number;
     deltaPct: number | null; // vs previous 7 days; null when last week was empty
 }
@@ -25,7 +26,7 @@ interface WeekRecap {
 // Sums the last 7 days (incl. today) and the 7 before from the per-day
 // review counts the heatmap already stores.
 function computeWeekRecap(dailyReviews: Record<string, number> | undefined): WeekRecap {
-    const recap: WeekRecap = { thisWeek: 0, activeDays: 0, bestDay: null, bestCount: 0, deltaPct: null };
+    const recap: WeekRecap = { thisWeek: 0, activeDays: 0, bestDayIndex: null, bestCount: 0, deltaPct: null };
     if (!dailyReviews) return recap;
     let lastWeek = 0;
     for (let i = 0; i < 14; i++) {
@@ -38,7 +39,7 @@ function computeWeekRecap(dailyReviews: Record<string, number> | undefined): Wee
             if (n > 0) recap.activeDays++;
             if (n > recap.bestCount) {
                 recap.bestCount = n;
-                recap.bestDay = DAY_NAMES[d.getDay()];
+                recap.bestDayIndex = d.getDay();
             }
         } else {
             lastWeek += n;
@@ -61,6 +62,7 @@ export default function StatsScreen() {
     const secondaryBg = useThemeColor({}, 'secondary');
 
     const router = useRouter();
+    const { t } = useLanguage();
     const [stats, setStats] = useState<UserStats | null>(null);
     const [deckCount, setDeckCount] = useState(0);
     const [hardest, setHardest] = useState<HardCard[]>([]);
@@ -106,10 +108,12 @@ export default function StatsScreen() {
     const recap = computeWeekRecap(stats?.dailyReviews);
 
     const formatStudyTime = (seconds: number) => {
-        if (seconds < 60) return `${seconds}s`;
+        if (seconds < 60) return t('statsSeconds').replace('{n}', String(seconds));
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
-        return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+        return hours > 0
+            ? t('statsHoursMinutes').replace('{h}', String(hours)).replace('{m}', String(minutes))
+            : t('statsMinutes').replace('{n}', String(minutes));
     };
 
     // A streak only counts if the last study day was today or yesterday
@@ -148,10 +152,10 @@ export default function StatsScreen() {
     return (
         <View style={[styles.container, { backgroundColor }]}>
             <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
-                <Text style={[styles.title, { color: textColor }]}>Stats</Text>
+                <Text style={[styles.title, { color: textColor }]}>{t('stats')}</Text>
                 <View style={[styles.levelPill, { backgroundColor: accentColor + '18' }]}>
                     <Zap size={13} color={accentColor} strokeWidth={2.5} fill={accentColor} />
-                    <Text style={[styles.levelPillText, { color: accentColor }]}>Level {level.level}</Text>
+                    <Text style={[styles.levelPillText, { color: accentColor }]}>{t('statsLevel').replace('{n}', String(level.level))}</Text>
                 </View>
             </View>
 
@@ -163,30 +167,30 @@ export default function StatsScreen() {
 
                 {recap.thisWeek > 0 && (
                     <>
-                        <SectionHeader title="THIS WEEK" />
+                        <SectionHeader title={t('statsThisWeek')} />
                         <View style={[styles.recapCard, { backgroundColor: cardColor }]}>
                             <View style={styles.recapTop}>
                                 <Text style={[styles.recapBig, { color: textColor }]}>{recap.thisWeek}</Text>
                                 <View style={{ flex: 1 }}>
                                     <Text style={[styles.recapLabel, { color: mutedForeground }]}>
-                                        cards in the last 7 days
+                                        {t('statsCardsLast7Days')}
                                     </Text>
                                     {recap.deltaPct !== null && (
                                         <Text style={[styles.recapDelta, { color: recap.deltaPct >= 0 ? '#22c55e' : '#ef4444' }]}>
-                                            {recap.deltaPct >= 0 ? '▲' : '▼'} {Math.abs(recap.deltaPct)}% vs the week before
+                                            {recap.deltaPct >= 0 ? '▲' : '▼'} {t('statsVsWeekBefore').replace('{n}', String(Math.abs(recap.deltaPct)))}
                                         </Text>
                                     )}
                                 </View>
                             </View>
                             <Text style={[styles.recapSub, { color: mutedForeground }]}>
-                                {recap.activeDays} active day{recap.activeDays === 1 ? '' : 's'}
-                                {recap.bestDay ? ` · best: ${recap.bestDay} (${recap.bestCount})` : ''}
+                                {t(recap.activeDays === 1 ? 'statsActiveDayOne' : 'statsActiveDayMany').replace('{n}', String(recap.activeDays))}
+                                {recap.bestDayIndex !== null ? t('statsBestDay').replace('{day}', t(DAY_NAME_KEYS[recap.bestDayIndex])).replace('{n}', String(recap.bestCount)) : ''}
                             </Text>
                         </View>
                     </>
                 )}
 
-                <SectionHeader title="ACTIVITY" />
+                <SectionHeader title={t('statsActivity')} />
                 <View style={[styles.heatmapCard, { backgroundColor: cardColor }]}>
                     <ReviewHeatmap data={stats?.dailyReviews} />
                 </View>
@@ -194,7 +198,7 @@ export default function StatsScreen() {
                 {hardest.length > 0 && (
                     <>
                         <View style={styles.hardHeaderRow}>
-                            <SectionHeader title="TOUGHEST CARDS" />
+                            <SectionHeader title={t('statsToughestCards')} />
                             <TouchableOpacity
                                 style={[styles.hardDrillBtn, { backgroundColor: accentColor }]}
                                 onPress={drillHardest}
@@ -202,7 +206,7 @@ export default function StatsScreen() {
                                 accessibilityRole="button"
                             >
                                 <Brain size={13} color={backgroundColor} strokeWidth={2.5} />
-                                <Text style={[styles.hardDrillText, { color: backgroundColor }]}>Drill</Text>
+                                <Text style={[styles.hardDrillText, { color: backgroundColor }]}>{t('statsDrill')}</Text>
                             </TouchableOpacity>
                         </View>
                         <View style={styles.group}>
@@ -219,23 +223,23 @@ export default function StatsScreen() {
                     </>
                 )}
 
-                <SectionHeader title="LIFETIME" />
+                <SectionHeader title={t('statsLifetime')} />
                 <View style={styles.group}>
-                    <StatRow icon={Zap} label="Level" value={`Lvl ${level.level} · ${level.rank}`} />
-                    <StatRow icon={Zap} label="Total XP" value={`${(stats?.totalXp ?? 0).toLocaleString()} XP`} />
-                    <StatRow icon={BookOpen} label="Cards Reviewed" value={`${stats?.totalCardsReviewed ?? 0}`} />
-                    <StatRow icon={Clock} label="Study Time" value={formatStudyTime(stats?.totalStudyTime ?? 0)} />
-                    <StatRow icon={Flame} label="Current Streak" value={`${stats?.currentStreak ?? 0} day${(stats?.currentStreak ?? 0) === 1 ? '' : 's'}`} />
-                    <StatRow icon={TrendingUp} label="Longest Streak" value={`${stats?.longestStreak ?? 0} day${(stats?.longestStreak ?? 0) === 1 ? '' : 's'}`} />
-                    <StatRow icon={Snowflake} label="Streak Freezes" value={`${stats?.streakFreezes ?? 0}`} />
-                    <StatRow icon={Database} label="Decks" value={`${deckCount}`} />
+                    <StatRow icon={Zap} label={t('statsLevelLabel')} value={t('statsLvlRank').replace('{n}', String(level.level)).replace('{rank}', level.rank)} />
+                    <StatRow icon={Zap} label={t('statsTotalXp')} value={`${(stats?.totalXp ?? 0).toLocaleString()} XP`} />
+                    <StatRow icon={BookOpen} label={t('statsCardsReviewed')} value={`${stats?.totalCardsReviewed ?? 0}`} />
+                    <StatRow icon={Clock} label={t('statsStudyTime')} value={formatStudyTime(stats?.totalStudyTime ?? 0)} />
+                    <StatRow icon={Flame} label={t('statsCurrentStreak')} value={t(stats?.currentStreak === 1 ? 'statsDayOne' : 'statsDayMany').replace('{n}', String(stats?.currentStreak ?? 0))} />
+                    <StatRow icon={TrendingUp} label={t('statsLongestStreak')} value={t(stats?.longestStreak === 1 ? 'statsDayOne' : 'statsDayMany').replace('{n}', String(stats?.longestStreak ?? 0))} />
+                    <StatRow icon={Snowflake} label={t('statsStreakFreezes')} value={`${stats?.streakFreezes ?? 0}`} />
+                    <StatRow icon={Database} label={t('decks')} value={`${deckCount}`} />
                 </View>
 
-                <SectionHeader title="ACHIEVEMENTS" />
+                <SectionHeader title={t('statsAchievementsTitle')} />
                 <View style={styles.group}>
                     <StatRow
                         icon={Award}
-                        label="Achievements"
+                        label={t('statsAchievements')}
                         value={`${unlocked} / ${ACHIEVEMENTS.length}`}
                         onPress={() => router.push('/achievements')}
                     />

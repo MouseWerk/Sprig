@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
 import { getCachedData, setCachedData, updateCardInDeck, updateUserStats } from '@/utils/Storage';
@@ -33,6 +34,7 @@ export default function FeedScreen() {
     const { id, uri, name } = useLocalSearchParams<{ id: string; uri: string; name?: string }>();
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const { t } = useLanguage();
     const listRef = useRef<FlatList<FeedCard>>(null);
 
     const [cards, setCards] = useState<FeedCard[] | null>(null);
@@ -146,7 +148,7 @@ export default function FeedScreen() {
     };
 
     const headerOptions = {
-        title: name || 'Feed',
+        title: name || t('onboardFeed'),
         headerStyle: { backgroundColor },
         headerTintColor: textColor,
         headerShadowVisible: false,
@@ -182,11 +184,11 @@ export default function FeedScreen() {
             <View style={[styles.container, styles.center, { backgroundColor, paddingHorizontal: 32 }]}>
                 <Stack.Screen options={headerOptions} />
                 <FileWarning size={48} color="#ef4444" strokeWidth={2} />
-                <Text style={[styles.emptyTitle, { color: textColor }]}>No cards to scroll</Text>
+                <Text style={[styles.emptyTitle, { color: textColor }]}>{t('feedNoCards')}</Text>
                 <Text style={[styles.emptyText, { color: mutedForeground }]}>
-                    Add some cards to this deck first, then swipe through them here.
+                    {t('feedNoCardsText')}
                 </Text>
-                <Button title="Go Back" onPress={() => router.back()} style={{ marginTop: 8, width: 200 }} />
+                <Button title={t('swipeGoBack')} onPress={() => router.back()} style={{ marginTop: 8, width: 200 }} />
             </View>
         );
     }
@@ -197,7 +199,7 @@ export default function FeedScreen() {
             <View style={[styles.page, { height: pageHeight, paddingBottom: insets.bottom + 16 }]}>
                 <View style={[styles.card, { backgroundColor: cardColor, borderColor: secondaryBg }, isHighlightMode && { borderColor: primaryColor + '60' }]}>
                     <Text style={[styles.cardLabel, { color: isHighlightMode ? primaryColor : mutedForeground }]}>
-                        {isHighlightMode ? 'TAP WORDS TO HIGHLIGHT' : `CARD ${index + 1} / ${cards.length}`}
+                        {isHighlightMode ? t('feedTapWordsToHighlight') : t('feedCardNOf').replace('{n}', String(index + 1)).replace('{total}', String(cards.length))}
                     </Text>
                     <ScrollView
                         contentContainerStyle={styles.cardScroll}
@@ -217,7 +219,7 @@ export default function FeedScreen() {
 
                         <View style={styles.answerDivider}>
                             <View style={[styles.dividerLine, { backgroundColor: secondaryBg }]} />
-                            <Text style={[styles.answerChip, { color: primaryColor, backgroundColor: primaryColor + '15' }]}>ANSWER</Text>
+                            <Text style={[styles.answerChip, { color: primaryColor, backgroundColor: primaryColor + '15' }]}>{t('feedAnswerChip')}</Text>
                             <View style={[styles.dividerLine, { backgroundColor: secondaryBg }]} />
                         </View>
 
@@ -228,7 +230,7 @@ export default function FeedScreen() {
                                 activeOpacity={0.8}
                             >
                                 <Eye size={18} color={mutedForeground} />
-                                <Text style={[styles.revealText, { color: mutedForeground }]}>Tap to reveal</Text>
+                                <Text style={[styles.revealText, { color: mutedForeground }]}>{t('tapToReveal')}</Text>
                             </TouchableOpacity>
                         ) : isHighlightMode ? (
                             <HighlightableText
@@ -245,7 +247,7 @@ export default function FeedScreen() {
                     {index < cards.length - 1 && (
                         <View style={styles.swipeHint}>
                             <ChevronsDown size={18} color={mutedForeground} style={{ transform: [{ rotate: '180deg' }] }} />
-                            <Text style={[styles.swipeHintText, { color: mutedForeground }]}>Swipe up for next</Text>
+                            <Text style={[styles.swipeHintText, { color: mutedForeground }]}>{t('feedSwipeUpForNext')}</Text>
                         </View>
                     )}
                 </View>

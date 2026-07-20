@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from '@/utils/AppHaptics';
 import { Check, HelpCircle, RotateCcw, X } from 'lucide-react-native';
@@ -44,6 +45,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
     frontLabel = 'Question',
     backLabel = 'Answer'
 }) => {
+    const { t } = useLanguage();
     const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
     const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
     const SWIPE_THRESHOLD_Y = SCREEN_HEIGHT * 0.15;
@@ -193,7 +195,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
                                 onPress={toggleFlip}
                             >
                                 <RotateCcw size={16} color={textColor} />
-                                <Text style={[styles.flipBtnText, { color: textColor }]}>Flip Card</Text>
+                                <Text style={[styles.flipBtnText, { color: textColor }]}>{t('flashcardFlipCard')}</Text>
                             </TouchableOpacity>
                         )}
                     </CardContent>
@@ -226,7 +228,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
                                 onPress={toggleFlip}
                             >
                                 <RotateCcw size={16} color={textColor} />
-                                <Text style={[styles.flipBtnText, { color: textColor }]}>Flip Card</Text>
+                                <Text style={[styles.flipBtnText, { color: textColor }]}>{t('flashcardFlipCard')}</Text>
                             </TouchableOpacity>
                         )}
                     </CardContent>

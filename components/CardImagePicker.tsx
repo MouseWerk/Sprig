@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { extractImageFiles, imageToken, importCardImage, removeImageToken, resolveCardImageUri } from '@/utils/CardImages';
 import * as DocumentPicker from 'expo-document-picker';
@@ -17,6 +18,7 @@ interface CardImagePickerProps {
 }
 
 export function CardImagePicker({ text, onChangeText }: CardImagePickerProps) {
+    const { t } = useLanguage();
     const textColor = useThemeColor({}, 'text');
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
@@ -86,13 +88,13 @@ export function CardImagePicker({ text, onChangeText }: CardImagePickerProps) {
                     <>
                         <ImagePlus size={16} color={accentColor} strokeWidth={2.5} />
                         <Text style={[styles.addText, { color: textColor }]}>
-                            {files.length > 0 ? 'Add' : 'Add Image'}
+                            {files.length > 0 ? t('cardImageAdd') : t('cardImageAddImage')}
                         </Text>
                     </>
                 )}
             </TouchableOpacity>
             {files.length === 0 && (
-                <Text style={[styles.hint, { color: mutedForeground }]}>optional</Text>
+                <Text style={[styles.hint, { color: mutedForeground }]}>{t('cardImageOptional')}</Text>
             )}
         </ScrollView>
     );

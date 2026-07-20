@@ -1,3 +1,5 @@
+import { TranslationKey } from '@/constants/translations';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { migrateKey } from '@/utils/StorageMigration';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -59,20 +61,22 @@ function Bar({ width, color }: { width: number; color: string }) {
 }
 
 function WelcomeVignette() {
+    const { t } = useLanguage();
     return (
         <View style={styles.vignette}>
             <SprigLogo size={128} />
             <View style={styles.chipRow}>
-                <Chip icon={Zap} label="Cards" />
-                <Chip icon={FileText} label="PDFs" />
-                <Chip icon={Music} label="Audio" />
-                <Chip icon={Sprout} label="Focus" />
+                <Chip icon={Zap} label={t('cards')} />
+                <Chip icon={FileText} label={t('pdfs')} />
+                <Chip icon={Music} label={t('audio')} />
+                <Chip icon={Sprout} label={t('onboardFocus')} />
             </View>
         </View>
     );
 }
 
 function StudyVignette() {
+    const { t } = useLanguage();
     const cardColor = useThemeColor({}, 'card');
     const secondaryBg = useThemeColor({}, 'secondary');
     const mutedForeground = useThemeColor({}, 'mutedForeground');
@@ -82,7 +86,7 @@ function StudyVignette() {
             <View style={styles.stackWrap}>
                 <View style={[styles.mockCard, styles.mockCardBehind, { backgroundColor: secondaryBg }]} />
                 <View style={[styles.mockCard, { backgroundColor: cardColor, borderColor: secondaryBg }]}>
-                    <Text style={[styles.mockLabel, { color: mutedForeground }]}>QUESTION</Text>
+                    <Text style={[styles.mockLabel, { color: mutedForeground }]}>{t('onboardQuestion')}</Text>
                     <View style={{ gap: 8, alignItems: 'center' }}>
                         <Bar width={150} color={secondaryBg} />
                         <Bar width={96} color={secondaryBg} />
@@ -90,25 +94,26 @@ function StudyVignette() {
                     <View style={styles.gradeRow}>
                         <View style={[styles.gradePill, { backgroundColor: '#ef444415' }]}>
                             <X size={14} color="#ef4444" strokeWidth={3} />
-                            <Text style={[styles.gradeText, { color: '#ef4444' }]}>Again</Text>
+                            <Text style={[styles.gradeText, { color: '#ef4444' }]}>{t('onboardAgain')}</Text>
                         </View>
                         <View style={[styles.gradePill, { backgroundColor: '#22c55e15' }]}>
                             <Check size={14} color="#22c55e" strokeWidth={3} />
-                            <Text style={[styles.gradeText, { color: '#22c55e' }]}>Got it</Text>
+                            <Text style={[styles.gradeText, { color: '#22c55e' }]}>{t('onboardGotIt')}</Text>
                         </View>
                     </View>
                 </View>
             </View>
             <View style={styles.chipRow}>
-                <Chip icon={HelpCircle} label="Quiz" />
-                <Chip icon={Keyboard} label="Type" />
-                <Chip icon={GalleryVerticalEnd} label="Feed" />
+                <Chip icon={HelpCircle} label={t('onboardQuiz')} />
+                <Chip icon={Keyboard} label={t('onboardType')} />
+                <Chip icon={GalleryVerticalEnd} label={t('onboardFeed')} />
             </View>
         </View>
     );
 }
 
 function LibraryVignette() {
+    const { t } = useLanguage();
     const cardColor = useThemeColor({}, 'card');
     const secondaryBg = useThemeColor({}, 'secondary');
     const accent = useThemeColor({}, 'primary');
@@ -142,13 +147,14 @@ function LibraryVignette() {
                 </View>
             </View>
             <View style={styles.chipRow}>
-                <Chip icon={Wifi} label="Drop files from your computer" />
+                <Chip icon={Wifi} label={t('onboardDropFiles')} />
             </View>
         </View>
     );
 }
 
 function FocusVignette() {
+    const { t } = useLanguage();
     const textColor = useThemeColor({}, 'text');
     const secondaryBg = useThemeColor({}, 'secondary');
     const accent = useThemeColor({}, 'primary');
@@ -180,13 +186,14 @@ function FocusVignette() {
                 <Text style={[styles.timerText, { color: textColor }]}>{timerLabel}</Text>
             </View>
             <View style={styles.chipRow}>
-                <Chip icon={Music} label="Ambient sounds" />
+                <Chip icon={Music} label={t('onboardAmbientSounds')} />
             </View>
         </View>
     );
 }
 
 function ProgressVignette() {
+    const { t } = useLanguage();
     const cardColor = useThemeColor({}, 'card');
     const textColor = useThemeColor({}, 'text');
     const mutedForeground = useThemeColor({}, 'mutedForeground');
@@ -198,22 +205,22 @@ function ProgressVignette() {
             <View style={[styles.mockStats, { backgroundColor: cardColor, borderColor: secondaryBg }]}>
                 <View style={styles.statRow}>
                     <Flame size={18} color="#f97316" strokeWidth={2.5} fill="#f97316" />
-                    <Text style={[styles.statText, { color: textColor }]}>12 day streak</Text>
+                    <Text style={[styles.statText, { color: textColor }]}>{t('onboardDayStreakSample')}</Text>
                     <View style={{ flex: 1 }} />
                     <Snowflake size={14} color={mutedForeground} strokeWidth={2.5} />
                     <Text style={[styles.statSub, { color: mutedForeground }]}>2</Text>
                 </View>
                 <View style={styles.statRow}>
                     <Zap size={18} color={accent} strokeWidth={2.5} fill={accent} />
-                    <Text style={[styles.statText, { color: textColor }]}>Level 5</Text>
-                    <Text style={[styles.statSub, { color: mutedForeground }]}>Scholar</Text>
+                    <Text style={[styles.statText, { color: textColor }]}>{t('onboardLevelSample')}</Text>
+                    <Text style={[styles.statSub, { color: mutedForeground }]}>{t('onboardScholarSample')}</Text>
                 </View>
                 <View style={[styles.mockProgress, { backgroundColor: secondaryBg }]}>
                     <View style={[styles.mockProgressFill, { width: '68%', backgroundColor: accent }]} />
                 </View>
             </View>
             <View style={styles.chipRow}>
-                <Chip icon={Trophy} label="23 achievements to unlock" />
+                <Chip icon={Trophy} label={t('onboardAchievementsSample')} />
             </View>
         </View>
     );
@@ -221,41 +228,22 @@ function ProgressVignette() {
 
 interface Slide {
     Vignette: React.ComponentType;
-    title: string;
-    body: string;
+    titleKey: TranslationKey;
+    bodyKey: TranslationKey;
 }
 
 const SLIDES: Slide[] = [
-    {
-        Vignette: WelcomeVignette,
-        title: 'Welcome to Sprig',
-        body: 'A calm study companion. Flashcards, PDFs, audio and focus sessions — everything in one quiet place.',
-    },
-    {
-        Vignette: StudyVignette,
-        title: 'Study your way',
-        body: 'Swipe to grade each card and spaced repetition schedules the next review for you. Switch to quiz, typing or feed mode whenever it fits.',
-    },
-    {
-        Vignette: LibraryVignette,
-        title: 'Bring all your material',
-        body: 'PDFs reopen exactly where you stopped, lectures play at your pace — and you can drop files straight from your computer over WiFi.',
-    },
-    {
-        Vignette: FocusVignette,
-        title: 'Grow while you focus',
-        body: 'Your plant grows for every focused minute and wilts if you wander off. Add ambient sounds and take earned breaks.',
-    },
-    {
-        Vignette: ProgressVignette,
-        title: 'Watch yourself grow',
-        body: 'Earn XP, keep your streak alive with freezes, unlock achievements and let exam countdowns pace your reviews.',
-    },
+    { Vignette: WelcomeVignette, titleKey: 'onboardWelcomeTitle', bodyKey: 'onboardWelcomeBody' },
+    { Vignette: StudyVignette, titleKey: 'onboardStudyTitle', bodyKey: 'onboardStudyBody' },
+    { Vignette: LibraryVignette, titleKey: 'onboardLibraryTitle', bodyKey: 'onboardLibraryBody' },
+    { Vignette: FocusVignette, titleKey: 'onboardFocusTitle', bodyKey: 'onboardFocusBody' },
+    { Vignette: ProgressVignette, titleKey: 'onboardProgressTitle', bodyKey: 'onboardProgressBody' },
 ];
 
 // Full-screen first-run walkthrough. Shows once, then never again unless
 // storage is cleared. Rendered near the app root so it overlays every tab.
 export function Onboarding() {
+    const { t } = useLanguage();
     const insets = useSafeAreaInsets();
     const [visible, setVisible] = useState(false);
     const [index, setIndex] = useState(0);
@@ -315,7 +303,7 @@ export function Onboarding() {
                         {index + 1} / {SLIDES.length}
                     </Text>
                     <TouchableOpacity onPress={finish} hitSlop={12} style={{ opacity: isLast ? 0 : 1 }} disabled={isLast}>
-                        <Text style={[styles.skip, { color: mutedForeground }]}>Skip</Text>
+                        <Text style={[styles.skip, { color: mutedForeground }]}>{t('onboardSkip')}</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -331,8 +319,8 @@ export function Onboarding() {
                     {SLIDES.map((slide, i) => (
                         <View key={i} style={[styles.slide, { width }]}>
                             <slide.Vignette />
-                            <Text style={[styles.title, { color: textColor }]}>{slide.title}</Text>
-                            <Text style={[styles.body, { color: mutedForeground }]}>{slide.body}</Text>
+                            <Text style={[styles.title, { color: textColor }]}>{t(slide.titleKey)}</Text>
+                            <Text style={[styles.body, { color: mutedForeground }]}>{t(slide.bodyKey)}</Text>
                         </View>
                     ))}
                 </ScrollView>
@@ -359,7 +347,7 @@ export function Onboarding() {
                         activeOpacity={0.9}
                     >
                         <Text style={[styles.nextText, { color: primaryForeground }]}>
-                            {isLast ? 'Get Started' : 'Next'}
+                            {isLast ? t('onboardGetStarted') : t('onboardNext')}
                         </Text>
                     </TouchableOpacity>
                 </View>

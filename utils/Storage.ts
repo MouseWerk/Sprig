@@ -1,3 +1,4 @@
+import { TranslationKey } from '@/constants/translations';
 import * as FileSystem from 'expo-file-system/legacy';
 import { ACHIEVEMENTS, AchievementDef, evaluateAchievements } from './Achievements';
 import { parseFlashcardsCsv, repairMispairedArrowCards } from './CsvParser';
@@ -111,14 +112,14 @@ export const POT_PRICES: Record<string, number> = {
 
 export interface DecorationDef {
     id: string;
-    name: string;
+    nameKey: TranslationKey;
     price: number;
 }
 
 export const DECORATION_CATALOG: DecorationDef[] = [
-    { id: 'stones', name: 'Stone Border', price: 500 },
-    { id: 'lanterns', name: 'Lantern Row', price: 1500 },
-    { id: 'fence', name: 'Picket Fence', price: 3000 },
+    { id: 'stones', nameKey: 'decorationStones', price: 500 },
+    { id: 'lanterns', nameKey: 'decorationLanterns', price: 1500 },
+    { id: 'fence', nameKey: 'decorationFence', price: 3000 },
 ];
 
 export interface GroveEconomy {

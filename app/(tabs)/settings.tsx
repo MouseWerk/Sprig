@@ -15,7 +15,7 @@ import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { Bell, ChevronRight, Clock, Coffee, Database, DownloadCloud, Github, Info, Monitor, Moon, PlayCircle, ScrollText, ShieldCheck, Smartphone, Star, Sun, Target, Timer, Trash2, UploadCloud, Vibrate, Wifi } from 'lucide-react-native';
+import { Bell, ChevronRight, Clock, Coffee, Database, DownloadCloud, Github, Globe, Info, Monitor, Moon, PlayCircle, ScrollText, ShieldCheck, Smartphone, Star, Sun, Target, Timer, Trash2, UploadCloud, Vibrate, Wifi } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Linking, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,7 +34,7 @@ export default function SettingsScreen() {
   const { mode, setThemeMode, theme } = useCustomTheme();
   const { showToast } = useToast();
   const confirm = useConfirm();
-  const { t } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [prefs, setPrefs] = useState<Preferences>(getPrefsSync());
@@ -59,18 +59,18 @@ export default function SettingsScreen() {
       return;
     }
     if (!isWebServerSupported()) {
-      showToast({ message: 'Web upload needs the full app build — it isn\'t available in Expo Go', type: 'warning' });
+      showToast({ message: t('settingsWebUploadNeedsBuild'), type: 'warning' });
       return;
     }
     try {
       const url = await startWebServer((name) => {
-        showToast({ message: `Received ${name}`, type: 'success' });
+        showToast({ message: t('settingsReceived').replace('{name}', name), type: 'success' });
       });
       setWebServerUrl(url);
       setWebServerOn(true);
     } catch (e: any) {
       showToast({
-        message: e?.message === 'no-network' ? 'Connect to WiFi first' : 'Could not start the upload server',
+        message: e?.message === 'no-network' ? t('settingsConnectWifiFirst') : t('settingsCouldNotStartServer'),
         type: 'error',
       });
     }
@@ -101,9 +101,9 @@ export default function SettingsScreen() {
 
   const handleClearCache = async () => {
     const ok = await confirm({
-      title: 'Clear Cache',
-      message: 'This will clear all temporary data but keep your flashcards. Continue?',
-      confirmText: 'Clear',
+      title: t('settingsClearCache'),
+      message: t('settingsClearCacheMessage'),
+      confirmText: t('settingsClear'),
       destructive: true,
     });
     if (!ok) return;
@@ -112,13 +112,13 @@ export default function SettingsScreen() {
     const keys = await AsyncStorage.getAllKeys();
     const cacheKeys = keys.filter((k) => k.startsWith('csvtudyapp_cache_'));
     if (cacheKeys.length > 0) await AsyncStorage.multiRemove(cacheKeys);
-    showToast({ message: 'Cache cleared successfully!', type: 'success' });
+    showToast({ message: t('settingsCacheCleared'), type: 'success' });
   };
 
   const handleShare = async () => {
     try {
       await Share.share({
-        message: 'Check out Sprig — a calm study companion for flashcards, PDFs and focus sessions!',
+        message: t('settingsShareMessage'),
       });
     } catch (error) {
       console.error(error);
@@ -127,11 +127,10 @@ export default function SettingsScreen() {
 
   const handlePrivacy = async () => {
     const viewFull = await confirm({
-      title: 'Your data stays on your device',
-      message:
-        'Sprig keeps everything local — your decks, PDFs, audio, and study stats are stored only on this phone and are never uploaded to any server. Notifications and reminders are scheduled on-device.',
-      confirmText: 'View Full Policy',
-      cancelText: 'Close',
+      title: t('settingsPrivacyTitle'),
+      message: t('settingsPrivacyMessage'),
+      confirmText: t('settingsViewFullPolicy'),
+      cancelText: t('close'),
     });
     if (viewFull) {
       await openUrl('https://mousewerk.de/sprig/privacy');
@@ -143,7 +142,7 @@ export default function SettingsScreen() {
       await Linking.openURL(url);
     } catch (e) {
       console.error('Could not open URL:', e);
-      showToast({ message: 'Could not open link', type: 'error' });
+      showToast({ message: t('couldNotOpenLink'), type: 'error' });
     }
   };
 
@@ -158,16 +157,16 @@ export default function SettingsScreen() {
 
   const handleDeleteAll = async () => {
     const first = await confirm({
-      title: 'Delete all data?',
-      message: 'This permanently removes every deck, PDF, audio file, and all your stats and achievements. A backup first is strongly recommended.',
-      confirmText: 'Continue',
+      title: t('settingsDeleteAllTitle'),
+      message: t('settingsDeleteAllMessage'),
+      confirmText: t('settingsContinue'),
       destructive: true,
     });
     if (!first) return;
     const second = await confirm({
-      title: 'Are you absolutely sure?',
-      message: 'There is no undo. Everything will be gone.',
-      confirmText: 'Delete Everything',
+      title: t('settingsAbsolutelySure'),
+      message: t('settingsNoUndo'),
+      confirmText: t('settingsDeleteEverything'),
       destructive: true,
     });
     if (!second) return;
@@ -175,10 +174,10 @@ export default function SettingsScreen() {
     try {
       await wipeAllData();
       await AsyncStorage.clear();
-      showToast({ message: 'All data deleted. Restart Sprig for a fresh start.', type: 'info' });
+      showToast({ message: t('settingsAllDataDeleted'), type: 'info' });
     } catch (e) {
       console.error('Wipe failed:', e);
-      showToast({ message: 'Could not delete everything', type: 'error' });
+      showToast({ message: t('settingsCouldNotDeleteAll'), type: 'error' });
     } finally {
       setBusy(false);
     }
@@ -188,17 +187,17 @@ export default function SettingsScreen() {
     if (busy) return;
     setBusy(true);
     try {
-      showToast({ message: 'Preparing backup…', type: 'info' });
+      showToast({ message: t('settingsPreparingBackup'), type: 'info' });
       const uri = await createBackup();
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Save Sprig backup' });
+        await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: t('settingsSaveBackupDialog') });
       } else {
-        showToast({ message: 'Sharing is not available on this device', type: 'error' });
+        showToast({ message: t('settingsSharingUnavailable'), type: 'error' });
       }
     } catch (e) {
       console.error('Backup failed:', e);
-      showToast({ message: 'Backup failed', type: 'error' });
+      showToast({ message: t('settingsBackupFailed'), type: 'error' });
     } finally {
       setBusy(false);
     }
@@ -210,20 +209,22 @@ export default function SettingsScreen() {
       const res = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain'], copyToCacheDirectory: true });
       if (res.canceled || !res.assets?.length) return;
       const ok = await confirm({
-        title: 'Restore from backup?',
-        message: 'This adds decks, folders and audio from the backup and merges your stats. Items you already have are kept — nothing is deleted.',
-        confirmText: 'Restore',
+        title: t('settingsRestoreTitle'),
+        message: t('settingsRestoreMessage'),
+        confirmText: t('settingsRestore'),
       });
       if (!ok) return;
       setBusy(true);
       const summary = await importBackup(res.assets[0].uri);
       showToast({
-        message: `Restored ${summary.decksAdded} deck${summary.decksAdded === 1 ? '' : 's'}, ${summary.audioAdded} audio`,
+        message: t(summary.decksAdded === 1 ? 'settingsRestoredOne' : 'settingsRestoredMany')
+          .replace('{decks}', String(summary.decksAdded))
+          .replace('{audio}', String(summary.audioAdded)),
         type: 'success',
       });
     } catch (e) {
       console.error('Restore failed:', e);
-      showToast({ message: 'Could not read that backup file', type: 'error' });
+      showToast({ message: t('settingsRestoreReadFailed'), type: 'error' });
     } finally {
       setBusy(false);
     }
@@ -273,33 +274,63 @@ export default function SettingsScreen() {
         <View style={styles.brandHeader}>
           <SprigLogo size={56} />
           <Text style={[styles.brandVersion, { color: mutedForeground }]}>
-            Version {Constants.expoConfig?.version ?? '1.0.0'}
+            {t('settingsVersion')} {Constants.expoConfig?.version ?? '1.0.0'}
           </Text>
+        </View>
+
+        <SectionHeader title={t('language').toUpperCase()} />
+        <View style={styles.group}>
+          <View style={[styles.item, { backgroundColor: cardColor }]}>
+            <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
+              <Globe size={20} color={accentColor} strokeWidth={2.5} />
+            </View>
+            <Text style={[styles.itemLabel, { color: textColor }]}>{t('language')}</Text>
+            <View style={styles.chipRow}>
+              <TouchableOpacity
+                style={[styles.prefChip, { backgroundColor: language === 'en' ? accentColor : secondaryBg, minWidth: 44 }]}
+                onPress={() => setLanguage('en')}
+                accessibilityLabel="English"
+                accessibilityRole="radio"
+                accessibilityState={{ selected: language === 'en' }}
+              >
+                <Text style={[styles.prefChipText, { color: language === 'en' ? backgroundColor : mutedForeground }]}>EN</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.prefChip, { backgroundColor: language === 'de' ? accentColor : secondaryBg, minWidth: 44 }]}
+                onPress={() => setLanguage('de')}
+                accessibilityLabel="Deutsch"
+                accessibilityRole="radio"
+                accessibilityState={{ selected: language === 'de' }}
+              >
+                <Text style={[styles.prefChipText, { color: language === 'de' ? backgroundColor : mutedForeground }]}>DE</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
 
         <SectionHeader title={t('theme').toUpperCase()} />
         <View style={styles.group}>
           <SettingItem
             icon={isDarkMode ? Moon : Sun}
-            label={t('dark') + ' Mode'}
+            label={t('settingsDarkMode')}
             toggle={isDarkMode}
             onPress={toggleTheme}
           />
           <SettingItem
             icon={Monitor}
-            label={'Use ' + t('system') + ' Theme'}
+            label={t('settingsUseSystemTheme')}
             toggle={mode === 'system'}
             onPress={() => setThemeMode(mode === 'system' ? theme || 'light' : 'system')}
           />
         </View>
 
-        <SectionHeader title="PREFERENCES" />
+        <SectionHeader title={t('settingsPreferences')} />
         <View style={styles.group}>
           <View style={[styles.item, { backgroundColor: cardColor }]}>
             <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
               <Target size={20} color={accentColor} strokeWidth={2.5} />
             </View>
-            <Text style={[styles.itemLabel, { color: textColor }]}>Daily Goal</Text>
+            <Text style={[styles.itemLabel, { color: textColor }]}>{t('settingsDailyGoal')}</Text>
             <View style={styles.chipRow}>
               {DAILY_GOAL_OPTIONS.map(n => (
                 <TouchableOpacity
@@ -319,7 +350,7 @@ export default function SettingsScreen() {
             <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
               <Timer size={20} color={accentColor} strokeWidth={2.5} />
             </View>
-            <Text style={[styles.itemLabel, { color: textColor }]}>Focus Length</Text>
+            <Text style={[styles.itemLabel, { color: textColor }]}>{t('settingsFocusLength')}</Text>
             <View style={styles.chipRow}>
               {FOCUS_MINUTES_OPTIONS.map(n => (
                 <TouchableOpacity
@@ -337,7 +368,7 @@ export default function SettingsScreen() {
           </View>
           <SettingItem
             icon={Bell}
-            label="Streak Reminder"
+            label={t('settingsStreakReminder')}
             toggle={prefs.streakReminderEnabled}
             onPress={toggleStreakReminder}
           />
@@ -346,7 +377,7 @@ export default function SettingsScreen() {
               <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
                 <Clock size={20} color={accentColor} strokeWidth={2.5} />
               </View>
-              <Text style={[styles.itemLabel, { color: textColor }]}>Reminder Time</Text>
+              <Text style={[styles.itemLabel, { color: textColor }]}>{t('settingsReminderTime')}</Text>
               <View style={styles.chipRow}>
                 <TouchableOpacity
                   style={[styles.prefChip, { backgroundColor: secondaryBg }]}
@@ -376,18 +407,18 @@ export default function SettingsScreen() {
           )}
           <SettingItem
             icon={Vibrate}
-            label="Haptic Feedback"
+            label={t('settingsHapticFeedback')}
             toggle={prefs.hapticsEnabled}
             onPress={() => setPref('hapticsEnabled', !prefs.hapticsEnabled)}
           />
-          <SettingItem icon={PlayCircle} label="Replay Intro" onPress={replayOnboarding} />
+          <SettingItem icon={PlayCircle} label={t('settingsReplayIntro')} onPress={replayOnboarding} />
         </View>
 
-        <SectionHeader title="WEB UPLOAD" />
+        <SectionHeader title={t('settingsWebUpload')} />
         <View style={styles.group}>
           <SettingItem
             icon={Wifi}
-            label="Upload from Computer"
+            label={t('settingsUploadFromComputer')}
             toggle={webServerOn}
             onPress={toggleWebServer}
           />
@@ -399,7 +430,7 @@ export default function SettingsScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.itemLabel, { color: textColor }]}>{webServerUrl}</Text>
                 <Text style={[styles.itemHint, { color: mutedForeground }]}>
-                  Open this address in a browser on the same WiFi to drop PDFs and audio files into Sprig. Keep the app open while transferring.
+                  {t('settingsWebUploadHint')}
                 </Text>
               </View>
             </View>
@@ -407,7 +438,7 @@ export default function SettingsScreen() {
           {webServerOn && webServerLog.length > 0 && (
             <View style={[styles.item, { backgroundColor: cardColor, alignItems: 'flex-start' }]}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.itemHint, { color: mutedForeground, marginBottom: 6 }]}>Recent requests</Text>
+                <Text style={[styles.itemHint, { color: mutedForeground, marginBottom: 6 }]}>{t('settingsRecentRequests')}</Text>
                 {webServerLog.slice(0, 6).map((line, i) => (
                   <Text key={i} style={[styles.logLine, { color: mutedForeground }]} numberOfLines={1}>
                     {line}
@@ -418,35 +449,35 @@ export default function SettingsScreen() {
           )}
         </View>
 
-        <SectionHeader title="BACKUP & RESTORE" />
+        <SectionHeader title={t('settingsBackupRestore')} />
         <View style={styles.group}>
-          <SettingItem icon={DownloadCloud} label={busy ? 'Working…' : 'Back Up Everything'} onPress={handleBackup} />
-          <SettingItem icon={UploadCloud} label="Restore from Backup" onPress={handleRestore} />
+          <SettingItem icon={DownloadCloud} label={busy ? t('settingsWorking') : t('settingsBackUpEverything')} onPress={handleBackup} />
+          <SettingItem icon={UploadCloud} label={t('settingsRestoreFromBackup')} onPress={handleRestore} />
         </View>
 
-        <SectionHeader title="STORAGE & DATA" />
+        <SectionHeader title={t('storageData')} />
         <View style={styles.group}>
-          <SettingItem icon={Database} label="Clear Cache" onPress={handleClearCache} />
-          <SettingItem icon={ShieldCheck} label="Privacy" onPress={handlePrivacy} />
-          <SettingItem icon={Trash2} label="Delete All Data" onPress={handleDeleteAll} destructive />
+          <SettingItem icon={Database} label={t('settingsClearCache')} onPress={handleClearCache} />
+          <SettingItem icon={ShieldCheck} label={t('settingsPrivacy')} onPress={handlePrivacy} />
+          <SettingItem icon={Trash2} label={t('settingsDeleteAllData')} onPress={handleDeleteAll} destructive />
         </View>
 
-        <SectionHeader title="COMMUNITY" />
+        <SectionHeader title={t('settingsCommunity')} />
         <View style={styles.group}>
-          <SettingItem icon={Coffee} label="Support Development" onPress={() => openUrl('https://buymeacoffee.com/mousewerk')} />
-          <SettingItem icon={Star} label="Rate Sprig" onPress={handleRate} />
-          <SettingItem icon={Github} label="Github Repository" onPress={() => openUrl('https://github.com/MouseWerk/Sprig')} />
-          <SettingItem icon={Smartphone} label="Share with Friends" onPress={handleShare} />
+          <SettingItem icon={Coffee} label={t('settingsSupportDevelopment')} onPress={() => openUrl('https://buymeacoffee.com/mousewerk')} />
+          <SettingItem icon={Star} label={t('settingsRateSprig')} onPress={handleRate} />
+          <SettingItem icon={Github} label={t('settingsGithubRepo')} onPress={() => openUrl('https://github.com/MouseWerk/Sprig')} />
+          <SettingItem icon={Smartphone} label={t('settingsShareWithFriends')} onPress={handleShare} />
         </View>
 
-        <SectionHeader title="ABOUT" />
+        <SectionHeader title={t('settingsAbout')} />
         <View style={styles.group}>
-          <SettingItem icon={ScrollText} label="Credits & Licenses" onPress={() => router.push('/credits')} />
-          <SettingItem icon={Info} label="Version" value={Constants.expoConfig?.version ?? '1.0.0'} />
+          <SettingItem icon={ScrollText} label={t('settingsCreditsLicenses')} onPress={() => router.push('/credits')} />
+          <SettingItem icon={Info} label={t('settingsVersion')} value={Constants.expoConfig?.version ?? '1.0.0'} />
         </View>
 
         <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: mutedForeground }]}>Made by Mousewerk</Text>
+          <Text style={[styles.footerText, { color: mutedForeground }]}>{t('settingsMadeBy')}</Text>
           <Text style={[styles.footerVersion, { color: mutedForeground }]}>Sprig © 2026</Text>
         </View>
       </ScrollView>

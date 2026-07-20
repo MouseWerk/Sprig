@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { getLevelInfo } from '@/utils/Levels';
 import { getPrefsSync, subscribePrefs } from '@/utils/Preferences';
@@ -15,6 +16,7 @@ interface LevelCardProps {
 // Home-screen gamification banner: level ring + rank + XP progress, plus a
 // daily goal ring fed by today's review count.
 export function LevelCard({ stats, displayStreak }: LevelCardProps) {
+    const { t } = useLanguage();
     const textColor = useThemeColor({}, 'text');
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
@@ -47,7 +49,7 @@ export function LevelCard({ stats, displayStreak }: LevelCardProps) {
                     <View style={styles.xpRow}>
                         <Zap size={13} color={primaryColor} strokeWidth={2.5} fill={primaryColor} />
                         <Text style={[styles.xpText, { color: mutedForeground }]}>
-                            {info.xpToNext} XP to Level {info.level + 1}
+                            {t('levelCardXpToNext').replace('{xp}', String(info.xpToNext)).replace('{level}', String(info.level + 1))}
                         </Text>
                     </View>
                     <View style={[styles.xpTrack, { backgroundColor: primaryColor + '18' }]}>
@@ -66,7 +68,7 @@ export function LevelCard({ stats, displayStreak }: LevelCardProps) {
                     <View>
                         <Text style={[styles.statValue, { color: textColor }]}>{displayStreak}</Text>
                         <View style={styles.streakLabelRow}>
-                            <Text style={[styles.statLabel, { color: mutedForeground }]}>Day streak</Text>
+                            <Text style={[styles.statLabel, { color: mutedForeground }]}>{t('levelCardDayStreak')}</Text>
                             {(stats.streakFreezes ?? 0) > 0 && (
                                 <View style={styles.freezeBadge}>
                                     <Snowflake size={10} color="#38bdf8" strokeWidth={2.5} />
@@ -88,7 +90,7 @@ export function LevelCard({ stats, displayStreak }: LevelCardProps) {
                             {Math.min(todayCount, dailyGoal)}<Text style={{ color: mutedForeground, fontSize: 13 }}> / {dailyGoal}</Text>
                         </Text>
                         <Text style={[styles.statLabel, { color: mutedForeground }]}>
-                            {goalMet ? 'Goal reached!' : 'Daily goal'}
+                            {goalMet ? t('levelCardGoalReached') : t('levelCardDailyGoal')}
                         </Text>
                         <View style={[styles.goalTrack, { backgroundColor: secondaryBg }]}>
                             <View style={[styles.goalFill, { width: `${Math.round(goalProgress * 100)}%`, backgroundColor: goalMet ? '#22c55e' : primaryColor }]} />

@@ -1,4 +1,6 @@
 import { useToast } from '@/components/ui/Toast';
+import { TranslationKey } from '@/constants/translations';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as Haptics from '@/utils/AppHaptics';
@@ -10,21 +12,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface SoundDef {
     id: string;
-    name: string;
+    nameKey: TranslationKey;
     icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
     color: string;
     src: number;
 }
 
 const SOUNDS: SoundDef[] = [
-    { id: 'rain', name: 'Rain', icon: CloudRain, color: '#3b82f6', src: require('../assets/sounds/rain.mp3') },
-    { id: 'waves', name: 'Ocean', icon: Waves, color: '#06b6d4', src: require('../assets/sounds/waves.mp3') },
-    { id: 'fire', name: 'Campfire', icon: Flame, color: '#f97316', src: require('../assets/sounds/fire.mp3') },
-    { id: 'wind', name: 'Wind', icon: Wind, color: '#64748b', src: require('../assets/sounds/wind.mp3') },
-    { id: 'forest', name: 'Forest', icon: Trees, color: '#22c55e', src: require('../assets/sounds/forest.mp3') },
-    { id: 'birds', name: 'Birds', icon: Bird, color: '#eab308', src: require('../assets/sounds/birds.mp3') },
-    { id: 'river', name: 'River', icon: Droplets, color: '#14b8a6', src: require('../assets/sounds/river.mp3') },
-    { id: 'thunder', name: 'Thunder', icon: CloudLightning, color: '#8b5cf6', src: require('../assets/sounds/thunder.mp3') },
+    { id: 'rain', nameKey: 'soundRain', icon: CloudRain, color: '#3b82f6', src: require('../assets/sounds/rain.mp3') },
+    { id: 'waves', nameKey: 'soundOcean', icon: Waves, color: '#06b6d4', src: require('../assets/sounds/waves.mp3') },
+    { id: 'fire', nameKey: 'soundCampfire', icon: Flame, color: '#f97316', src: require('../assets/sounds/fire.mp3') },
+    { id: 'wind', nameKey: 'soundWind', icon: Wind, color: '#64748b', src: require('../assets/sounds/wind.mp3') },
+    { id: 'forest', nameKey: 'soundForest', icon: Trees, color: '#22c55e', src: require('../assets/sounds/forest.mp3') },
+    { id: 'birds', nameKey: 'soundBirds', icon: Bird, color: '#eab308', src: require('../assets/sounds/birds.mp3') },
+    { id: 'river', nameKey: 'soundRiver', icon: Droplets, color: '#14b8a6', src: require('../assets/sounds/river.mp3') },
+    { id: 'thunder', nameKey: 'soundThunder', icon: CloudLightning, color: '#8b5cf6', src: require('../assets/sounds/thunder.mp3') },
 ];
 
 interface MixEntry { playing: boolean; volume: number; }
@@ -192,6 +194,7 @@ const CLOSED_TRANSLATE_Y = 480;
 export function SoundMixer({ visible, onClose }: SoundMixerProps) {
     const insets = useSafeAreaInsets();
     const { showToast } = useToast();
+    const { t } = useLanguage();
     const [, forceRender] = useState(0);
     const rerender = () => forceRender(n => n + 1);
     const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -264,7 +267,7 @@ export function SoundMixer({ visible, onClose }: SoundMixerProps) {
             rerender();
         } catch (e) {
             console.error('Error playing ambient sound:', def.id, e);
-            showToast({ message: `Couldn't play ${def.name}. Try again.`, type: 'error' });
+            showToast({ message: t('soundCouldNotPlay').replace('{name}', t(def.nameKey)), type: 'error' });
             // Clean up a half-created player so the next tap starts fresh
             const failed = players.get(def.id);
             if (failed) {
@@ -310,7 +313,7 @@ export function SoundMixer({ visible, onClose }: SoundMixerProps) {
                 <Animated.View style={[styles.sheet, { backgroundColor, paddingBottom: Math.max(insets.bottom, 20), transform: [{ translateY: sheetTranslateY }] }]}>
                     <View style={styles.header}>
                         <View>
-                            <Text style={[styles.title, { color: textColor }]}>Sound Mixer</Text>
+                            <Text style={[styles.title, { color: textColor }]}>{t('soundMixerTitle')}</Text>
                             <Text style={[styles.subtitle, { color: mutedForeground }]}>
                                 {activeCount > 0 ? `${activeCount} playing` : 'Blend ambient sounds to focus'}
                             </Text>
@@ -338,7 +341,7 @@ export function SoundMixer({ visible, onClose }: SoundMixerProps) {
                                         onPress={() => toggleSound(def)}
                                         activeOpacity={0.7}
                                         disabled={isLoading}
-                                        accessibilityLabel={`${entry.playing ? 'Stop' : 'Play'} ${def.name} sound`}
+                                        accessibilityLabel={`${entry.playing ? 'Stop' : 'Play'} ${t(def.nameKey)} sound`}
                                         accessibilityRole="button"
                                     >
                                         <View style={[
@@ -352,7 +355,7 @@ export function SoundMixer({ visible, onClose }: SoundMixerProps) {
                                             )}
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={[styles.tileName, { color: textColor }]}>{def.name}</Text>
+                                            <Text style={[styles.tileName, { color: textColor }]}>{t(def.nameKey)}</Text>
                                             {entry.playing && <PlayingIndicator color={def.color} />}
                                         </View>
                                     </TouchableOpacity>
@@ -377,7 +380,7 @@ export function SoundMixer({ visible, onClose }: SoundMixerProps) {
                         accessibilityRole="button"
                     >
                         <Square size={16} color={activeCount > 0 ? primaryForeground : mutedForeground} fill={activeCount > 0 ? primaryForeground : 'none'} strokeWidth={2.5} />
-                        <Text style={[styles.stopText, { color: activeCount > 0 ? primaryForeground : mutedForeground }]}>Stop All</Text>
+                        <Text style={[styles.stopText, { color: activeCount > 0 ? primaryForeground : mutedForeground }]}>{t('soundStopAll')}</Text>
                     </TouchableOpacity>
                 </Animated.View>
             </Animated.View>
