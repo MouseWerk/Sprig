@@ -10,6 +10,7 @@ interface ToastOptions {
     message: string;
     type?: ToastType;
     duration?: number;
+    action?: { label: string; onPress: () => void };
 }
 
 interface ToastContextType {
@@ -50,13 +51,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
     }, [opacity, translateY]);
 
-    const showToast = useCallback(({ message, type = 'success', duration = 3000 }: ToastOptions) => {
+    const showToast = useCallback(({ message, type = 'success', duration = 3000, action }: ToastOptions) => {
         // A newer toast replaces the old one along with its hide timer,
         // so an earlier timer can't dismiss this toast prematurely.
         if (hideTimer.current) {
             clearTimeout(hideTimer.current);
         }
-        setToast({ message, type, duration });
+        setToast({ message, type, duration, action });
 
         // Show
         Animated.parallel([
@@ -118,6 +119,19 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                             {getIcon()}
                         </View>
                         <Text style={[styles.message, { color: textColor }]}>{toast.message}</Text>
+                        {toast.action && (
+                            <TouchableOpacity
+                                onPress={() => {
+                                    toast.action?.onPress();
+                                    hideToast();
+                                }}
+                                style={styles.actionBtn}
+                                accessibilityLabel={toast.action.label}
+                                accessibilityRole="button"
+                            >
+                                <Text style={[styles.actionText, { color: getStatusColor() }]}>{toast.action.label}</Text>
+                            </TouchableOpacity>
+                        )}
                         <TouchableOpacity onPress={hideToast} style={styles.closeBtn} accessibilityLabel="Dismiss notification" accessibilityRole="button">
                             <X size={16} color={textColor} opacity={0.5} />
                         </TouchableOpacity>
@@ -183,5 +197,16 @@ const styles = StyleSheet.create({
     closeBtn: {
         padding: 4,
         marginLeft: 8,
-    }
+    },
+    actionBtn: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        marginLeft: 4,
+    },
+    actionText: {
+        fontSize: 13,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
 });

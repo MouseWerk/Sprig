@@ -2,6 +2,7 @@ import { ReviewHeatmap } from '@/components/ReviewHeatmap';
 import { LevelCard } from '@/components/LevelCard';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { ACHIEVEMENTS, unlockedCount } from '@/utils/Achievements';
+import { toDisplayText } from '@/utils/CardText';
 import { getLevelInfo } from '@/utils/Levels';
 import { getDecks, getHardestCards, getUserStats, HardCard, UserStats } from '@/utils/Storage';
 import { startTodaySession, TodayDeckEntry } from '@/utils/TodayPlan';
@@ -209,7 +210,7 @@ export default function StatsScreen() {
                                 <View key={`${c.deckId}-${c.cardIndex}`} style={[styles.item, { backgroundColor: cardColor }]}>
                                     <View style={[styles.hardDot, { backgroundColor: c.easeFactor <= 1.5 ? '#ef4444' : c.easeFactor <= 2.0 ? '#f97316' : '#eab308' }]} />
                                     <View style={{ flex: 1 }}>
-                                        <Text style={[styles.hardQuestion, { color: textColor }]} numberOfLines={1}>{c.question}</Text>
+                                        <Text style={[styles.hardQuestion, { color: textColor }]} numberOfLines={1}>{toDisplayText(c.question)}</Text>
                                         <Text style={[styles.hardDeck, { color: mutedForeground }]} numberOfLines={1}>{c.deckName}</Text>
                                     </View>
                                 </View>

@@ -1,5 +1,6 @@
 import { useToast } from '@/components/ui/Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTabPressReset } from '@/hooks/use-tab-press-reset';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { AudioFile, deleteAudioFile, deleteFolder, Folder, getAudioFiles, getFolders, saveAudioFile, saveFolder, setAudioPosition, updateAudioFile } from '@/utils/Storage';
 import { subscribeWebServerSaves } from '@/utils/WebServer';
@@ -58,6 +59,14 @@ export default function AudioPlayerScreen() {
     // Audio's own folders, navigated like the Home/Library tabs
     const [folders, setFolders] = useState<Folder[]>([]);
     const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+
+    // Tapping the tab in the navbar pops folder navigation back to the root
+    // and leaves multi-select
+    useTabPressReset(() => {
+        setCurrentFolderId(null);
+        setSelectMode(false);
+        setSelectedIds(new Set());
+    });
     const [editAudio, setEditAudio] = useState<AudioFile | null>(null);
     const [editAudioName, setEditAudioName] = useState('');
     const [editAudioFolderId, setEditAudioFolderId] = useState<string | null>(null);

@@ -1,7 +1,7 @@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Tabs } from 'expo-router';
-import { BarChart3, Home, Library, Music, Settings } from 'lucide-react-native';
+import { BarChart3, Home, Layers, Library, Music, Settings } from 'lucide-react-native';
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -26,7 +26,7 @@ export default function TabLayout() {
           height: 64 + insets.bottom, // Increased height and added safe area
           paddingBottom: insets.bottom + 8, // Proper bottom padding for modern devices
           paddingTop: 12,
-          paddingHorizontal: 20,
+          paddingHorizontal: 8,
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -40,6 +40,13 @@ export default function TabLayout() {
         options={{
           title: t('home'),
           tabBarIcon: ({ color, size }) => <Home size={28} color={color} strokeWidth={2.5} />,
+        }}
+      />
+      <Tabs.Screen
+        name="decks"
+        options={{
+          title: t('decks'),
+          tabBarIcon: ({ color, size }) => <Layers size={28} color={color} strokeWidth={2.5} />,
         }}
       />
       <Tabs.Screen

@@ -1,13 +1,106 @@
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { useKeepAwake } from 'expo-keep-awake';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { ChevronLeft, ChevronRight, Share2, X } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, PanResponder, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import type { View as RNView } from 'react-native';
 import Pdf from 'react-native-pdf';
 import { getPdfPage, setPdfPage } from '../utils/Storage';
+
+interface PageSliderProps {
+    page: number;
+    total: number;
+    color: string;
+    trackColor: string;
+    labelColor: string;
+    onCommit: (page: number) => void;
+}
+
+// Scrub bar for long documents — pure JS (same pageX technique as the sound
+// mixer's VolumeBar). Dragging previews the target page; the PDF only jumps
+// once on release, since re-rendering a page per move tick is too heavy.
+function PageSlider({ page, total, color, trackColor, labelColor, onCommit }: PageSliderProps) {
+    const containerRef = useRef<RNView>(null);
+    const widthRef = useRef(1);
+    const originXRef = useRef(0);
+    const totalRef = useRef(total);
+    totalRef.current = total;
+    const onCommitRef = useRef(onCommit);
+    onCommitRef.current = onCommit;
+
+    const [dragPage, setDragPage] = useState<number | null>(null);
+    const dragPageRef = useRef<number | null>(null);
+
+    const measure = () => {
+        containerRef.current?.measure((_x, _y, width, _height, pageX) => {
+            widthRef.current = width || 1;
+            originXRef.current = pageX;
+        });
+    };
+
+    const pageForX = (pageX: number): number => {
+        const t = Math.max(1, totalRef.current);
+        const fraction = Math.max(0, Math.min(1, (pageX - originXRef.current) / widthRef.current));
+        return Math.max(1, Math.min(t, Math.round(1 + fraction * (t - 1))));
+    };
+
+    const pan = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderGrant: (e) => {
+                measure();
+                const p = pageForX(e.nativeEvent.pageX);
+                dragPageRef.current = p;
+                setDragPage(p);
+            },
+            onPanResponderMove: (e) => {
+                const p = pageForX(e.nativeEvent.pageX);
+                dragPageRef.current = p;
+                setDragPage(p);
+            },
+            onPanResponderRelease: () => {
+                if (dragPageRef.current !== null) onCommitRef.current(dragPageRef.current);
+                dragPageRef.current = null;
+                setDragPage(null);
+            },
+            onPanResponderTerminate: () => {
+                dragPageRef.current = null;
+                setDragPage(null);
+            },
+        })
+    ).current;
+
+    const shownPage = dragPage ?? page;
+    const fraction = total > 1 ? (shownPage - 1) / (total - 1) : 0;
+
+    return (
+        <View
+            ref={containerRef}
+            style={styles.sliderHit}
+            onLayout={measure}
+            accessibilityRole="adjustable"
+            accessibilityLabel="Page position"
+            accessibilityValue={{ min: 1, max: total, now: shownPage }}
+            {...pan.panHandlers}
+        >
+            {dragPage !== null && (
+                <Text style={[styles.sliderPreview, { color: labelColor }]}>{dragPage}</Text>
+            )}
+            <View style={[styles.sliderTrack, { backgroundColor: trackColor }]}>
+                <View style={[styles.sliderFill, { width: `${fraction * 100}%`, backgroundColor: color }]} />
+            </View>
+            <View
+                pointerEvents="none"
+                style={[styles.sliderThumb, { backgroundColor: color, left: `${fraction * 100}%` }]}
+            />
+        </View>
+    );
+}
 
 const PDFViewScreen = () => {
     const { id, uri, name } = useLocalSearchParams<{ id?: string, uri: string, name?: string }>();
@@ -17,12 +110,18 @@ const PDFViewScreen = () => {
     const [loading, setLoading] = useState(true);
     const [jumpVisible, setJumpVisible] = useState(false);
     const [jumpValue, setJumpValue] = useState('');
+    // Tap the page to hide the header/footer for distraction-free reading
+    const [immersive, setImmersive] = useState(false);
     const pdfRef = useRef<any>(null);
     const { showToast } = useToast();
+
+    // Reading shouldn't fight the screen timeout
+    useKeepAwake();
 
     // Latest page + a debounce timer so we persist reading position without
     // hammering AsyncStorage on every scroll tick.
     const latestPageRef = useRef(1);
+    const totalPagesRef = useRef(0);
     const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const backgroundColor = useThemeColor({}, 'background');
@@ -52,7 +151,7 @@ const PDFViewScreen = () => {
         latestPageRef.current = page;
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         saveTimerRef.current = setTimeout(() => {
-            setPdfPage(id, latestPageRef.current).catch(() => { });
+            setPdfPage(id, latestPageRef.current, totalPagesRef.current || undefined).catch(() => { });
         }, 600);
     };
 
@@ -60,7 +159,7 @@ const PDFViewScreen = () => {
     useEffect(() => {
         return () => {
             if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-            if (id) setPdfPage(id, latestPageRef.current).catch(() => { });
+            if (id) setPdfPage(id, latestPageRef.current, totalPagesRef.current || undefined).catch(() => { });
         };
     }, [id]);
 
@@ -99,6 +198,7 @@ const PDFViewScreen = () => {
         <View style={[styles.container, { backgroundColor }]}>
             <Stack.Screen options={{
                 title: name || 'Document',
+                headerShown: !immersive,
                 headerStyle: { backgroundColor },
                 headerTintColor: textColor,
                 headerShadowVisible: false,
@@ -119,6 +219,7 @@ const PDFViewScreen = () => {
                         trustAllCerts={false}
                         onLoadComplete={(numberOfPages) => {
                             setTotalPages(numberOfPages);
+                            totalPagesRef.current = numberOfPages;
                             setLoading(false);
                             // Clamp a stale saved position if the file changed
                             if (initialPage > numberOfPages) {
@@ -136,6 +237,7 @@ const PDFViewScreen = () => {
                             setLoading(false);
                             showToast({ message: 'Failed to load PDF. Try opening in an external viewer.', type: 'error' });
                         }}
+                        onPageSingleTap={() => setImmersive(v => !v)}
                         enablePaging={false}
                         horizontal={false}
                         spacing={8}
@@ -155,7 +257,18 @@ const PDFViewScreen = () => {
                 )}
             </View>
 
+            {!immersive && (
             <View style={[styles.footer, { backgroundColor: secondaryBg }]}>
+                {totalPages > 1 && (
+                    <PageSlider
+                        page={currentPage}
+                        total={totalPages}
+                        color={accentColor}
+                        trackColor={mutedForeground + '30'}
+                        labelColor={textColor}
+                        onCommit={goToPage}
+                    />
+                )}
                 <View style={styles.controls}>
                     <TouchableOpacity
                         onPress={() => goToPage(currentPage - 1)}
@@ -190,6 +303,7 @@ const PDFViewScreen = () => {
                     </TouchableOpacity>
                 </View>
             </View>
+            )}
 
             {/* Jump to page modal */}
             <Modal
@@ -242,6 +356,36 @@ const styles = StyleSheet.create({
     pdf: {
         flex: 1,
         width: '100%',
+    },
+    sliderHit: {
+        paddingTop: 18,
+        paddingBottom: 10,
+        justifyContent: 'center',
+    },
+    sliderTrack: {
+        height: 5,
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    sliderFill: {
+        height: '100%',
+        borderRadius: 3,
+    },
+    sliderThumb: {
+        position: 'absolute',
+        top: 18 + 2.5 - 8,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        marginLeft: -8,
+    },
+    sliderPreview: {
+        position: 'absolute',
+        top: -6,
+        alignSelf: 'center',
+        fontSize: 15,
+        fontWeight: '900',
+        fontVariant: ['tabular-nums'],
     },
     footer: {
         paddingVertical: 12,

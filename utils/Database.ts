@@ -106,6 +106,9 @@ async function initDb(): Promise<SQLite.SQLiteDatabase> {
     await addColumnIfMissing(db, 'decks', 'exam_date', 'TEXT');
     await addColumnIfMissing(db, 'audio_files', 'folder_id', 'TEXT');
     await addColumnIfMissing(db, 'audio_files', 'position', 'REAL');
+    // Reading progress display needs the page count and recency, not just the page
+    await addColumnIfMissing(db, 'pdf_progress', 'total', 'INTEGER');
+    await addColumnIfMissing(db, 'pdf_progress', 'last_read_at', 'INTEGER');
 
     // Folders are scoped per area (deck / pdf / audio) instead of shared.
     // On upgrade, claim all pre-existing folders for the Home tab and move

@@ -83,6 +83,168 @@ export interface StatsUpdateResult {
     freezeUsed: boolean;   // a banked freeze repaired a missed day
     freezeEarned: boolean; // a new freeze was banked this update
     streakFreezes: number; // freezes remaining after this update
+    dewEarned: number;     // grove dew dripped by this review
+    boostActive: boolean;  // a sunshine boost doubled the XP
+}
+
+// ---------------------------------------------------------------------------
+// Grove economy — the idle-game layer (see docs/grove-spec.md). Dew accrues
+// while away (accrual math lives in utils/Grove.ts), drips from reviews here,
+// and is spent on streak freezes and sunshine boosts.
+// ---------------------------------------------------------------------------
+
+export const DEW_BURST_DAILY_CAP = 100;   // max dew from reviews per day
+export const DEW_COST_FREEZE = 1500;
+export const DEW_COST_SUNSHINE = 400;
+export const SUNSHINE_DURATION_MS = 30 * 60 * 1000; // 2x XP window
+
+// Cosmetic shop (phase 4 — collection layer). Planters are per-deck; a deck
+// with no entry renders bare soil ('classic', free). Decorations are
+// grove-wide and only one can be equipped at a time, matching how a single
+// shelf backdrop reads at a glance.
+export const POT_PRICES: Record<string, number> = {
+    terracotta: 250,
+    bowl: 400,
+    hex: 700,
+    scalloped: 1000,
+};
+
+export interface DecorationDef {
+    id: string;
+    name: string;
+    price: number;
+}
+
+export const DECORATION_CATALOG: DecorationDef[] = [
+    { id: 'stones', name: 'Stone Border', price: 500 },
+    { id: 'lanterns', name: 'Lantern Row', price: 1500 },
+    { id: 'fence', name: 'Picket Fence', price: 3000 },
+];
+
+export interface GroveEconomy {
+    dew: number;
+    lastCollectedAt: number; // epoch ms; idle accrual is computed from here
+    burstDate: string;       // "YYYY-MM-DD" the burst counter belongs to
+    burstDewToday: number;
+    boostUntil: number;      // epoch ms; XP is doubled while now < boostUntil
+    seeds: number;                            // harvested from blossoming decks
+    harvests: Record<string, number>;         // deckId -> last harvest epoch ms
+    speciesOverrides: Record<string, number>; // deckId -> rare species planted with a seed
+    lastStages: Record<string, string>;       // deckId -> stage at last check, for grow celebrations
+    planters: Record<string, string>;         // deckId -> owned pot style id
+    ownedDecorations: string[];               // purchased grove-wide decoration ids
+    equippedDecoration: string | null;        // currently displayed decoration, if any
+}
+
+export async function getGroveEconomy(): Promise<GroveEconomy> {
+    try {
+        const db = await getDb();
+        const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM kv WHERE key = ?', 'grove');
+        if (row) {
+            const parsed = JSON.parse(row.value);
+            return {
+                dew: parsed.dew || 0,
+                lastCollectedAt: parsed.lastCollectedAt || Date.now(),
+                burstDate: parsed.burstDate || '',
+                burstDewToday: parsed.burstDewToday || 0,
+                boostUntil: parsed.boostUntil || 0,
+                seeds: parsed.seeds || 0,
+                harvests: parsed.harvests || {},
+                speciesOverrides: parsed.speciesOverrides || {},
+                lastStages: parsed.lastStages || {},
+                planters: parsed.planters || {},
+                ownedDecorations: parsed.ownedDecorations || [],
+                equippedDecoration: parsed.equippedDecoration || null,
+            };
+        }
+    } catch (e) {
+        console.error('Error getting grove economy', e);
+    }
+    // First run: persist immediately so the accrual clock survives restarts
+    const fresh: GroveEconomy = {
+        dew: 0,
+        lastCollectedAt: Date.now(),
+        burstDate: new Date().toISOString().split('T')[0],
+        burstDewToday: 0,
+        boostUntil: 0,
+        seeds: 0,
+        harvests: {},
+        speciesOverrides: {},
+        lastStages: {},
+        planters: {},
+        ownedDecorations: [],
+        equippedDecoration: null,
+    };
+    await saveGroveEconomy(fresh).catch(() => { });
+    return fresh;
+}
+
+export async function saveGroveEconomy(econ: GroveEconomy): Promise<void> {
+    const db = await getDb();
+    await db.runAsync('INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)', 'grove', JSON.stringify(econ));
+}
+
+export type PurchaseFailure = 'dew' | 'max' | 'active';
+
+export async function buyStreakFreezeWithDew(): Promise<{ ok: boolean; reason?: PurchaseFailure; dew: number; streakFreezes: number }> {
+    const [econ, stats] = await Promise.all([getGroveEconomy(), getUserStats()]);
+    const owned = stats.streakFreezes || 0;
+    if (owned >= MAX_STREAK_FREEZES) return { ok: false, reason: 'max', dew: econ.dew, streakFreezes: owned };
+    if (econ.dew < DEW_COST_FREEZE) return { ok: false, reason: 'dew', dew: econ.dew, streakFreezes: owned };
+    econ.dew -= DEW_COST_FREEZE;
+    stats.streakFreezes = owned + 1;
+    await Promise.all([saveGroveEconomy(econ), saveUserStats(stats)]);
+    return { ok: true, dew: econ.dew, streakFreezes: stats.streakFreezes };
+}
+
+export async function buySunshineBoost(): Promise<{ ok: boolean; reason?: PurchaseFailure; dew: number; boostUntil: number }> {
+    const econ = await getGroveEconomy();
+    const now = Date.now();
+    if (now < econ.boostUntil) return { ok: false, reason: 'active', dew: econ.dew, boostUntil: econ.boostUntil };
+    if (econ.dew < DEW_COST_SUNSHINE) return { ok: false, reason: 'dew', dew: econ.dew, boostUntil: econ.boostUntil };
+    econ.dew -= DEW_COST_SUNSHINE;
+    econ.boostUntil = now + SUNSHINE_DURATION_MS;
+    await saveGroveEconomy(econ);
+    return { ok: true, dew: econ.dew, boostUntil: econ.boostUntil };
+}
+
+// Buying a planter both purchases and assigns it in one step — pots are a
+// per-deck choice, not a shared inventory, so there's nothing to "equip"
+// later. Re-buying a style you already own on another deck is still full
+// price; each deck's pot is its own purchase.
+export async function buyPlanter(deckId: string, potId: string): Promise<{ ok: boolean; reason?: PurchaseFailure; dew: number; planters: Record<string, string> }> {
+    const econ = await getGroveEconomy();
+    const price = POT_PRICES[potId] || 0;
+    if (econ.dew < price) return { ok: false, reason: 'dew', dew: econ.dew, planters: econ.planters };
+    econ.dew -= price;
+    econ.planters = { ...econ.planters, [deckId]: potId };
+    await saveGroveEconomy(econ);
+    return { ok: true, dew: econ.dew, planters: econ.planters };
+}
+
+export async function buyDecoration(decorationId: string): Promise<{ ok: boolean; reason?: PurchaseFailure; dew: number; ownedDecorations: string[] }> {
+    const econ = await getGroveEconomy();
+    if (econ.ownedDecorations.includes(decorationId)) return { ok: false, reason: 'max', dew: econ.dew, ownedDecorations: econ.ownedDecorations };
+    const price = DECORATION_CATALOG.find(d => d.id === decorationId)?.price || 0;
+    if (econ.dew < price) return { ok: false, reason: 'dew', dew: econ.dew, ownedDecorations: econ.ownedDecorations };
+    econ.dew -= price;
+    econ.ownedDecorations = [...econ.ownedDecorations, decorationId];
+    econ.equippedDecoration = decorationId;
+    await saveGroveEconomy(econ);
+    return { ok: true, dew: econ.dew, ownedDecorations: econ.ownedDecorations };
+}
+
+// Toggling an owned decoration on/off, or switching which one is shown —
+// free, since the dew was already spent to unlock it.
+export async function equipDecoration(decorationId: string | null): Promise<GroveEconomy> {
+    const econ = await getGroveEconomy();
+    if (decorationId === null) {
+        econ.equippedDecoration = null;
+    } else if (econ.ownedDecorations.includes(decorationId)) {
+        econ.equippedDecoration = econ.equippedDecoration === decorationId ? null : decorationId;
+    }
+    await saveGroveEconomy(econ);
+    return econ;
 }
 
 // Whole days between two "YYYY-MM-DD" strings (b - a)
@@ -365,12 +527,44 @@ export async function getPdfPage(id: string): Promise<number> {
     }
 }
 
-export async function setPdfPage(id: string, page: number): Promise<void> {
+export async function setPdfPage(id: string, page: number, total?: number): Promise<void> {
     try {
         const db = await getDb();
-        await db.runAsync('INSERT OR REPLACE INTO pdf_progress (deck_id, page) VALUES (?, ?)', id, Math.round(page));
+        // COALESCE keeps a previously stored page count when a save happens
+        // before the document finished loading.
+        await db.runAsync(
+            `INSERT INTO pdf_progress (deck_id, page, total, last_read_at) VALUES (?, ?, ?, ?)
+             ON CONFLICT(deck_id) DO UPDATE SET
+                page = excluded.page,
+                total = COALESCE(excluded.total, pdf_progress.total),
+                last_read_at = excluded.last_read_at`,
+            id, Math.round(page), total && total > 0 ? Math.round(total) : null, Date.now()
+        );
     } catch (e) {
         console.error('Error saving PDF page', e);
+    }
+}
+
+export interface PdfProgress {
+    page: number;
+    total: number | null;
+    lastReadAt: number | null;
+}
+
+// Per-document reading progress for the library list ("62%", continue reading)
+export async function getAllPdfProgress(): Promise<Record<string, PdfProgress>> {
+    try {
+        const db = await getDb();
+        const rows = await db.getAllAsync<{ deck_id: string; page: number; total: number | null; last_read_at: number | null }>(
+            'SELECT * FROM pdf_progress'
+        );
+        const map: Record<string, PdfProgress> = {};
+        for (const r of rows) {
+            map[r.deck_id] = { page: r.page, total: r.total ?? null, lastReadAt: r.last_read_at ?? null };
+        }
+        return map;
+    } catch {
+        return {};
     }
 }
 
@@ -504,7 +698,26 @@ export async function updateUserStats(
 
     const prevXp = stats.totalXp || 0;
     const prevLevel = levelForXp(prevXp);
-    const xpGained = (grade !== undefined ? xpForGrade(grade) * Math.max(1, cardsReviewed) : 0) + Math.max(0, Math.round(bonusXp));
+    const baseXp = (grade !== undefined ? xpForGrade(grade) * Math.max(1, cardsReviewed) : 0) + Math.max(0, Math.round(bonusXp));
+
+    // Grove economy: an active sunshine boost doubles XP, and card reviews
+    // drip dew into the balance (capped per day so grinding can't farm it)
+    const groveEcon = await getGroveEconomy();
+    const boostActive = Date.now() < groveEcon.boostUntil;
+    const xpGained = boostActive ? baseXp * 2 : baseXp;
+    let dewEarned = 0;
+    if (cardsReviewed > 0) {
+        if (groveEcon.burstDate !== today) {
+            groveEcon.burstDate = today;
+            groveEcon.burstDewToday = 0;
+        }
+        dewEarned = Math.max(0, Math.min(cardsReviewed, DEW_BURST_DAILY_CAP - groveEcon.burstDewToday));
+        if (dewEarned > 0) {
+            groveEcon.burstDewToday += dewEarned;
+            groveEcon.dew += dewEarned;
+            await saveGroveEconomy(groveEcon).catch(() => { });
+        }
+    }
 
     stats.totalCardsReviewed += cardsReviewed;
     stats.totalStudyTime += studyTime;
@@ -584,6 +797,8 @@ export async function updateUserStats(
         freezeUsed,
         freezeEarned,
         streakFreezes: stats.streakFreezes,
+        dewEarned,
+        boostActive,
     };
 }
 

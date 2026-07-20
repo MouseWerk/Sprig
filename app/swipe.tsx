@@ -3,12 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from '@/utils/AppHaptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
-import { CheckCircle2, Edit3, FileWarning, HelpCircle, Sprout, Trophy, Undo2, Volume2, XCircle, Zap } from 'lucide-react-native';
+import { CheckCircle2, Droplet, Edit3, FileWarning, HelpCircle, Sprout, Sun, Trophy, Undo2, Volume2, XCircle, Zap } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashcardSwipe } from '../components/FlashcardSwipe';
 import { FocusPlant } from '../components/FocusPlant';
+import { GrowingPlant } from '../components/GrowingPlant';
+import { detectStageUps, STAGE_LABELS, StageUp } from '../utils/Grove';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast';
 import { FlashcardData, parseFlashcardsCsv } from '../utils/CsvParser';
@@ -34,7 +36,7 @@ export default function SwipeScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { showToast } = useToast();
-    const { id, uri, name, mode: initialMode, cards: drillParam, today } = useLocalSearchParams<{ id: string, uri: string, name?: string, mode?: string, cards?: string, today?: string }>();
+    const { id, uri, name, mode: initialMode, cards: drillParam, today, water } = useLocalSearchParams<{ id: string, uri: string, name?: string, mode?: string, cards?: string, today?: string, water?: string }>();
 
     // Drill mode: a comma-separated list of card indices (e.g. from the
     // "Often Confused" section) restricts the session to exactly those cards.
@@ -72,6 +74,9 @@ export default function SwipeScreen() {
     const [sessionHard, setSessionHard] = useState(0);
     const [sessionAgain, setSessionAgain] = useState(0);
     const [sessionXp, setSessionXp] = useState(0);
+    const [sessionDew, setSessionDew] = useState(0);
+    const [sessionBoosted, setSessionBoosted] = useState(false);
+    const [stageUp, setStageUp] = useState<StageUp | null>(null);
     const [sessionComplete, setSessionComplete] = useState(false);
     const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
     const [isFlipped, setIsFlipped] = useState(false);
@@ -82,7 +87,7 @@ export default function SwipeScreen() {
     const [srsData, setSrsData] = useState<Record<number, SRSCardData>>({});
     const [isHighlightMode, setIsHighlightMode] = useState(false);
     const [studyMode, setStudyMode] = useState<'all' | 'due'>(initialMode === 'all' ? 'all' : 'due');
-    const [focusMode, setFocusMode] = useState(true);
+    const [focusMode, setFocusMode] = useState(false);
 
     // Live SRS mirror (ref, not state) so undo and repeat passes stay
     // accurate without re-filtering the session queue mid-session.
@@ -99,6 +104,7 @@ export default function SwipeScreen() {
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const primaryColor = useThemeColor({}, 'primary');
     const secondaryBg = useThemeColor({}, 'secondary');
+    const borderColor = useThemeColor({}, 'border');
 
     useEffect(() => {
         async function loadData() {
@@ -280,6 +286,12 @@ export default function SwipeScreen() {
 
         updateUserStats(1, deltaSeconds, grade)
             .then(result => {
+                if (result.dewEarned > 0) setSessionDew(d => d + result.dewEarned);
+                if (result.boostActive) {
+                    setSessionBoosted(true);
+                    // The sync path already counted base XP; add the doubled half
+                    setSessionXp(x => x + xpForGrade(grade));
+                }
                 let delay = 0;
                 if (result.freezeUsed) {
                     setTimeout(() => {
@@ -354,11 +366,31 @@ export default function SwipeScreen() {
         setSessionHard(0);
         setSessionAgain(0);
         setSessionXp(0);
+        setSessionDew(0);
+        setSessionBoosted(false);
+        setStageUp(null);
         setUndoStack([]);
         setSessionComplete(false);
         setIsFlipped(false);
         lastActionRef.current = Date.now();
     };
+
+    // When the session ends, check whether this deck's grove plant grew a
+    // stage — wait for the last swipe's SRS write to land first.
+    useEffect(() => {
+        if (!sessionComplete || !id) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                await pendingPersistRef.current;
+                const ups = await detectStageUps();
+                if (cancelled) return;
+                const mine = ups.find(u => u.deckId === id);
+                if (mine) setStageUp(mine);
+            } catch { }
+        })();
+        return () => { cancelled = true; };
+    }, [sessionComplete, id]);
 
     const speakCurrentCard = () => {
         if (!currentCard) return;
@@ -438,10 +470,44 @@ export default function SwipeScreen() {
                         <Text style={[styles.scoreDivider, { color: mutedForeground }]}>%</Text>
                         <Text style={[styles.resultTotal, { color: mutedForeground }]}>correct</Text>
                     </View>
-                    {sessionXp > 0 && (
-                        <View style={[styles.xpBadge, { backgroundColor: primaryColor + '18' }]}>
-                            <Zap size={18} color={primaryColor} strokeWidth={2.5} fill={primaryColor} />
-                            <Text style={[styles.xpBadgeText, { color: primaryColor }]}>+{sessionXp} XP earned</Text>
+                    {(sessionXp > 0 || sessionDew > 0 || sessionBoosted) && (
+                        <View style={styles.earnRow}>
+                            {sessionXp > 0 && (
+                                <View style={[styles.xpBadge, { backgroundColor: primaryColor + '18' }]}>
+                                    <Zap size={18} color={primaryColor} strokeWidth={2.5} fill={primaryColor} />
+                                    <Text style={[styles.xpBadgeText, { color: primaryColor }]}>+{sessionXp} XP</Text>
+                                </View>
+                            )}
+                            {sessionDew > 0 && (
+                                <View style={[styles.xpBadge, { backgroundColor: primaryColor + '18' }]}>
+                                    <Droplet size={18} color={primaryColor} strokeWidth={2.5} />
+                                    <Text style={[styles.xpBadgeText, { color: primaryColor }]}>+{sessionDew} dew</Text>
+                                </View>
+                            )}
+                            {sessionBoosted && (
+                                <View style={[styles.xpBadge, { backgroundColor: '#eab30820' }]}>
+                                    <Sun size={18} color="#eab308" strokeWidth={2.5} />
+                                    <Text style={[styles.xpBadgeText, { color: '#eab308' }]}>×2 Sunshine</Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+                    {stageUp && (
+                        <View style={[styles.stageUpCard, { backgroundColor: secondaryBg }]}>
+                            <GrowingPlant
+                                progress={stageUp.growth}
+                                size={72}
+                                color={primaryColor}
+                                soilColor={borderColor}
+                                species={stageUp.species}
+                                sway
+                            />
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.stageUpTitle, { color: textColor }]}>Your plant grew!</Text>
+                                <Text style={[styles.stageUpSub, { color: mutedForeground }]}>
+                                    {stageUp.deckName} is now a {STAGE_LABELS[stageUp.stage]}
+                                </Text>
+                            </View>
                         </View>
                     )}
                     <View style={styles.resultBreakdown}>
@@ -490,7 +556,11 @@ export default function SwipeScreen() {
         <View style={[styles.container, { backgroundColor, paddingBottom: insets.bottom }]}>
             <Stack.Screen
                 options={{
-                    title: isTodaySession ? `Today · ${name || 'Flashcards'}` : drillSet ? 'Drill: Tricky Cards' : (name || 'Flashcards'),
+                    title: isTodaySession
+                        ? `Today · ${name || 'Flashcards'}`
+                        : water === '1'
+                            ? `Watering · ${name || 'Flashcards'}`
+                            : drillSet ? 'Drill: Tricky Cards' : (name || 'Flashcards'),
                     headerRight: () => (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 }}>
                             <TouchableOpacity
@@ -718,14 +788,41 @@ const styles = StyleSheet.create({
         marginTop: 32,
         marginBottom: 16,
     },
+    earnRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: 8,
+        marginBottom: 24,
+        paddingHorizontal: 16,
+    },
     xpBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        paddingHorizontal: 18,
+        gap: 6,
+        paddingHorizontal: 14,
         paddingVertical: 10,
         borderRadius: 16,
+    },
+    stageUpCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        borderRadius: 20,
+        padding: 14,
         marginBottom: 24,
+        marginHorizontal: 24,
+        alignSelf: 'stretch',
+    },
+    stageUpTitle: {
+        fontSize: 15,
+        fontWeight: '900',
+        letterSpacing: -0.2,
+    },
+    stageUpSub: {
+        fontSize: 13,
+        fontWeight: '600',
+        marginTop: 2,
     },
     xpBadgeText: {
         fontSize: 16,

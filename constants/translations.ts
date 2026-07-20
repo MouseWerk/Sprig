@@ -2,6 +2,7 @@ export const translations = {
   en: {
     // Tabs
     home: 'Home',
+    decks: 'Decks',
     audio: 'Audio',
     explore: 'Library',
     stats: 'Stats',
@@ -52,6 +53,7 @@ export const translations = {
     folderEmptyMessage: 'Create a subfolder or add a PDF document here.',
     addPdfDocument: 'Add PDF Document',
     pdfDocument: 'PDF Document',
+    continueReading: 'Continue reading',
     newDocument: 'New Document',
     documentName: 'Document Name',
     documentPlaceholder: 'e.g. Biology Chapter 1',

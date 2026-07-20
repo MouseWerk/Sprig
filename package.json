@@ -1,7 +1,7 @@
 {
   "name": "sprig",
   "main": "index.js",
-  "version": "1.4.0",
+  "version": "1.8.0",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -72,7 +72,9 @@
   "expo": {
     "doctor": {
       "reactNativeDirectoryCheck": {
-        "exclude": ["react-native-tcp-socket"]
+        "exclude": [
+          "react-native-tcp-socket"
+        ]
       }
     }
   }

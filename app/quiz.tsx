@@ -1,4 +1,5 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { toDisplayText } from '@/utils/CardText';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
 import { getCachedData, recordConfusion, recordQuizCompleted, setCachedData, updateUserStats } from '@/utils/Storage';
 import * as Haptics from '@/utils/AppHaptics';
@@ -41,22 +42,25 @@ function buildQuestions(cards: FlashcardData[]): Question[] {
         .map((c, i) => ({ ...c, idx: i }))
         .filter(c => c.question?.trim() && c.answer?.trim());
 
-    // First card owning each distinct answer text
-    const ownerByAnswer = new Map<string, number>();
+    // First card owning each distinct answer. Answers are deduped by what the
+    // user actually sees (markup stripped), so `==Paris==` and `Paris` never
+    // show up as two seemingly identical choices.
+    const ownerByAnswer = new Map<string, { text: string; cardIndex: number }>();
     for (const c of clean) {
-        const a = c.answer.trim();
-        if (!ownerByAnswer.has(a)) ownerByAnswer.set(a, c.idx);
+        const key = toDisplayText(c.answer).trim();
+        if (key && !ownerByAnswer.has(key)) ownerByAnswer.set(key, { text: c.answer.trim(), cardIndex: c.idx });
     }
-    const answers = Array.from(ownerByAnswer.keys());
-    if (answers.length < 4) return [];
+    if (ownerByAnswer.size < 4) return [];
+    const answerEntries = Array.from(ownerByAnswer.entries());
 
     return shuffle(clean).slice(0, MAX_QUESTIONS).map(card => {
         const correct = card.answer.trim();
+        const correctKey = toDisplayText(correct).trim();
         const distractors: QuizOption[] = [];
-        const pool = shuffle(answers.filter(a => a !== correct));
-        for (const a of pool) {
+        const pool = shuffle(answerEntries.filter(([key]) => key !== correctKey));
+        for (const [, entry] of pool) {
             if (distractors.length >= 3) break;
-            distractors.push({ text: a, cardIndex: ownerByAnswer.get(a)! });
+            distractors.push({ text: entry.text, cardIndex: entry.cardIndex });
         }
         return {
             prompt: card.question,

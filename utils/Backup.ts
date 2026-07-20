@@ -4,17 +4,20 @@ import {
     AudioFile,
     Deck,
     Folder,
-    UserStats,
     getAudioFiles,
     getDecks,
     getFolders,
+    getGroveEconomy,
     getPdfProgressMap,
     getUserStats,
+    GroveEconomy,
     importAudioRecord,
     importDeckRecord,
     importFolderRecord,
     mergePdfProgress,
+    saveGroveEconomy,
     saveUserStats,
+    UserStats,
 } from './Storage';
 
 const BACKUP_VERSION = 1;
@@ -37,6 +40,7 @@ interface BackupPayload {
         pdfProgress: Record<string, number>;
         stats: UserStats | null;
         prefs: Record<string, string>;
+        grove: GroveEconomy | null;
     };
     files: {
         decks: Record<string, FileEntry>;
@@ -49,6 +53,7 @@ export interface ImportSummary {
     foldersAdded: number;
     audioAdded: number;
     statsMerged: boolean;
+    groveMerged: boolean;
 }
 
 async function ensureDir(dir: string) {
@@ -62,12 +67,13 @@ async function ensureDir(dir: string) {
 // File contents are embedded so a restore works even after a reinstall,
 // where the document directory path changes.
 export async function createBackup(): Promise<string> {
-    const [decks, folders, audioFiles, pdfProgress, stats] = await Promise.all([
+    const [decks, folders, audioFiles, pdfProgress, stats, grove] = await Promise.all([
         getDecks(),
         getFolders(),
         getAudioFiles(),
         getPdfProgressMap(),
         getUserStats(),
+        getGroveEconomy(),
     ]);
 
     const files: BackupPayload['files'] = { decks: {}, audio: {} };
@@ -103,7 +109,7 @@ export async function createBackup(): Promise<string> {
         app: 'Sprig',
         version: BACKUP_VERSION,
         exportedAt: new Date().toISOString(),
-        data: { decks, folders, audioFiles, pdfProgress, stats, prefs },
+        data: { decks, folders, audioFiles, pdfProgress, stats, prefs, grove },
         files,
     };
 
@@ -139,6 +145,33 @@ function mergeStats(current: UserStats | null, incoming: UserStats | null): User
     };
 }
 
+// Merge grove economy the same way as stats: numeric progress takes the max
+// so a restore can never take dew, seeds, or growth away from the player.
+// Species overrides and harvest cooldowns favor whichever side saw the deck
+// more recently, since those aren't naturally additive.
+function mergeGrove(current: GroveEconomy | null, incoming: GroveEconomy | null | undefined): GroveEconomy | null {
+    if (!incoming) return current;
+    if (!current) return incoming;
+    const harvests: Record<string, number> = { ...current.harvests };
+    for (const [deckId, ts] of Object.entries(incoming.harvests || {})) {
+        harvests[deckId] = Math.max(harvests[deckId] || 0, ts);
+    }
+    return {
+        dew: Math.max(current.dew || 0, incoming.dew || 0),
+        lastCollectedAt: Math.max(current.lastCollectedAt || 0, incoming.lastCollectedAt || 0),
+        burstDate: current.burstDate,
+        burstDewToday: current.burstDewToday,
+        boostUntil: Math.max(current.boostUntil || 0, incoming.boostUntil || 0),
+        seeds: Math.max(current.seeds || 0, incoming.seeds || 0),
+        harvests,
+        speciesOverrides: { ...(incoming.speciesOverrides || {}), ...current.speciesOverrides },
+        lastStages: current.lastStages,
+        planters: { ...(incoming.planters || {}), ...current.planters },
+        ownedDecorations: Array.from(new Set([...(current.ownedDecorations || []), ...(incoming.ownedDecorations || [])])),
+        equippedDecoration: current.equippedDecoration ?? incoming.equippedDecoration ?? null,
+    };
+}
+
 // Restore from a backup file. Decks/folders/audio are merged by id (existing
 // items are kept, missing ones are added and their files rewritten to the
 // current document directory). Stats are merged so progress is never lost.
@@ -154,7 +187,7 @@ export async function importBackup(uri: string): Promise<ImportSummary> {
         throw new Error('This is not a Sprig backup');
     }
 
-    const summary: ImportSummary = { decksAdded: 0, foldersAdded: 0, audioAdded: 0, statsMerged: false };
+    const summary: ImportSummary = { decksAdded: 0, foldersAdded: 0, audioAdded: 0, statsMerged: false, groveMerged: false };
 
     // Decks
     const deckIds = new Set((await getDecks()).map(d => d.id));
@@ -212,6 +245,13 @@ export async function importBackup(uri: string): Promise<ImportSummary> {
     if (merged) {
         await saveUserStats(merged);
         summary.statsMerged = true;
+    }
+
+    // Grove economy (merge, never lose dew/seeds/growth)
+    const mergedGrove = mergeGrove(await getGroveEconomy(), backup.data.grove);
+    if (mergedGrove) {
+        await saveGroveEconomy(mergedGrove);
+        summary.groveMerged = true;
     }
 
     // Preferences (only set ones the user hasn't already chosen)

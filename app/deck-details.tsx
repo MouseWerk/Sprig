@@ -17,6 +17,7 @@ import { CardImagePicker } from '../components/CardImagePicker';
 import { CardTextInput } from '../components/CardTextInput';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { isImageToken } from '@/utils/CardImages';
+import { toDisplayText } from '@/utils/CardText';
 import { Button } from '../components/ui/Button';
 import { BottomSheet } from '../components/ui/BottomSheet';
 import { useConfirm } from '../components/ui/ConfirmDialog';
@@ -188,8 +189,8 @@ export default function DeckDetailsScreen() {
         const cardsWithIndices = (cards || []).map((card, index) => ({ card, originalIndex: index }));
         return cardsWithIndices.filter(({ card, originalIndex }) => {
             if (cardQuery &&
-                !card.question.toLowerCase().includes(cardQuery) &&
-                !card.answer.toLowerCase().includes(cardQuery)) {
+                !toDisplayText(card.question).toLowerCase().includes(cardQuery) &&
+                !toDisplayText(card.answer).toLowerCase().includes(cardQuery)) {
                 return false;
             }
             const isLearned = deck?.learnedIndices?.includes(originalIndex);
@@ -728,12 +729,12 @@ export default function DeckDetailsScreen() {
                                         <View key={`${pair.cardA}-${pair.cardB}`} style={[styles.confusionCard, { backgroundColor: cardColor }]}>
                                             <View style={{ flex: 1, gap: 8 }}>
                                                 <View>
-                                                    <Text style={[styles.confusionQ, { color: textColor }]} numberOfLines={2}>{a.question}</Text>
-                                                    <Text style={[styles.confusionA, { color: mutedForeground }]} numberOfLines={1}>→ {a.answer}</Text>
+                                                    <Text style={[styles.confusionQ, { color: textColor }]} numberOfLines={2}>{toDisplayText(a.question)}</Text>
+                                                    <Text style={[styles.confusionA, { color: mutedForeground }]} numberOfLines={1}>→ {toDisplayText(a.answer)}</Text>
                                                 </View>
                                                 <View>
-                                                    <Text style={[styles.confusionQ, { color: textColor }]} numberOfLines={2}>{b.question}</Text>
-                                                    <Text style={[styles.confusionA, { color: mutedForeground }]} numberOfLines={1}>→ {b.answer}</Text>
+                                                    <Text style={[styles.confusionQ, { color: textColor }]} numberOfLines={2}>{toDisplayText(b.question)}</Text>
+                                                    <Text style={[styles.confusionA, { color: mutedForeground }]} numberOfLines={1}>→ {toDisplayText(b.answer)}</Text>
                                                 </View>
                                             </View>
                                             <View style={[styles.confusionBadge, { backgroundColor: '#f59e0b20' }]}>

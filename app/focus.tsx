@@ -7,6 +7,7 @@ import * as Haptics from '@/utils/AppHaptics';
 import { useNavigation } from '@react-navigation/native';
 import { FOCUS_MINUTES_OPTIONS, getPrefsSync, setPref } from '@/utils/Preferences';
 import { recordFocusSession } from '@/utils/Storage';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Stack } from 'expo-router';
 import { Coffee, Music, Pause, Play, RotateCcw, X } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
@@ -70,6 +71,14 @@ export default function FocusScreen() {
     const secondaryBg = useThemeColor({}, 'secondary');
     const primaryColor = useThemeColor({}, 'primary');
     const primaryForeground = useThemeColor({}, 'primaryForeground');
+
+    // The screen dimming/locking mid-session would background the app and
+    // wilt the plant — keep the display on while a session or break runs.
+    useEffect(() => {
+        if (phase !== 'running' && phase !== 'break') return;
+        activateKeepAwakeAsync('focus-session').catch(() => { });
+        return () => { deactivateKeepAwake('focus-session'); };
+    }, [phase]);
 
     // Countdown ticker
     useEffect(() => {

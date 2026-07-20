@@ -74,6 +74,12 @@ function RootLayoutNav() {
           headerStyle: { backgroundColor },
           headerTitleStyle: { fontWeight: '600' }
         }} />
+        <Stack.Screen name="grove" options={{
+          headerBackTitle: 'Back',
+          headerTintColor: textColor,
+          headerStyle: { backgroundColor },
+          headerTitleStyle: { fontWeight: '600' }
+        }} />
         <Stack.Screen name="focus" options={{
           headerBackTitle: 'Back',
           headerTintColor: textColor,

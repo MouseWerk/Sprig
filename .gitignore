@@ -63,3 +63,6 @@ GoogleService-Info.plist
 # test & tooling output
 coverage/
 .claude/settings.local.json
+*.jks
+credentials.json
+play-service-account.json

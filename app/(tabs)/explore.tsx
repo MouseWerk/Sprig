@@ -1,10 +1,11 @@
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTabPressReset } from '@/hooks/use-tab-press-reset';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Icons from 'lucide-react-native';
-import { ArrowUpDown, Check, CheckCircle2, ChevronRight, Circle, FileText, FileUp, Folder as FolderIcon, FolderInput, Library, Plus, Trash2, X } from 'lucide-react-native';
+import { ArrowUpDown, BookOpen, Check, CheckCircle2, ChevronRight, Circle, FileText, FileUp, Folder as FolderIcon, FolderInput, Library, Plus, Trash2, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +16,7 @@ import { Button } from '../../components/ui/Button';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { useToast } from '../../components/ui/Toast';
-import { Deck, deleteDeck, deleteFolder, Folder, getDecks, getFolders, saveDeck, saveFolder, updateDeck } from '../../utils/Storage';
+import { Deck, deleteDeck, deleteFolder, Folder, getAllPdfProgress, getDecks, getFolders, PdfProgress, saveDeck, saveFolder, updateDeck } from '../../utils/Storage';
 import { subscribeWebServerSaves } from '../../utils/WebServer';
 
 type SortMode = 'nameAsc' | 'nameDesc' | 'newest' | 'oldest';
@@ -62,7 +63,11 @@ export default function LibraryScreen() {
 
   const [pdfs, setPdfs] = useState<Deck[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [pdfProgress, setPdfProgress] = useState<Record<string, PdfProgress>>({});
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+
+  // Tapping the tab in the navbar pops folder navigation back to the root
+  useTabPressReset(() => setCurrentFolderId(null));
 
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [newFolderModalVisible, setNewFolderModalVisible] = useState(false);
@@ -91,9 +96,10 @@ export default function LibraryScreen() {
   const borderColor = useThemeColor({}, 'border');
 
   const loadData = useCallback(async () => {
-    const [savedDecks, savedFolders] = await Promise.all([getDecks(), getFolders('pdf')]);
+    const [savedDecks, savedFolders, progress] = await Promise.all([getDecks(), getFolders('pdf'), getAllPdfProgress()]);
     setPdfs(savedDecks.filter(d => d.type === 'pdf'));
     setFolders(savedFolders);
+    setPdfProgress(progress);
   }, []);
 
   useFocusEffect(
@@ -298,6 +304,10 @@ export default function LibraryScreen() {
     const IconComponent = (Icons as any)[item.icon] || Icons.FileText;
 
     const isSelected = selectedIds.has(item.id);
+    const progress = pdfProgress[item.id];
+    const pct = progress?.total && progress.total > 0
+      ? Math.min(100, Math.round((progress.page / progress.total) * 100))
+      : null;
     return (
       <View style={[
         styles.docCard,
@@ -319,7 +329,14 @@ export default function LibraryScreen() {
           </View>
           <View style={styles.docInfo}>
             <Text style={[styles.docName, { color: textColor }]} numberOfLines={1}>{item.name}</Text>
-            <Text style={[styles.docSub, { color: mutedForeground }]}>{t('pdfDocument')}</Text>
+            <Text style={[styles.docSub, { color: mutedForeground }]}>
+              {pct !== null ? `Page ${progress.page} of ${progress.total} · ${pct}%` : t('pdfDocument')}
+            </Text>
+            {pct !== null && (
+              <View style={[styles.docProgressTrack, { backgroundColor: mutedForeground + '25' }]}>
+                <View style={[styles.docProgressFill, { width: `${pct}%`, backgroundColor: accentColor }]} />
+              </View>
+            )}
           </View>
           {selectMode ? (
             isSelected
@@ -357,6 +374,21 @@ export default function LibraryScreen() {
   const combinedData = [...currentFolders.map(f => ({ ...f, isFolder: true })), ...currentPdfs.map(d => ({ ...d, isFolder: false }))];
 
   const activeSortLabel = SORT_OPTIONS.find(o => o.mode === sortMode);
+
+  // Most recently opened PDF, surfaced as a "continue reading" shortcut at
+  // the top of the root listing.
+  let continueDoc: Deck | null = null;
+  if (!currentFolderId && !selectMode) {
+    let bestAt = 0;
+    for (const p of pdfs) {
+      const prog = pdfProgress[p.id];
+      if (prog?.lastReadAt && prog.lastReadAt > bestAt) {
+        continueDoc = p;
+        bestAt = prog.lastReadAt;
+      }
+    }
+  }
+  const continueProg = continueDoc ? pdfProgress[continueDoc.id] : null;
 
   const folderPath = [];
   let tempId = currentFolderId;
@@ -450,6 +482,31 @@ export default function LibraryScreen() {
         windowSize={7}
         removeClippedSubviews={true}
         showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          continueDoc && continueProg ? (
+            <TouchableOpacity
+              style={[styles.continueCard, { backgroundColor: accentColor + '12', borderColor: accentColor + '30' }]}
+              activeOpacity={0.8}
+              onPress={() => router.push({ pathname: '/pdf-view', params: { id: continueDoc!.id, uri: continueDoc!.uri, name: continueDoc!.name } })}
+              accessibilityLabel={`Continue reading ${continueDoc.name}`}
+              accessibilityRole="button"
+            >
+              <View style={[styles.continueIcon, { backgroundColor: accentColor + '18' }]}>
+                <BookOpen size={22} color={accentColor} strokeWidth={2.5} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.continueLabel, { color: accentColor }]}>{t('continueReading').toUpperCase()}</Text>
+                <Text style={[styles.docName, { color: textColor }]} numberOfLines={1}>{continueDoc.name}</Text>
+                <Text style={[styles.docSub, { color: mutedForeground }]}>
+                  {continueProg.total && continueProg.total > 0
+                    ? `Page ${continueProg.page} of ${continueProg.total} · ${Math.min(100, Math.round((continueProg.page / continueProg.total) * 100))}%`
+                    : `Page ${continueProg.page}`}
+                </Text>
+              </View>
+              <ChevronRight size={18} color={accentColor} />
+            </TouchableOpacity>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <View style={[styles.emptyIcon, { backgroundColor: secondaryBg }]}>
@@ -829,6 +886,38 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     letterSpacing: -0.3,
+  },
+  docProgressTrack: {
+    height: 4,
+    borderRadius: 2,
+    marginTop: 7,
+    overflow: 'hidden',
+  },
+  docProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  continueCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    marginBottom: 12,
+  },
+  continueIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  continueLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 2,
   },
   docSub: {
     fontSize: 12,
