@@ -17,6 +17,7 @@ import { FlashcardData, parseFlashcardsCsv } from '../utils/CsvParser';
 import { xpForGrade } from '../utils/Levels';
 import { scheduleStreakReminder } from '../utils/Notifications';
 import { applySwipeResult, getCachedData, getDecks, restoreCardSRS, setCachedData, SRSCardData, updateCardInDeck, updateDeckProgress, updateUserStats } from '../utils/Storage';
+import { migrateKey } from '../utils/StorageMigration';
 import { nextTodayEntry, peekNextTodayEntry } from '../utils/TodayPlan';
 
 interface UndoEntry {
@@ -416,7 +417,7 @@ export default function SwipeScreen() {
 
     // Remember the focus-mode preference between sessions
     useEffect(() => {
-        AsyncStorage.getItem('csvtudyapp_focus_mode').then(v => {
+        migrateKey('csvtudyapp_focus_mode', 'sprig_focus_mode').then(v => {
             if (v === 'off') setFocusMode(false);
         });
     }, []);
@@ -424,7 +425,7 @@ export default function SwipeScreen() {
     const toggleFocusMode = () => {
         setFocusMode(prev => {
             const next = !prev;
-            AsyncStorage.setItem('csvtudyapp_focus_mode', next ? 'on' : 'off').catch(() => { });
+            AsyncStorage.setItem('sprig_focus_mode', next ? 'on' : 'off').catch(() => { });
             return next;
         });
     };

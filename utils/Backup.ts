@@ -21,7 +21,16 @@ import {
 } from './Storage';
 
 const BACKUP_VERSION = 1;
-const PREF_KEYS = ['csvtudyapp_library_sort', 'csvtudyapp_focus_mode', 'csvtudyapp_onboarded', 'csvtudyapp_prefs'];
+const PREF_KEYS = ['sprig_library_sort', 'sprig_focus_mode', 'sprig_onboarded', 'sprig_prefs'];
+
+// Backups written before the "csvtudyapp" -> "sprig" AsyncStorage key rename
+// carry these old names; restoring one should still land on the new keys.
+const LEGACY_PREF_KEY_MAP: Record<string, string> = {
+    csvtudyapp_library_sort: 'sprig_library_sort',
+    csvtudyapp_focus_mode: 'sprig_focus_mode',
+    csvtudyapp_onboarded: 'sprig_onboarded',
+    csvtudyapp_prefs: 'sprig_prefs',
+};
 
 interface FileEntry {
     ext: string;
@@ -254,8 +263,10 @@ export async function importBackup(uri: string): Promise<ImportSummary> {
         summary.groveMerged = true;
     }
 
-    // Preferences (only set ones the user hasn't already chosen)
-    for (const [k, v] of Object.entries(backup.data.prefs || {})) {
+    // Preferences (only set ones the user hasn't already chosen). Older
+    // backups use the pre-rename key names — map those onto the current ones.
+    for (const [rawKey, v] of Object.entries(backup.data.prefs || {})) {
+        const k = LEGACY_PREF_KEY_MAP[rawKey] || rawKey;
         const existing = await AsyncStorage.getItem(k);
         if (existing == null) await AsyncStorage.setItem(k, v);
     }

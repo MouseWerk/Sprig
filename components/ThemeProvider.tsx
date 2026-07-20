@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Appearance, ColorSchemeName } from 'react-native';
+import { migrateKey } from '@/utils/StorageMigration';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -12,7 +13,8 @@ interface ThemeContextType {
 
 export const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const THEME_STORAGE_KEY = 'csvtudyapp_theme_mode';
+const THEME_STORAGE_KEY = 'sprig_theme_mode';
+const LEGACY_THEME_STORAGE_KEY = 'csvtudyapp_theme_mode';
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [mode, setMode] = useState<ThemeMode>('system');
@@ -21,7 +23,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     useEffect(() => {
         // Load saved theme
         const loadTheme = async () => {
-            const savedMode = await AsyncStorage.getItem(THEME_STORAGE_KEY) as ThemeMode;
+            const savedMode = await migrateKey(LEGACY_THEME_STORAGE_KEY, THEME_STORAGE_KEY) as ThemeMode;
             if (savedMode) {
                 setMode(savedMode);
             }

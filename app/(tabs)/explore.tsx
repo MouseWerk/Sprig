@@ -17,11 +17,13 @@ import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { useToast } from '../../components/ui/Toast';
 import { Deck, deleteDeck, deleteFolder, Folder, getAllPdfProgress, getDecks, getFolders, PdfProgress, saveDeck, saveFolder, updateDeck } from '../../utils/Storage';
+import { migrateKey } from '../../utils/StorageMigration';
 import { subscribeWebServerSaves } from '../../utils/WebServer';
 
 type SortMode = 'nameAsc' | 'nameDesc' | 'newest' | 'oldest';
 
-const SORT_STORAGE_KEY = 'csvtudyapp_library_sort';
+const SORT_STORAGE_KEY = 'sprig_library_sort';
+const LEGACY_SORT_STORAGE_KEY = 'csvtudyapp_library_sort';
 
 const SORT_OPTIONS: { mode: SortMode; labelKey: 'sortNameAsc' | 'sortNameDesc' | 'sortNewest' | 'sortOldest' }[] = [
   { mode: 'nameAsc', labelKey: 'sortNameAsc' },
@@ -116,7 +118,7 @@ export default function LibraryScreen() {
   }, [loadData]);
 
   useEffect(() => {
-    AsyncStorage.getItem(SORT_STORAGE_KEY).then(saved => {
+    migrateKey(LEGACY_SORT_STORAGE_KEY, SORT_STORAGE_KEY).then(saved => {
       if (saved === 'nameAsc' || saved === 'nameDesc' || saved === 'newest' || saved === 'oldest') {
         setSortMode(saved);
       }

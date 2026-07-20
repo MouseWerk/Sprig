@@ -1,4 +1,5 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { migrateKey } from '@/utils/StorageMigration';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     Check,
@@ -23,13 +24,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GrowingPlant } from './GrowingPlant';
 import { SprigLogo } from './SprigLogo';
 
-const ONBOARDED_KEY = 'csvtudyapp_onboarded';
+const ONBOARDED_KEY = 'sprig_onboarded';
+const LEGACY_ONBOARDED_KEY = 'csvtudyapp_onboarded';
 
 // The mounted Onboarding instance registers itself here so Settings can
 // replay the intro on demand without any navigation plumbing.
 let replayTrigger: (() => void) | null = null;
 export function replayOnboarding() {
-    AsyncStorage.removeItem(ONBOARDED_KEY).catch(() => { });
+    AsyncStorage.multiRemove([ONBOARDED_KEY, LEGACY_ONBOARDED_KEY]).catch(() => { });
     replayTrigger?.();
 }
 
@@ -268,7 +270,7 @@ export function Onboarding() {
     const secondaryBg = useThemeColor({}, 'secondary');
 
     useEffect(() => {
-        AsyncStorage.getItem(ONBOARDED_KEY).then(v => {
+        migrateKey(LEGACY_ONBOARDED_KEY, ONBOARDED_KEY).then(v => {
             if (!v) setVisible(true);
         }).catch(() => { });
     }, []);

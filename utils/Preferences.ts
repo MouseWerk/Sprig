@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { migrateKey } from './StorageMigration';
 
 // User-tunable knobs for the gamification + focus features. Stored as one
 // JSON blob in AsyncStorage with an in-memory mirror so synchronous readers
@@ -12,7 +13,8 @@ export interface Preferences {
     hapticsEnabled: boolean;
 }
 
-export const PREFS_STORAGE_KEY = 'csvtudyapp_prefs';
+export const PREFS_STORAGE_KEY = 'sprig_prefs';
+const LEGACY_PREFS_KEY = 'csvtudyapp_prefs';
 
 export const DEFAULT_PREFS: Preferences = {
     dailyGoal: 20,
@@ -36,7 +38,7 @@ async function load(): Promise<void> {
     if (loaded) return;
     loaded = true;
     try {
-        const raw = await AsyncStorage.getItem(PREFS_STORAGE_KEY);
+        const raw = await migrateKey(LEGACY_PREFS_KEY, PREFS_STORAGE_KEY);
         if (raw) {
             cache = { ...DEFAULT_PREFS, ...JSON.parse(raw) };
             notify();

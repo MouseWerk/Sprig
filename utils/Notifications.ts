@@ -4,12 +4,14 @@ import { Platform } from 'react-native';
 import { buildGrovePlants } from './Grove';
 import { getPrefs } from './Preferences';
 import { getDecks } from './Storage';
+import { migrateKey } from './StorageMigration';
 
 // All calls are wrapped so a missing permission, an unsupported platform
 // (web / Expo Go limitations), or any native error can never crash a study
 // session — notifications are a nice-to-have, not load-bearing.
 
-const STREAK_REMINDER_ID_KEY = 'csvtudyapp_streak_reminder_id';
+const STREAK_REMINDER_ID_KEY = 'sprig_streak_reminder_id';
+const LEGACY_STREAK_REMINDER_ID_KEY = 'csvtudyapp_streak_reminder_id';
 let handlerConfigured = false;
 let permissionGranted: boolean | null = null;
 
@@ -89,7 +91,7 @@ export async function cancelNotification(id: string | null): Promise<void> {
 // Cancel any pending streak reminder (used when the user disables it)
 export async function cancelStreakReminder(): Promise<void> {
     try {
-        const prevId = await AsyncStorage.getItem(STREAK_REMINDER_ID_KEY);
+        const prevId = await migrateKey(LEGACY_STREAK_REMINDER_ID_KEY, STREAK_REMINDER_ID_KEY);
         if (prevId) {
             await cancelNotification(prevId);
             await AsyncStorage.removeItem(STREAK_REMINDER_ID_KEY);
@@ -114,7 +116,7 @@ export async function scheduleStreakReminder(): Promise<void> {
         const granted = await ensureNotificationPermissions();
         if (!granted) return;
 
-        const prevId = await AsyncStorage.getItem(STREAK_REMINDER_ID_KEY);
+        const prevId = await migrateKey(LEGACY_STREAK_REMINDER_ID_KEY, STREAK_REMINDER_ID_KEY);
         if (prevId) {
             await cancelNotification(prevId);
         }
