@@ -159,7 +159,18 @@ export function parseFlashcardsText(raw: string): FlashcardData[] {
   }
 
   if (delimiter) {
-    const result = Papa.parse<string[]>(text, { delimiter, skipEmptyLines: true });
+    // Anki's plain-text export never uses CSV-style quoting — a literal `"`
+    // anywhere in a field (e.g. a quoted term in an answer) is just a
+    // character, not a cell delimiter. Papaparse defaults to treating a
+    // leading `"` as an opening quote, and if that quote is never properly
+    // closed (no matching `"` immediately before the next delimiter), it
+    // keeps consuming subsequent lines as part of the same field — silently
+    // merging many cards into one and shrinking the total card count. Only
+    // genuine CSV (comma-delimited) relies on quoting to embed delimiters/
+    // newlines inside a field, so keep quote handling there and disable it
+    // for tab/semicolon/pipe/Anki-style files.
+    const quoteChar = delimiter === ',' ? '"' : '\0';
+    const result = Papa.parse<string[]>(text, { delimiter, quoteChar, skipEmptyLines: true });
     const rows = (result.data as string[][]).filter(row => row.some(cell => cell?.trim()));
 
     if (rows.length > 0) {
