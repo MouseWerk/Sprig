@@ -43,7 +43,11 @@ export function parseZipEntries(buf: Buffer): Map<string, ZipEntry> {
         const extraLen = buf.readUInt16LE(off + 30);
         const commentLen = buf.readUInt16LE(off + 32);
         const localOffset = buf.readUInt32LE(off + 42);
-        const name = buf.subarray(off + 46, off + 46 + nameLen).toString('utf8');
+        // Re-wrapped through Buffer.from: the `buffer` polyfill's subarray()
+        // doesn't reliably keep the Buffer subclass under Hermes, and
+        // .toString('utf8') on a plain Uint8Array silently ignores the
+        // encoding and comma-joins the raw byte values instead of decoding.
+        const name = Buffer.from(buf.subarray(off + 46, off + 46 + nameLen)).toString('utf8');
         entries.set(name, { name, method, compSize, uncompSize, localOffset });
         off += 46 + nameLen + extraLen + commentLen;
     }
@@ -59,6 +63,60 @@ export function extractZipEntry(buf: Buffer, entry: ZipEntry): Uint8Array {
     const extraLen = buf.readUInt16LE(off + 28);
     const dataStart = off + 30 + nameLen + extraLen;
     const data = buf.subarray(dataStart, dataStart + entry.compSize);
+    if (entry.method === 0) return new Uint8Array(data);
+    if (entry.method === 8) return inflateRaw(new Uint8Array(data));
+    throw new Error('unsupported-compression');
+}
+
+// ---------------------------------------------------------------------------
+// Ranged reading — for archives too large to load into memory whole (a
+// multi-hundred-MB .apkg export can OOM if read as one base64 string). Reads
+// only the central directory up front, then each entry's bytes on demand.
+// ---------------------------------------------------------------------------
+
+export type RangeReader = (position: number, length: number) => Promise<Buffer>;
+
+export async function parseZipEntriesRanged(fileSize: number, readRange: RangeReader): Promise<Map<string, ZipEntry>> {
+    const tailSize = Math.min(fileSize, 65557);
+    const tail = await readRange(fileSize - tailSize, tailSize);
+
+    let eocd = -1;
+    for (let i = tail.length - 22; i >= 0; i--) {
+        if (tail.readUInt32LE(i) === EOCD_SIG) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('not-a-zip');
+
+    const count = tail.readUInt16LE(eocd + 10);
+    const centralDirSize = tail.readUInt32LE(eocd + 12);
+    const centralDirOffset = tail.readUInt32LE(eocd + 16);
+
+    const central = await readRange(centralDirOffset, centralDirSize);
+
+    const entries = new Map<string, ZipEntry>();
+    let off = 0;
+    for (let n = 0; n < count; n++) {
+        if (off + 46 > central.length || central.readUInt32LE(off) !== CENTRAL_SIG) break;
+        const method = central.readUInt16LE(off + 10);
+        const compSize = central.readUInt32LE(off + 20);
+        const uncompSize = central.readUInt32LE(off + 24);
+        const nameLen = central.readUInt16LE(off + 28);
+        const extraLen = central.readUInt16LE(off + 30);
+        const commentLen = central.readUInt16LE(off + 32);
+        const localOffset = central.readUInt32LE(off + 42);
+        const name = Buffer.from(central.subarray(off + 46, off + 46 + nameLen)).toString('utf8');
+        entries.set(name, { name, method, compSize, uncompSize, localOffset });
+        off += 46 + nameLen + extraLen + commentLen;
+    }
+    return entries;
+}
+
+export async function extractZipEntryRanged(entry: ZipEntry, readRange: RangeReader): Promise<Uint8Array> {
+    const header = await readRange(entry.localOffset, 30);
+    if (header.readUInt32LE(0) !== LOCAL_SIG) throw new Error('bad-local-header');
+    const nameLen = header.readUInt16LE(26);
+    const extraLen = header.readUInt16LE(28);
+    const dataStart = entry.localOffset + 30 + nameLen + extraLen;
+    const data = await readRange(dataStart, entry.compSize);
     if (entry.method === 0) return new Uint8Array(data);
     if (entry.method === 8) return inflateRaw(new Uint8Array(data));
     throw new Error('unsupported-compression');

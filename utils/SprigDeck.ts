@@ -1,6 +1,6 @@
 import { Buffer } from 'buffer';
 import * as FileSystem from 'expo-file-system/legacy';
-import { extractImageFiles, imageToken, IMAGE_TOKEN_RE, importCardImageBase64, resolveCardImageUri } from './CardImages';
+import { extractImageFiles, imageToken, IMAGE_TOKEN_RE, importCardImageBase64, occlusionToken, OCCLUSION_TOKEN_RE, resolveCardImageUri } from './CardImages';
 import { parseFlashcardsCsv } from './CsvParser';
 import { createDeckWithCards, Deck, getCachedData } from './Storage';
 import { buildZip, extractZipEntry, parseZipEntries } from './Zip';
@@ -140,6 +140,11 @@ export async function importSprigDeck(
             .replace(IMAGE_TOKEN_RE, (match, file) => {
                 const newFile = renamed.get(file);
                 return newFile ? imageToken(newFile) : '';
+            })
+            .replace(OCCLUSION_TOKEN_RE, (match, base, mask) => {
+                const newBase = renamed.get(base);
+                const newMask = renamed.get(mask);
+                return newBase && newMask ? occlusionToken(newBase, newMask) : '';
             })
             .replace(/\n{3,}/g, '\n\n')
             .trim();

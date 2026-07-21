@@ -6,20 +6,26 @@ import { ToastProvider, useToast } from '@/components/ui/Toast';
 import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { importIncomingFile, isFileUrl } from '@/utils/IncomingFile';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Linking } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 // "Open with Sprig": files launched from other apps arrive as the app's
-// launch URL (cold start) or a url event (already running).
+// launch URL (cold start) or a url event (already running). expo-router
+// tries to match that same content:// / file:// URL against the app's own
+// routes and fails, landing on its "Unmatched Route" screen — so as soon as
+// we recognize the URL as an incoming file, we steer navigation back into
+// the app instead of leaving the user stuck there.
 function useIncomingFiles() {
   const { showToast } = useToast();
   const { t } = useLanguage();
+  const router = useRouter();
 
   useEffect(() => {
     const handle = async (url: string | null) => {
       if (!isFileUrl(url)) return;
+      router.replace('/decks');
       try {
         const result = await importIncomingFile(url);
         if (!result) return; // already handled

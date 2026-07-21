@@ -1,9 +1,10 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { extractImageFiles, IMAGE_TOKEN_RE, resolveCardImageUri } from '@/utils/CardImages';
+import { CARD_TOKEN_RE, extractOcclusionPairs, IMAGE_TOKEN_RE, resolveCardImageUri } from '@/utils/CardImages';
 import { Image } from 'expo-image';
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Markdown from 'react-native-markdown-display';
+import { SvgUri } from 'react-native-svg';
 import { showImagePreview } from './ImageViewer';
 import MathView from './MathView';
 
@@ -87,17 +88,22 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         image: () => null,
     }), []);
 
-    // Card images use relative cardimg/ tokens. They are stripped from the
-    // markdown source and rendered as regular views after the text, where
-    // they can size themselves reliably.
-    const imageFiles = useMemo(() => extractImageFiles(content), [content]);
+    // Card images/occlusion pairs use relative cardimg/ tokens. They are
+    // stripped from the markdown source and rendered as regular views after
+    // the text, where they can size themselves reliably.
+    const imageFiles = useMemo(() => {
+        const files: string[] = [];
+        for (const m of content.matchAll(IMAGE_TOKEN_RE)) files.push(m[1]);
+        return files;
+    }, [content]);
+    const occlusionPairs = useMemo(() => extractOcclusionPairs(content), [content]);
 
     const renderContent = () => {
-        // Pre-process: drop image tokens (rendered separately below), then turn
-        // highlight syntax ==text== / legacy <mark>text</mark> into ~~text~~
-        // (strikethrough proxy).
+        // Pre-process: drop image/occlusion tokens (rendered separately below),
+        // then turn highlight syntax ==text== / legacy <mark>text</mark> into
+        // ~~text~~ (strikethrough proxy).
         const processedContent = content
-            .replace(new RegExp(`\\n?${IMAGE_TOKEN_RE.source}`, 'g'), '')
+            .replace(new RegExp(`\\n?${CARD_TOKEN_RE.source}`, 'g'), '')
             .replace(/^\n+/, '')
             .replace(/==([\s\S]+?)==/g, '~~$1~~')
             .replace(/<mark>([\s\S]+?)<\/mark>/g, '~~$1~~');
@@ -153,6 +159,27 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                     </TouchableOpacity>
                 );
             })}
+            {occlusionPairs.map(({ base, mask }, i) => {
+                const baseUri = resolveCardImageUri(base);
+                return (
+                    <TouchableOpacity
+                        key={`occl-${base}-${i}`}
+                        onPress={() => showImagePreview(baseUri)}
+                        activeOpacity={0.85}
+                        accessibilityLabel="Show enlarged image"
+                        accessibilityRole="imagebutton"
+                        style={markdownStyles.occlusionWrap}
+                    >
+                        <Image
+                            source={{ uri: baseUri }}
+                            style={StyleSheet.absoluteFillObject}
+                            contentFit="contain"
+                            transition={100}
+                        />
+                        <SvgUri uri={resolveCardImageUri(mask)} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
+                    </TouchableOpacity>
+                );
+            })}
         </View>
     );
 };
@@ -166,6 +193,14 @@ const markdownStyles = StyleSheet.create({
         height: 160,
         borderRadius: 14,
         marginVertical: 6,
+    },
+    occlusionWrap: {
+        width: '100%',
+        height: 240,
+        borderRadius: 14,
+        marginVertical: 6,
+        overflow: 'hidden',
+        position: 'relative',
     },
 });
 

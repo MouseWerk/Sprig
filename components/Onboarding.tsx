@@ -4,6 +4,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { migrateKey } from '@/utils/StorageMigration';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+    Bug,
     Check,
     FileText,
     Flame,
@@ -16,12 +17,14 @@ import {
     Snowflake,
     Sprout,
     Trophy,
+    Users,
     Wifi,
     X,
     Zap,
 } from 'lucide-react-native';
+import { DiscordIcon } from './DiscordIcon';
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, Modal, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Linking, Modal, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GrowingPlant } from './GrowingPlant';
 import { SprigLogo } from './SprigLogo';
@@ -226,6 +229,37 @@ function ProgressVignette() {
     );
 }
 
+const DISCORD_INVITE_URL = 'https://discord.gg/TS9BXaJe9f';
+
+function DiscordVignette() {
+    const { t } = useLanguage();
+    const cardColor = useThemeColor({}, 'card');
+    const secondaryBg = useThemeColor({}, 'secondary');
+    const accent = useThemeColor({}, 'primary');
+    const primaryForeground = useThemeColor({}, 'primaryForeground');
+
+    return (
+        <View style={styles.vignette}>
+            <View style={[styles.discordCard, { backgroundColor: cardColor, borderColor: secondaryBg }]}>
+                <View style={[styles.mockTile, styles.discordIcon, { backgroundColor: accent + '15' }]}>
+                    <DiscordIcon size={26} color={accent} />
+                </View>
+                <TouchableOpacity
+                    style={[styles.discordBtn, { backgroundColor: accent }]}
+                    onPress={() => Linking.openURL(DISCORD_INVITE_URL).catch(() => { })}
+                    activeOpacity={0.85}
+                >
+                    <Text style={[styles.discordBtnText, { color: primaryForeground }]}>{t('onboardJoinDiscordButton')}</Text>
+                </TouchableOpacity>
+            </View>
+            <View style={styles.chipRow}>
+                <Chip icon={Users} label={t('onboardStudyTogether')} />
+                <Chip icon={Bug} label={t('onboardGetHelp')} />
+            </View>
+        </View>
+    );
+}
+
 interface Slide {
     Vignette: React.ComponentType;
     titleKey: TranslationKey;
@@ -238,6 +272,7 @@ const SLIDES: Slide[] = [
     { Vignette: LibraryVignette, titleKey: 'onboardLibraryTitle', bodyKey: 'onboardLibraryBody' },
     { Vignette: FocusVignette, titleKey: 'onboardFocusTitle', bodyKey: 'onboardFocusBody' },
     { Vignette: ProgressVignette, titleKey: 'onboardProgressTitle', bodyKey: 'onboardProgressBody' },
+    { Vignette: DiscordVignette, titleKey: 'onboardDiscordTitle', bodyKey: 'onboardDiscordBody' },
 ];
 
 // Full-screen first-run walkthrough. Shows once, then never again unless
@@ -496,6 +531,32 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         letterSpacing: -0.5,
         fontVariant: ['tabular-nums'],
+    },
+    // Discord slide
+    discordCard: {
+        width: 264,
+        borderRadius: 24,
+        borderWidth: 1.5,
+        padding: 24,
+        alignItems: 'center',
+        gap: 20,
+    },
+    discordIcon: {
+        width: 52,
+        height: 52,
+        borderRadius: 16,
+    },
+    discordBtn: {
+        height: 52,
+        width: '100%',
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    discordBtnText: {
+        fontSize: 15.5,
+        fontWeight: '800',
+        letterSpacing: -0.2,
     },
     // Progress slide
     mockStats: {

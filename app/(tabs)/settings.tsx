@@ -16,6 +16,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { Bell, ChevronRight, Clock, Coffee, Database, DownloadCloud, Github, Globe, Info, Monitor, Moon, PlayCircle, ScrollText, ShieldCheck, Smartphone, Star, Sun, Target, Timer, Trash2, UploadCloud, Vibrate, Wifi } from 'lucide-react-native';
+import { DiscordIcon } from '@/components/DiscordIcon';
 import React, { useEffect, useState } from 'react';
 import { Linking, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -465,6 +466,7 @@ export default function SettingsScreen() {
         <SectionHeader title={t('settingsCommunity')} />
         <View style={styles.group}>
           <SettingItem icon={Coffee} label={t('settingsSupportDevelopment')} onPress={() => openUrl('https://buymeacoffee.com/mousewerk')} />
+          <SettingItem icon={DiscordIcon} label={t('settingsJoinDiscord')} onPress={() => openUrl('https://discord.gg/TS9BXaJe9f')} />
           <SettingItem icon={Star} label={t('settingsRateSprig')} onPress={handleRate} />
           <SettingItem icon={Github} label={t('settingsGithubRepo')} onPress={() => openUrl('https://github.com/MouseWerk/Sprig')} />
           <SettingItem icon={Smartphone} label={t('settingsShareWithFriends')} onPress={handleShare} />

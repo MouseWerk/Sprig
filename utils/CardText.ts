@@ -1,9 +1,10 @@
-import { IMAGE_TOKEN_RE, imageToken } from './CardImages';
+import { CARD_TOKEN_RE } from './CardImages';
 
 // Raw card text carries markup users should never read literally:
-// ==highlight== markers and ![img](cardimg/…) tokens. The editor's text
-// inputs show a clean "display" version instead; these helpers convert
-// between the two while keeping highlights and attached images intact.
+// ==highlight== markers and ![img](cardimg/…) / ![occl](cardimg/…|cardimg/…)
+// tokens. The editor's text inputs show a clean "display" version instead;
+// these helpers convert between the two while keeping highlights and
+// attached images (or occlusion pairs) intact.
 
 const HIGHLIGHT_RE = /==([^=\n][\s\S]*?)==/g;
 
@@ -17,7 +18,7 @@ function removeImageTokens(raw: string): string {
     // Consume only the line break that precedes an appended token — never
     // user-typed spaces, so editing stays stable while images are attached.
     return raw
-        .replace(new RegExp(`\\n?${IMAGE_TOKEN_RE.source}`, 'g'), '')
+        .replace(new RegExp(`\\n?${CARD_TOKEN_RE.source}`, 'g'), '')
         .replace(/^\n+/, '');
 }
 
@@ -25,23 +26,23 @@ function stripHighlightMarkers(text: string): string {
     return text.replace(HIGHLIGHT_RE, '$1');
 }
 
+// Returns the raw token strings (not just file names) so an occlusion
+// token's base+mask pairing survives being reattached below.
 export function extractTokenSuffix(raw: string): string[] {
-    const files: string[] = [];
-    for (const m of raw.matchAll(IMAGE_TOKEN_RE)) files.push(m[1]);
-    return files;
+    return raw.match(CARD_TOKEN_RE) || [];
 }
 
 // Rebuild raw text after the user edited the display version: re-apply
 // ==markers== to words that survived the edit unchanged (word-level LCS
-// against the previous raw text), then re-append the image tokens.
+// against the previous raw text), then re-append the image/occlusion tokens.
 export function fromDisplayText(previousRaw: string, display: string): string {
     const prevText = removeImageTokens(previousRaw);
-    const files = extractTokenSuffix(previousRaw);
+    const tokenStrings = extractTokenSuffix(previousRaw);
 
     const merged = reapplyHighlights(prevText, display);
 
-    if (files.length === 0) return merged;
-    const tokens = files.map(imageToken).join('\n');
+    if (tokenStrings.length === 0) return merged;
+    const tokens = tokenStrings.join('\n');
     return merged.length > 0 ? `${merged}\n${tokens}` : tokens;
 }
 

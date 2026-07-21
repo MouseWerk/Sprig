@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { importApkg } from './AnkiImport';
 import { importSprigDeck, looksLikeZipBase64Head } from './SprigDeck';
 import { createEmptyDeck, deleteDeck, importCsvToDeck, saveDeck } from './Storage';
 
@@ -8,7 +9,7 @@ import { createEmptyDeck, deleteDeck, importCsvToDeck, saveDeck } from './Storag
 // imported through the same paths the in-app pickers use.
 
 export interface IncomingImportResult {
-    kind: 'pdf' | 'csv' | 'sprig';
+    kind: 'pdf' | 'csv' | 'sprig' | 'anki';
     name: string;
     cards?: number;
 }
@@ -24,7 +25,7 @@ export function isFileUrl(url: string | null): url is string {
 function nameFromUrl(url: string, fallback: string): string {
     try {
         const last = decodeURIComponent(url.split('/').pop() || '');
-        const cleaned = last.replace(/\.(pdf|csv|txt|sprig)$/i, '').trim();
+        const cleaned = last.replace(/\.(pdf|csv|txt|sprig|apkg|colpkg)$/i, '').trim();
         if (cleaned.length >= 2 && cleaned.length <= 80 && !cleaned.includes(':')) return cleaned;
     } catch {
         // fall through
@@ -51,14 +52,31 @@ export async function importIncomingFile(url: string): Promise<IncomingImportRes
     }
 
     if (looksLikeZipBase64Head(head)) {
-        // A shared .sprig deck (importSprigDeck rejects other ZIPs cleanly)
+        // Could be an Anki .apkg/.colpkg export or a shared .sprig deck —
+        // both are ZIPs, so try Anki's collection database first and only
+        // fall back to the Sprig format when this isn't an Anki package.
         try {
+            const name = nameFromUrl(url, `Imported Deck ${new Date().toLocaleDateString()}`);
+            try {
+                const res = await importApkg(tmp, name, 'Book', null);
+                return { kind: 'anki', name, cards: res.cardCount };
+            } catch (e: any) {
+                if (e?.message !== 'no-collection') {
+                    throw new Error(
+                        e?.message === 'new-format' ? 'This Anki export uses a newer format Sprig can\'t read yet — re-export with "Support older Anki versions" enabled'
+                            : e?.message === 'empty' ? 'No cards found in this Anki deck'
+                                : 'Could not import this Anki deck'
+                    );
+                }
+            }
+
+            // Not an Anki package — try it as a shared Sprig deck
             const res = await importSprigDeck(tmp, null);
             return { kind: 'sprig', name: res.deck.name, cards: res.cardCount };
         } catch (e: any) {
             throw new Error(e?.message === 'not-sprig'
                 ? 'This file is not a Sprig deck'
-                : 'Could not import this Sprig deck');
+                : (e?.message || 'Could not import this file'));
         } finally {
             await FileSystem.deleteAsync(tmp, { idempotent: true }).catch(() => { });
         }

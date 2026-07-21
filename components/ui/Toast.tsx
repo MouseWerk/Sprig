@@ -28,6 +28,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const bgColor = useThemeColor({}, 'card');
     const textColor = useThemeColor({}, 'text');
+    const mutedForeground = useThemeColor({}, 'mutedForeground');
+    const secondaryBg = useThemeColor({}, 'secondary');
     const accentColor = useThemeColor({}, 'primary');
 
     const hideToast = useCallback(() => {
@@ -81,11 +83,12 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, [insets.top, opacity, translateY, hideToast]);
 
     const getIcon = () => {
+        const color = getStatusColor();
         switch (toast?.type) {
-            case 'success': return <CheckCircle2 size={20} color="#22c55e" strokeWidth={2.5} />;
-            case 'error': return <XCircle size={20} color="#ef4444" strokeWidth={2.5} />;
-            case 'warning': return <AlertCircle size={20} color="#eab308" strokeWidth={2.5} />;
-            default: return <Info size={20} color={accentColor} strokeWidth={2.5} />;
+            case 'success': return <CheckCircle2 size={18} color={color} strokeWidth={2.5} />;
+            case 'error': return <XCircle size={18} color={color} strokeWidth={2.5} />;
+            case 'warning': return <AlertCircle size={18} color={color} strokeWidth={2.5} />;
+            default: return <Info size={18} color={color} strokeWidth={2.5} />;
         }
     };
 
@@ -109,13 +112,12 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                             opacity,
                             transform: [{ translateY }],
                             backgroundColor: bgColor,
-                            borderColor: getStatusColor() + '40',
+                            borderColor: secondaryBg,
                         }
                     ]}
                 >
-                    <View style={[styles.statusLine, { backgroundColor: getStatusColor() }]} />
                     <View style={styles.content}>
-                        <View style={styles.iconWrapper}>
+                        <View style={[styles.iconWrapper, { backgroundColor: getStatusColor() + '18' }]}>
                             {getIcon()}
                         </View>
                         <Text style={[styles.message, { color: textColor }]}>{toast.message}</Text>
@@ -133,7 +135,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                             </TouchableOpacity>
                         )}
                         <TouchableOpacity onPress={hideToast} style={styles.closeBtn} accessibilityLabel="Dismiss notification" accessibilityRole="button">
-                            <X size={16} color={textColor} opacity={0.5} />
+                            <X size={16} color={mutedForeground} />
                         </TouchableOpacity>
                     </View>
                 </Animated.View>
@@ -156,37 +158,33 @@ const styles = StyleSheet.create({
         top: 0,
         left: 20,
         right: 20,
-        borderRadius: 16,
-        padding: 1,
+        borderRadius: 22,
         zIndex: 9999,
-        borderWidth: 1.5,
+        borderWidth: 1,
         ...Platform.select({
             ios: {
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 10 },
-                shadowOpacity: 0.15,
+                shadowOpacity: 0.1,
                 shadowRadius: 12,
             },
             android: {
-                elevation: 10,
+                elevation: 6,
             },
         }),
         overflow: 'hidden',
     },
-    statusLine: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: 4,
-    },
     content: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 12,
-        paddingVertical: 14,
+        padding: 14,
     },
     iconWrapper: {
+        width: 34,
+        height: 34,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
         marginRight: 12,
     },
     message: {

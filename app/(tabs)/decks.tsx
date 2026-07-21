@@ -50,7 +50,8 @@ export default function DecksScreen() {
   const [selectedIcon, setSelectedIcon] = useState('Book');
   const [newFolderName, setNewFolderName] = useState('');
   const [importing, setImporting] = useState(false);
-  
+  const [ankiProgress, setAnkiProgress] = useState<{ current: number; total: number } | null>(null);
+
   const [editingDeck, setEditingDeck] = useState<Deck | null>(null);
   const [editDeckName, setEditDeckName] = useState('');
   const [editDeckIcon, setEditDeckIcon] = useState('Book');
@@ -155,7 +156,8 @@ export default function DecksScreen() {
       const name = boxName.trim() || fallbackName;
 
       setImporting(true);
-      const res = await importApkg(asset.uri, name, selectedIcon, currentFolderId);
+      setAnkiProgress(null);
+      const res = await importApkg(asset.uri, name, selectedIcon, currentFolderId, (current, total) => setAnkiProgress({ current, total }));
 
       setImportModalVisible(false);
       setBoxName('');
@@ -176,6 +178,7 @@ export default function DecksScreen() {
       showToast({ message, type: 'error' });
     } finally {
       setImporting(false);
+      setAnkiProgress(null);
     }
   };
 
@@ -627,12 +630,26 @@ export default function DecksScreen() {
                     accessibilityLabel="Import Anki deck"
                     accessibilityRole="button"
                   >
-                    <Package size={22} color={accentColor} strokeWidth={2.5} />
+                    {importing ? (
+                      <ActivityIndicator color={accentColor} />
+                    ) : (
+                      <Package size={22} color={accentColor} strokeWidth={2.5} />
+                    )}
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.pickText, { color: textColor, fontSize: 15 }]}>{t('decksImportAnki')}</Text>
-                      <Text style={[styles.pickSub, { color: mutedForeground }]}>
-                        {t('decksImportAnkiSub')}
+                      <Text style={[styles.pickText, { color: textColor, fontSize: 15 }]}>
+                        {importing
+                          ? (ankiProgress ? t('decksImportAnkiProgress').replace('{current}', String(ankiProgress.current)).replace('{total}', String(ankiProgress.total)) : t('decksImporting'))
+                          : t('decksImportAnki')}
                       </Text>
+                      {importing && ankiProgress ? (
+                        <View style={[styles.progressBarBg, { backgroundColor: accentColor + '15', marginTop: 6 }]}>
+                          <View style={[styles.progressBarFill, { width: `${Math.min(100, (ankiProgress.current / ankiProgress.total) * 100)}%`, backgroundColor: accentColor }]} />
+                        </View>
+                      ) : (
+                        <Text style={[styles.pickSub, { color: mutedForeground }]}>
+                          {t('decksImportAnkiSub')}
+                        </Text>
+                      )}
                     </View>
                   </TouchableOpacity>
 

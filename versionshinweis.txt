@@ -1,0 +1,14 @@
+<en-US>
+- Fixed importing Anki (.apkg) flashcard decks, including decks with Image Occlusion cards (great for anatomy/diagram decks)
+- Added a progress bar for Anki imports, so large decks no longer look stuck
+- New: join our Discord community from Settings
+- Fixed "Share with Friends" not including a working link
+- Refreshed the in-app notification design
+</en-US>
+<de-DE>
+- Der Import von Anki-Kartendecks (.apkg) wurde repariert, inklusive Decks mit Image-Occlusion-Karten (ideal für Anatomie-/Diagramm-Decks)
+- Fortschrittsanzeige beim Anki-Import hinzugefügt, damit große Decks nicht mehr wie eingefroren wirken
+- Neu: Tritt unserer Discord-Community über die Einstellungen bei
+- "Mit Freunden teilen" enthält jetzt einen funktionierenden Link
+- Überarbeitetes Design der In-App-Benachrichtigungen
+</de-DE>
