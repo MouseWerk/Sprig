@@ -241,7 +241,7 @@ const en = {
   settingsJoinDiscord: "Join our Discord",
   settingsAbout: "About",
   settingsCreditsLicenses: "Credits & Licenses",
-  settingsMadeBy: "Made by Mousewerk",
+  settingsMadeBy: "Made by ",
   settingsWebUploadNeedsBuild:
     "Web upload needs the full app build — it isn't available in Expo Go",
   settingsReceived: "Received {name}",
@@ -953,7 +953,7 @@ const de: Record<keyof typeof en, string> = {
   settingsJoinDiscord: "Discord beitreten",
   settingsAbout: "Über",
   settingsCreditsLicenses: "Credits & Lizenzen",
-  settingsMadeBy: "Gemacht von Mousewerk",
+  settingsMadeBy: "Gemacht von ",
   settingsWebUploadNeedsBuild:
     "Web-Upload benötigt den vollständigen App-Build — in Expo Go nicht verfügbar",
   settingsReceived: "{name} empfangen",

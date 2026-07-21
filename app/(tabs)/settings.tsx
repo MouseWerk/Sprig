@@ -251,7 +251,7 @@ export default function SettingsScreen() {
         />
       )}
       {rightElement}
-      {onPress && !toggle && !rightElement && <ChevronRight size={18} color={mutedForeground} />}
+      {onPress && toggle === undefined && !rightElement && <ChevronRight size={18} color={mutedForeground} />}
     </TouchableOpacity>
   );
 
@@ -479,8 +479,17 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: mutedForeground }]}>{t('settingsMadeBy')}</Text>
+          <Text style={[styles.footerText, { color: mutedForeground }]}>
+            {t('settingsMadeBy')}
+            <Text
+              onPress={() => openUrl('https://mousewerk.de')}
+              style={{ color: accentColor, textDecorationLine: 'underline' }}
+            >
+              Mousewerk
+            </Text>
+          </Text>
           <Text style={[styles.footerVersion, { color: mutedForeground }]}>Sprig © 2026</Text>
+          <SprigLogo size={20} />
         </View>
       </ScrollView>
     </View>

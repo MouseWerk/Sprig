@@ -786,7 +786,7 @@ export default function DeckDetailsScreen() {
                             ))}
                             <View style={{ flex: 1 }} />
                             <TouchableOpacity onPress={handleResetProgress} hitSlop={8}>
-                                <Text style={[styles.resetLink, { color: mutedForeground }]}>{t('deckDetailsResetProgress')}</Text>
+                                <Text style={[styles.resetLink, { color: mutedForeground }]}>{t('deckDetailsReset')}</Text>
                             </TouchableOpacity>
                         </View>
 
