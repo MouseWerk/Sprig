@@ -82,7 +82,7 @@ New users (1–2 sprouts) see ~50–80/day — small, but stage upgrades feel hu
 | Streak freeze | 1,500 | Second path to the existing mechanic; `MAX_STREAK_FREEZES = 3` still caps banking, purchase disabled at cap |
 | Sunshine (2× XP for 30 min) | 400 | Time-boxed, non-stacking (stats updates are per-card, so "next session" has no clean boundary — a timed window does) |
 | Planters/pots (cosmetic) | 250–1,000 | Per-deck assignment |
-| Grove decorations (cosmetic) | 500–5,000 | Fences, stones, lanterns — grove-wide |
+| Grove decorations (cosmetic) | 500–3,000 | Fences, stones, lanterns, pathway, hedge, trellis — grove-wide, any number can be shown at once |
 | Rare seed varieties | seeds only | See prestige; never buyable with dew |
 
 **Hard rule:** dew never buys XP, levels, ranks, or SRS shortcuts. The moment
@@ -124,7 +124,7 @@ interface GroveState {
   speciesOverrides: Record<string, number>; // deckId -> rare species planted with a seed
   planters: Record<string, string>;         // deckId -> pot style id; buying = assigning
   ownedDecorations: string[];               // purchased grove-wide backdrop ids
-  equippedDecoration: string | null;        // which owned decoration is shown, if any
+  equippedDecorations: string[];            // owned decorations currently shown, any number at once
 }
 ```
 

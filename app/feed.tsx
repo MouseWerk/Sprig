@@ -3,9 +3,10 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
 import { getCachedData, setCachedData, updateCardInDeck, updateUserStats } from '@/utils/Storage';
 import * as Haptics from '@/utils/AppHaptics';
+import { getPrefsSync, subscribePrefs } from '@/utils/Preferences';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronsDown, Edit3, Eye, EyeOff, FileWarning, Shuffle, Sprout } from 'lucide-react-native';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View, ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FocusPlant } from '../components/FocusPlant';
@@ -38,6 +39,8 @@ export default function FeedScreen() {
     const listRef = useRef<FlatList<FeedCard>>(null);
 
     const [cards, setCards] = useState<FeedCard[] | null>(null);
+    const [cardTextScale, setCardTextScale] = useState(getPrefsSync().cardTextScale);
+    useEffect(() => subscribePrefs(prefs => setCardTextScale(prefs.cardTextScale)), []);
     const [loading, setLoading] = useState(true);
     const [pageHeight, setPageHeight] = useState(0);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -209,12 +212,12 @@ export default function FeedScreen() {
                         {isHighlightMode ? (
                             <HighlightableText
                                 text={item.question}
-                                fontSize={22}
+                                fontSize={22 * cardTextScale}
                                 align="left"
                                 onChange={(t) => handleHighlightChange(index, 'question', t)}
                             />
                         ) : (
-                            <MarkdownRenderer content={item.question} fontSize={22} />
+                            <MarkdownRenderer content={item.question} fontSize={22 * cardTextScale} />
                         )}
 
                         <View style={styles.answerDivider}>
@@ -235,12 +238,12 @@ export default function FeedScreen() {
                         ) : isHighlightMode ? (
                             <HighlightableText
                                 text={item.answer}
-                                fontSize={18}
+                                fontSize={18 * cardTextScale}
                                 align="left"
                                 onChange={(t) => handleHighlightChange(index, 'answer', t)}
                             />
                         ) : (
-                            <MarkdownRenderer content={item.answer} fontSize={18} />
+                            <MarkdownRenderer content={item.answer} fontSize={18 * cardTextScale} />
                         )}
                     </ScrollView>
 

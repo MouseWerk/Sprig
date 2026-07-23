@@ -17,14 +17,17 @@ import {
     MAX_STREAK_FREEZES, POT_PRICES,
 } from '@/utils/Storage';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { CalendarDays, Check, ChevronRight, Droplet, Droplets, Fence, Flower2, Lamp, Moon, Snowflake, Sprout, Stone, Sun, X } from 'lucide-react-native';
+import { CalendarDays, Check, ChevronRight, Droplet, Droplets, Fence, Flower2, Footprints, Grid3x3, Lamp, Moon, Snowflake, Sprout, Stone, Sun, TreeDeciduous, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const DECORATION_ICONS: Record<string, typeof Fence> = {
     stones: Stone,
+    pathway: Footprints,
+    hedge: TreeDeciduous,
     lanterns: Lamp,
+    trellis: Grid3x3,
     fence: Fence,
 };
 
@@ -157,13 +160,13 @@ export default function GroveScreen() {
             showToast({ message: t('groveNotEnoughDew'), type: 'info' });
             return;
         }
-        setEcon(prev => prev ? { ...prev, dew: result.dew, ownedDecorations: result.ownedDecorations, equippedDecoration: decorationId } : prev);
+        setEcon(prev => prev ? { ...prev, dew: result.dew, ownedDecorations: result.ownedDecorations, equippedDecorations: [...prev.equippedDecorations, decorationId] } : prev);
         showToast({ message: t('groveDecorationAdded'), type: 'success' });
     };
 
     const handleEquipDecoration = async (decorationId: string) => {
         const updated = await equipDecoration(decorationId);
-        setEcon(prev => prev ? { ...prev, equippedDecoration: updated.equippedDecoration } : prev);
+        setEcon(prev => prev ? { ...prev, equippedDecorations: updated.equippedDecorations } : prev);
     };
 
     // Watering studies exactly the overdue cards via the drill mechanism —
@@ -318,7 +321,7 @@ export default function GroveScreen() {
                             </View>
 
                             <View style={[styles.hero, { backgroundColor: secondaryBg }]}>
-                                <GroveStrip plants={plants} onPressPlant={setSelected} large decoration={econ?.equippedDecoration ?? null} />
+                                <GroveStrip plants={plants} onPressPlant={setSelected} large decorations={econ?.equippedDecorations ?? []} />
                             </View>
 
                             <View style={styles.statRowContainer}>
@@ -389,7 +392,7 @@ export default function GroveScreen() {
                             <Text style={[styles.subsectionTitle, { color: mutedForeground }]}>{t('groveDecorationsHeader')}</Text>
                             {DECORATION_CATALOG.map(dec => {
                                 const owned = econ?.ownedDecorations.includes(dec.id) ?? false;
-                                const equipped = econ?.equippedDecoration === dec.id;
+                                const equipped = econ?.equippedDecorations.includes(dec.id) ?? false;
                                 const Icon = DECORATION_ICONS[dec.id] || Fence;
                                 const decName = t(dec.nameKey);
                                 return (

@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { LANGUAGE_STORAGE_KEY } from '../contexts/LanguageContext';
+import { Language, TranslationKey, translations } from '../constants/translations';
 import { buildGrovePlants } from './Grove';
 import { getPrefs } from './Preferences';
 import { getDecks } from './Storage';
@@ -14,6 +16,20 @@ const STREAK_REMINDER_ID_KEY = 'sprig_streak_reminder_id';
 const LEGACY_STREAK_REMINDER_ID_KEY = 'csvtudyapp_streak_reminder_id';
 let handlerConfigured = false;
 let permissionGranted: boolean | null = null;
+
+// Scheduled notifications fire outside any component tree, so there's no
+// LanguageProvider to pull `t()` from — read the same AsyncStorage key
+// LanguageContext saves the user's choice under instead.
+async function tNotif(key: TranslationKey): Promise<string> {
+    let lang: Language = 'en';
+    try {
+        const saved = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
+        if (saved === 'en' || saved === 'de') lang = saved;
+    } catch {
+        // ignore — English fallback
+    }
+    return translations[lang][key] ?? translations.en[key] ?? key;
+}
 
 function configureHandler() {
     if (handlerConfigured) return;
@@ -65,8 +81,8 @@ export async function scheduleFocusWarning(seconds: number): Promise<string | nu
         if (!granted) return null;
         return await Notifications.scheduleNotificationAsync({
             content: {
-                title: 'Your focus plant wilted!',
-                body: 'You left the app during a focus session. Come back to replant and keep studying.',
+                title: await tNotif('notifFocusWiltedTitle'),
+                body: await tNotif('notifFocusWiltedBody'),
             },
             trigger: {
                 type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -123,8 +139,8 @@ export async function scheduleStreakReminder(): Promise<void> {
 
         const id = await Notifications.scheduleNotificationAsync({
             content: {
-                title: 'Keep your streak alive!',
-                body: 'A few cards today keeps your streak growing. Ready for a quick session?',
+                title: await tNotif('notifStreakTitle'),
+                body: await tNotif('notifStreakBody'),
             },
             trigger: {
                 type: Notifications.SchedulableTriggerInputTypes.DAILY,

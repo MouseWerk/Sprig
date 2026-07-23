@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sprig",
     "slug": "sprig",
-    "version": "1.9.3",
+    "version": "1.9.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "sprig",
@@ -13,7 +13,50 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.mousewerk.sprig",
       "infoPlist": {
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": ["audio"],
+        "LSSupportsOpeningDocumentsInPlace": true,
+        "UISupportsDocumentBrowser": true,
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "PDF Document",
+            "LSItemContentTypes": ["com.adobe.pdf"],
+            "LSHandlerRank": "Alternate"
+          },
+          {
+            "CFBundleTypeName": "CSV File",
+            "LSItemContentTypes": ["public.comma-separated-values-text", "public.plain-text"],
+            "LSHandlerRank": "Alternate"
+          },
+          {
+            "CFBundleTypeName": "Sprig Deck",
+            "LSItemContentTypes": ["com.mousewerk.sprig.deck", "public.zip-archive"],
+            "LSHandlerRank": "Owner"
+          },
+          {
+            "CFBundleTypeName": "Anki Package",
+            "LSItemContentTypes": ["com.mousewerk.sprig.apkg", "public.zip-archive"],
+            "LSHandlerRank": "Alternate"
+          },
+          {
+            "CFBundleTypeName": "Audio",
+            "LSItemContentTypes": ["public.mp3", "public.mpeg-4-audio"],
+            "LSHandlerRank": "Alternate"
+          }
+        ],
+        "UTExportedTypeDeclarations": [
+          {
+            "UTTypeIdentifier": "com.mousewerk.sprig.deck",
+            "UTTypeDescription": "Sprig Deck",
+            "UTTypeConformsTo": ["public.zip-archive"],
+            "UTTypeTagSpecification": { "public.filename-extension": ["sprig"] }
+          },
+          {
+            "UTTypeIdentifier": "com.mousewerk.sprig.apkg",
+            "UTTypeDescription": "Anki Package",
+            "UTTypeConformsTo": ["public.zip-archive"],
+            "UTTypeTagSpecification": { "public.filename-extension": ["apkg", "colpkg"] }
+          }
+        ]
       }
     },
     "android": {
@@ -24,7 +67,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.mousewerk.sprig",
-      "versionCode": 28,
+      "versionCode": 30,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW"
@@ -73,6 +116,38 @@
             {
               "scheme": "file",
               "mimeType": "application/zip"
+            },
+            {
+              "scheme": "content",
+              "mimeType": "text/plain"
+            },
+            {
+              "scheme": "file",
+              "mimeType": "text/plain"
+            },
+            {
+              "scheme": "content",
+              "mimeType": "audio/mpeg"
+            },
+            {
+              "scheme": "file",
+              "mimeType": "audio/mpeg"
+            },
+            {
+              "scheme": "content",
+              "mimeType": "audio/mp4"
+            },
+            {
+              "scheme": "file",
+              "mimeType": "audio/mp4"
+            },
+            {
+              "scheme": "content",
+              "mimeType": "audio/x-m4a"
+            },
+            {
+              "scheme": "file",
+              "mimeType": "audio/x-m4a"
             }
           ]
         }
@@ -102,7 +177,26 @@
       "@react-native-community/datetimepicker",
       "expo-asset",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "PinnedDeck",
+              "label": "Sprig Deck",
+              "minWidth": "180dp",
+              "minHeight": "40dp",
+              "targetCellWidth": 3,
+              "targetCellHeight": 1,
+              "resizeMode": "horizontal",
+              "description": "Shows your pinned deck's due count — tap to study",
+              "previewImage": "./assets/images/icon.png",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

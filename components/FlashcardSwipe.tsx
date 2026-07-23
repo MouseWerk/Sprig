@@ -31,6 +31,7 @@ interface FlashcardSwipeProps {
     // while displaying the answer.
     frontLabel?: string;
     backLabel?: string;
+    fontScale?: number; // user's card-text-size preference; 1 = default
 }
 
 export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
@@ -43,7 +44,8 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
     onHighlightChange,
     onFlip,
     frontLabel = 'Question',
-    backLabel = 'Answer'
+    backLabel = 'Answer',
+    fontScale = 1
 }) => {
     const { t } = useLanguage();
     const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
@@ -179,9 +181,9 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
                         <Text style={[styles.label, { color: mutedFg }]} pointerEvents="none">{frontLabel}</Text>
                         <ScrollView centerContent showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
                             {highlightMode ? (
-                                <HighlightableText text={question} fontSize={24} onChange={(t) => onHighlightChange?.(true, t)} />
+                                <HighlightableText text={question} fontSize={24 * fontScale} onChange={(t) => onHighlightChange?.(true, t)} />
                             ) : (
-                                <MarkdownRenderer content={question} fontSize={24} />
+                                <MarkdownRenderer content={question} fontSize={24 * fontScale} />
                             )}
                         </ScrollView>
                         <View style={styles.footerHint} pointerEvents="none">
@@ -212,9 +214,9 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
                         <Text style={[styles.label, { color: mutedFg }]} pointerEvents="none">{backLabel}</Text>
                         <ScrollView centerContent showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
                             {highlightMode ? (
-                                <HighlightableText text={answer} fontSize={22} onChange={(t) => onHighlightChange?.(false, t)} />
+                                <HighlightableText text={answer} fontSize={22 * fontScale} onChange={(t) => onHighlightChange?.(false, t)} />
                             ) : (
-                                <MarkdownRenderer content={answer} fontSize={22} />
+                                <MarkdownRenderer content={answer} fontSize={22 * fontScale} />
                             )}
                         </ScrollView>
                         <View style={styles.footerHint} pointerEvents="none">

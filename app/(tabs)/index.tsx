@@ -4,11 +4,13 @@ import { SprigLogo } from '@/components/SprigLogo';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { buildGrovePlants, GrovePlant, pendingDew } from '@/utils/Grove';
+import { getPrefsSync, subscribePrefs } from '@/utils/Preferences';
+import { refreshWidgetSnapshot } from '@/utils/PinnedDeck';
 import { Deck, getDecks, getGroveEconomy, getUserStats, UserStats } from '@/utils/Storage';
 import { buildTodayPlan, startTodaySession, TodayPlan } from '@/utils/TodayPlan';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { CalendarCheck, ChevronRight, Layers, Leaf, Play } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
@@ -38,6 +40,12 @@ export default function HomeScreen() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [todayPlan, setTodayPlan] = useState<TodayPlan | null>(null);
   const [dewReady, setDewReady] = useState(0);
+  const [sectionOrder, setSectionOrder] = useState(getPrefsSync().homeSectionOrder);
+  const [sectionsHidden, setSectionsHidden] = useState(getPrefsSync().homeSectionsHidden);
+  useEffect(() => subscribePrefs(prefs => {
+    setSectionOrder(prefs.homeSectionOrder);
+    setSectionsHidden(prefs.homeSectionsHidden);
+  }), []);
 
   useFocusEffect(
     useCallback(() => {
@@ -52,6 +60,7 @@ export default function HomeScreen() {
         })
         .catch(() => { });
       buildTodayPlan().then(setTodayPlan).catch(() => setTodayPlan(null));
+      refreshWidgetSnapshot().catch(() => { });
     }, [])
   );
 
@@ -131,85 +140,99 @@ export default function HomeScreen() {
         </TouchableOpacity>
       )}
 
-      {plants.length > 0 && (
-        <View style={[styles.groveCard, { backgroundColor: secondaryBg }]}>
-          <TouchableOpacity
-            style={styles.groveHeader}
-            onPress={() => router.push('/grove')}
-            activeOpacity={0.8}
-            accessibilityLabel="Open the Grove"
-            accessibilityRole="button"
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowTitle, { color: textColor }]}>{t('homeGroveTitle')}</Text>
-              <Text style={[styles.rowSub, { color: mutedForeground }]}>
-                {plants.length} {plants.length === 1 ? t('homePlant') : t('homePlants')}
-                {dewReady > 0 ? t('homeDewToCollect').replace('{n}', String(dewReady)) : ''}
-                {totalDue > 0 ? t('homeCardsToWater').replace('{n}', String(totalDue)) : t('homeAllWatered')}
-              </Text>
+      {sectionOrder.filter(id => !sectionsHidden.includes(id)).map(id => {
+        if (id === 'grove') {
+          return plants.length === 0 ? null : (
+            <View key="grove" style={[styles.groveCard, { backgroundColor: secondaryBg }]}>
+              <TouchableOpacity
+                style={styles.groveHeader}
+                onPress={() => router.push('/grove')}
+                activeOpacity={0.8}
+                accessibilityLabel="Open the Grove"
+                accessibilityRole="button"
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rowTitle, { color: textColor }]}>{t('homeGroveTitle')}</Text>
+                  <Text style={[styles.rowSub, { color: mutedForeground }]}>
+                    {plants.length} {plants.length === 1 ? t('homePlant') : t('homePlants')}
+                    {dewReady > 0 ? t('homeDewToCollect').replace('{n}', String(dewReady)) : ''}
+                    {totalDue > 0 ? t('homeCardsToWater').replace('{n}', String(totalDue)) : t('homeAllWatered')}
+                  </Text>
+                </View>
+                <ChevronRight size={20} color={mutedForeground} />
+              </TouchableOpacity>
+              <GroveStrip plants={plants} onPressPlant={() => router.push('/grove')} />
             </View>
-            <ChevronRight size={20} color={mutedForeground} />
-          </TouchableOpacity>
-          <GroveStrip plants={plants} onPressPlant={() => router.push('/grove')} />
-        </View>
-      )}
+          );
+        }
 
-      <TouchableOpacity
-        style={[styles.rowCard, { backgroundColor: accentColor }]}
-        onPress={() => router.push('/focus')}
-        activeOpacity={0.9}
-        accessibilityLabel="Start a focus session"
-        accessibilityRole="button"
-      >
-        <View style={[styles.rowIcon, { backgroundColor: primaryForeground }]}>
-          <Leaf size={22} color={accentColor} strokeWidth={2.5} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.rowTitle, { color: primaryForeground }]}>{t('homeFocusSession')}</Text>
-          <Text style={[styles.rowSub, { color: primaryForeground }]}>{t('homeFocusSub')}</Text>
-        </View>
-        <ChevronRight size={20} color={primaryForeground} />
-      </TouchableOpacity>
+        if (id === 'focus') {
+          return (
+            <TouchableOpacity
+              key="focus"
+              style={[styles.rowCard, { backgroundColor: accentColor }]}
+              onPress={() => router.push('/focus')}
+              activeOpacity={0.9}
+              accessibilityLabel="Start a focus session"
+              accessibilityRole="button"
+            >
+              <View style={[styles.rowIcon, { backgroundColor: primaryForeground }]}>
+                <Leaf size={22} color={accentColor} strokeWidth={2.5} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.rowTitle, { color: primaryForeground }]}>{t('homeFocusSession')}</Text>
+                <Text style={[styles.rowSub, { color: primaryForeground }]}>{t('homeFocusSub')}</Text>
+              </View>
+              <ChevronRight size={20} color={primaryForeground} />
+            </TouchableOpacity>
+          );
+        }
 
-      <TouchableOpacity
-        style={[styles.rowCard, { backgroundColor: secondaryBg }]}
-        onPress={() => router.push('/decks')}
-        activeOpacity={0.85}
-        accessibilityLabel="Open your decks"
-        accessibilityRole="button"
-      >
-        <View style={[styles.rowIcon, { backgroundColor: accentColor + '15' }]}>
-          <Layers size={22} color={accentColor} strokeWidth={2.5} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.rowTitle, { color: textColor }]}>{t('homeMyDecks')}</Text>
-          <Text style={[styles.rowSub, { color: mutedForeground }]}>
-            {decks.length === 0
-              ? t('homeCreateFirstDeck')
-              : t('homeDeckCountSummary')
-                .replace('{decks}', `${decks.length} ${decks.length === 1 ? t('homeDeck') : t('homeDecks')}`)
-                .replace('{cards}', String(decks.reduce((s, d) => s + (d.totalCards || 0), 0)))}
-          </Text>
-        </View>
-        <ChevronRight size={20} color={mutedForeground} />
-      </TouchableOpacity>
+        // id === 'decks'
+        return (
+          <View key="decks">
+            <TouchableOpacity
+              style={[styles.rowCard, { backgroundColor: secondaryBg }]}
+              onPress={() => router.push('/decks')}
+              activeOpacity={0.85}
+              accessibilityLabel="Open your decks"
+              accessibilityRole="button"
+            >
+              <View style={[styles.rowIcon, { backgroundColor: accentColor + '15' }]}>
+                <Layers size={22} color={accentColor} strokeWidth={2.5} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.rowTitle, { color: textColor }]}>{t('homeMyDecks')}</Text>
+                <Text style={[styles.rowSub, { color: mutedForeground }]}>
+                  {decks.length === 0
+                    ? t('homeCreateFirstDeck')
+                    : t('homeDeckCountSummary')
+                      .replace('{decks}', `${decks.length} ${decks.length === 1 ? t('homeDeck') : t('homeDecks')}`)
+                      .replace('{cards}', String(decks.reduce((s, d) => s + (d.totalCards || 0), 0)))}
+                </Text>
+              </View>
+              <ChevronRight size={20} color={mutedForeground} />
+            </TouchableOpacity>
 
-      {decks.length === 0 && (
-        <View style={styles.emptyContainer}>
-          <View style={{ marginBottom: 20 }}>
-            <SprigLogo size={96} />
+            {decks.length === 0 && (
+              <View style={styles.emptyContainer}>
+                <View style={{ marginBottom: 20 }}>
+                  <SprigLogo size={96} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: textColor }]}>{t('homePlantFirstDeckTitle')}</Text>
+                <Text style={[styles.emptyText, { color: mutedForeground }]}>
+                  {t('homePlantFirstDeckText')}
+                </Text>
+                <Button
+                  title={t('homeCreateNewDeck')}
+                  onPress={() => router.push('/decks')}
+                  style={styles.emptyButton}
+                />
+              </View>
+            )}
           </View>
-          <Text style={[styles.emptyTitle, { color: textColor }]}>{t('homePlantFirstDeckTitle')}</Text>
-          <Text style={[styles.emptyText, { color: mutedForeground }]}>
-            {t('homePlantFirstDeckText')}
-          </Text>
-          <Button
-            title={t('homeCreateNewDeck')}
-            onPress={() => router.push('/decks')}
-            style={styles.emptyButton}
-          />
-        </View>
-      )}
+        );
+      })}
     </ScrollView>
   );
 }

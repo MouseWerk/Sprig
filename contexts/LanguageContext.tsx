@@ -2,7 +2,7 @@ import { Language, TranslationKey, translations } from '@/constants/translations
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
-const LANGUAGE_STORAGE_KEY = 'sprig_language';
+export const LANGUAGE_STORAGE_KEY = 'sprig_language';
 
 // Best-effort device-locale default for a first launch with no saved choice.
 // Pure JS (Hermes' built-in Intl), so this never needs a native module or

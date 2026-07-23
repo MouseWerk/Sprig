@@ -19,6 +19,7 @@ import { xpForGrade } from '../utils/Levels';
 import { scheduleStreakReminder } from '../utils/Notifications';
 import { applySwipeResult, getCachedData, getDecks, restoreCardSRS, setCachedData, SRSCardData, updateCardInDeck, updateDeckProgress, updateUserStats } from '../utils/Storage';
 import { migrateKey } from '../utils/StorageMigration';
+import { getPrefsSync, subscribePrefs } from '../utils/Preferences';
 import { nextTodayEntry, peekNextTodayEntry } from '../utils/TodayPlan';
 
 interface UndoEntry {
@@ -71,6 +72,8 @@ export default function SwipeScreen() {
 
     const [cards, setCards] = useState<FlashcardWithIndex[]>([]);
     const [shuffledCards, setShuffledCards] = useState<FlashcardWithIndex[]>([]);
+    const [cardTextScale, setCardTextScale] = useState(getPrefsSync().cardTextScale);
+    useEffect(() => subscribePrefs(prefs => setCardTextScale(prefs.cardTextScale)), []);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [sessionReviewed, setSessionReviewed] = useState(0);
     const [sessionCorrect, setSessionCorrect] = useState(0);
@@ -636,6 +639,7 @@ export default function SwipeScreen() {
                         onSwipeTop={() => handleSwipe(3)}
                         highlightMode={isHighlightMode}
                         onHighlightChange={handleHighlightChange}
+                        fontScale={cardTextScale}
                         onFlip={setIsFlipped}
                     />
                 )}

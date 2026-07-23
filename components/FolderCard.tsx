@@ -1,21 +1,24 @@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { ChevronRight, Folder as FolderIcon, Trash2 } from 'lucide-react-native';
+import { ChevronRight, Folder as FolderIcon, MoreVertical } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // The single folder design shared by Home, Library and Audio, so folders look
 // identical everywhere: secondary background, tinted icon tile with a filled
-// folder glyph, name + FOLDER label, muted trash affordance.
+// folder glyph, name + FOLDER label, muted three-dot menu affordance.
 // `grid` fits the 2-column deck/audio grids, `row` fits Library's list rows.
+// The three-dot button is a visible entry point into rename/delete — it
+// exists alongside long-press so the option isn't hidden behind a gesture
+// users may not discover on their own.
 interface FolderCardProps {
     name: string;
     onOpen: () => void;
-    onDelete?: () => void; // omit to hide the delete affordance (e.g. select mode)
+    onMenu?: () => void; // omit to hide the menu affordance (e.g. select mode)
     layout?: 'grid' | 'row';
 }
 
-export function FolderCard({ name, onOpen, onDelete, layout = 'grid' }: FolderCardProps) {
+export function FolderCard({ name, onOpen, onMenu, layout = 'grid' }: FolderCardProps) {
     const { t } = useLanguage();
     const textColor = useThemeColor({}, 'text');
     const mutedForeground = useThemeColor({}, 'mutedForeground');
@@ -45,15 +48,15 @@ export function FolderCard({ name, onOpen, onDelete, layout = 'grid' }: FolderCa
                     </View>
                     <ChevronRight size={18} color={mutedForeground} />
                 </TouchableOpacity>
-                {onDelete && (
+                {onMenu && (
                     <TouchableOpacity
                         style={styles.rowDelete}
-                        onPress={onDelete}
+                        onPress={onMenu}
                         activeOpacity={0.5}
-                        accessibilityLabel={`Delete folder ${name}`}
+                        accessibilityLabel={`Options for folder ${name}`}
                         accessibilityRole="button"
                     >
-                        <Trash2 size={16} color={mutedForeground} />
+                        <MoreVertical size={18} color={mutedForeground} />
                     </TouchableOpacity>
                 )}
             </View>
@@ -70,15 +73,15 @@ export function FolderCard({ name, onOpen, onDelete, layout = 'grid' }: FolderCa
         >
             <View style={styles.gridHeader}>
                 {iconTile}
-                {onDelete && (
+                {onMenu && (
                     <TouchableOpacity
                         style={styles.gridDelete}
-                        onPress={onDelete}
+                        onPress={onMenu}
                         activeOpacity={0.5}
-                        accessibilityLabel={`Delete folder ${name}`}
+                        accessibilityLabel={`Options for folder ${name}`}
                         accessibilityRole="button"
                     >
-                        <Trash2 size={16} color={mutedForeground} />
+                        <MoreVertical size={18} color={mutedForeground} />
                     </TouchableOpacity>
                 )}
             </View>

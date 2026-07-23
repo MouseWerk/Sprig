@@ -34,6 +34,7 @@ export const Input: React.FC<InputProps> = ({
                         height: props.multiline ? undefined : 52,
                         minHeight: props.multiline ? 100 : 52,
                         paddingTop: props.multiline ? 12 : 0,
+                        textAlignVertical: props.multiline ? 'top' : 'center',
                     },
                     inputStyle
                 ]}

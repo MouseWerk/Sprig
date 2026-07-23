@@ -4,6 +4,7 @@ import * as Haptics from '@/utils/AppHaptics';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
 import { stripImageTokens } from '@/utils/CardImages';
 import { AnswerVerdict, checkAnswer } from '@/utils/Fuzzy';
+import { getPrefsSync, subscribePrefs } from '@/utils/Preferences';
 import { getCachedData, setCachedData, updateCardSRS, updateUserStats } from '@/utils/Storage';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, FileWarning, Keyboard, Trophy, X } from 'lucide-react-native';
@@ -12,8 +13,6 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleShe
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { Button } from '../components/ui/Button';
-
-const MAX_CARDS = 20;
 
 function shuffle<T>(arr: T[]): T[] {
     const a = [...arr];
@@ -36,6 +35,12 @@ export default function TypeScreen() {
 
     const [cards, setCards] = useState<TypeCard[] | null>(null);
     const [loading, setLoading] = useState(true);
+    const [cardTextScale, setCardTextScale] = useState(getPrefsSync().cardTextScale);
+    const [studySessionLength, setStudySessionLength] = useState(getPrefsSync().studySessionLength);
+    useEffect(() => subscribePrefs(prefs => {
+        setCardTextScale(prefs.cardTextScale);
+        setStudySessionLength(prefs.studySessionLength);
+    }), []);
     const [index, setIndex] = useState(0);
     const [typed, setTyped] = useState('');
     const [verdict, setVerdict] = useState<AnswerVerdict | null>(null);
@@ -65,7 +70,7 @@ export default function TypeScreen() {
                 const enriched: TypeCard[] = (parsed || [])
                     .map((c, i) => ({ ...c, originalIndex: i }))
                     .filter(c => c.question?.trim() && c.answer?.trim());
-                setCards(shuffle(enriched).slice(0, MAX_CARDS));
+                setCards(shuffle(enriched).slice(0, studySessionLength));
             } catch (e) {
                 console.error('Error loading typing cards:', e);
                 setCards([]);
@@ -73,7 +78,7 @@ export default function TypeScreen() {
                 setLoading(false);
             }
         })();
-    }, [id, uri]);
+    }, [id, uri, studySessionLength]);
 
     const total = cards?.length ?? 0;
     const current = cards?.[index];
@@ -209,7 +214,7 @@ export default function TypeScreen() {
                         <Keyboard size={14} color={mutedForeground} strokeWidth={2.5} />
                         <Text style={[styles.qLabel, { color: mutedForeground }]}>{t('typeTypeTheAnswer')}</Text>
                     </View>
-                    <MarkdownRenderer content={current!.question} fontSize={20} />
+                    <MarkdownRenderer content={current!.question} fontSize={20 * cardTextScale} />
                 </View>
 
                 <TextInput
@@ -246,7 +251,7 @@ export default function TypeScreen() {
                 {verdict && (
                     <View style={[styles.answerCard, { backgroundColor: secondaryBg }]}>
                         <Text style={[styles.answerLabel, { color: mutedForeground }]}>{t('typeCorrectAnswer')}</Text>
-                        <MarkdownRenderer content={current!.answer} fontSize={16} />
+                        <MarkdownRenderer content={current!.answer} fontSize={16 * cardTextScale} />
                     </View>
                 )}
 

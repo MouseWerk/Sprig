@@ -83,10 +83,12 @@ const en = {
     'This will permanently delete "{name}" and all its flashcards.',
   deleteFolder: "Delete Folder",
   deleteFolderMessage: 'Delete "{name}"? Decks inside will be moved to root.',
+  renameFolderTitle: "Rename Folder",
   deckCreated: 'Deck "{name}" created!',
   folderCreated: 'Folder "{name}" created!',
   deckDeleted: 'Deck "{name}" deleted',
   folderDeleted: 'Folder "{name}" deleted',
+  folderRenamed: 'Folder renamed to "{name}"',
   decksSearchPlaceholder: "Search decks and folders...",
   decksNoResultsTitle: "No results",
   decksNoResultsText: 'Nothing matches "{query}". Try a different search.',
@@ -117,6 +119,9 @@ const en = {
   decksAnkiEmpty: "No cards found in this Anki deck",
   decksAnkiFailed: "Could not import this Anki deck",
   decksDeckUpdated: "Deck updated successfully",
+  decksPinToWidget: "Pin to Home Screen Widget",
+  decksPinnedToWidget: "Pinned to widget",
+  decksUnpinnedFromWidget: "Unpinned from widget",
   decksExamToday: "EXAM TODAY",
 
   // Audio Screen
@@ -213,10 +218,17 @@ const en = {
   settingsPreferences: "Preferences",
   settingsDailyGoal: "Daily Goal",
   settingsFocusLength: "Focus Length",
+  settingsSessionLength: "Quiz/Type Session Length",
   settingsStreakReminder: "Streak Reminder",
   settingsReminderTime: "Reminder Time",
   settingsHapticFeedback: "Haptic Feedback",
+  settingsCardTextSize: "Card Text Size",
+  cardTextSizeSmall: "S",
+  cardTextSizeMedium: "M",
+  cardTextSizeLarge: "L",
+  cardTextSizeXLarge: "XL",
   settingsReplayIntro: "Replay Intro",
+  settingsHomeScreen: "Home Screen",
   settingsWebUpload: "Web Upload",
   settingsUploadFromComputer: "Upload from Computer",
   settingsWebUploadHint:
@@ -399,11 +411,17 @@ const en = {
   speciesRose: "Rose",
   potClassic: "Bare Soil",
   potTerracotta: "Terracotta",
+  potWoven: "Woven Basket",
   potBowl: "Round Bowl",
+  potBarrel: "Barrel",
   potHex: "Hex Planter",
+  potUrn: "Classic Urn",
   potScalloped: "Scalloped",
   decorationStones: "Stone Border",
+  decorationPathway: "Stone Pathway",
+  decorationHedge: "Trimmed Hedge",
   decorationLanterns: "Lantern Row",
+  decorationTrellis: "Garden Trellis",
   decorationFence: "Picket Fence",
 
   // Grove Screen
@@ -703,7 +721,17 @@ const en = {
   layoutBack: "Back",
   layoutPdfAdded: '"{name}" added to your Library',
   layoutDeckImported: 'Deck "{name}" imported · {n} cards',
+  layoutAudioImported: '"{name}" added to your Audio library',
   layoutImportFailed: "Could not import that file",
+  layoutIncomingTitle: "Import File",
+  layoutIncomingNameLabel: "Name",
+  layoutIncomingImportButton: "Import",
+
+  // Local notifications
+  notifFocusWiltedTitle: "Your focus plant wilted!",
+  notifFocusWiltedBody: "You left the app during a focus session. Come back to replant and keep studying.",
+  notifStreakTitle: "Keep your streak alive!",
+  notifStreakBody: "A few cards today keeps your streak growing. Ready for a quick session?",
 } as const;
 
 const de: Record<keyof typeof en, string> = {
@@ -790,10 +818,12 @@ const de: Record<keyof typeof en, string> = {
   deleteFolder: "Ordner löschen",
   deleteFolderMessage:
     '"{name}" löschen? Enthaltene Decks werden ins Hauptverzeichnis verschoben.',
+  renameFolderTitle: "Ordner umbenennen",
   deckCreated: 'Deck "{name}" erstellt!',
   folderCreated: 'Ordner "{name}" erstellt!',
   deckDeleted: 'Deck "{name}" gelöscht',
   folderDeleted: 'Ordner "{name}" gelöscht',
+  folderRenamed: 'Ordner umbenannt in "{name}"',
   decksSearchPlaceholder: "Decks und Ordner durchsuchen...",
   decksNoResultsTitle: "Keine Ergebnisse",
   decksNoResultsText: 'Nichts passt zu "{query}". Versuch eine andere Suche.',
@@ -827,6 +857,9 @@ const de: Record<keyof typeof en, string> = {
   decksAnkiEmpty: "Keine Karten in diesem Anki-Deck gefunden",
   decksAnkiFailed: "Dieses Anki-Deck konnte nicht importiert werden",
   decksDeckUpdated: "Deck erfolgreich aktualisiert",
+  decksPinToWidget: "An Startbildschirm-Widget anheften",
+  decksPinnedToWidget: "An Widget angeheftet",
+  decksUnpinnedFromWidget: "Vom Widget gelöst",
   decksExamToday: "PRÜFUNG HEUTE",
 
   // Audio Screen
@@ -925,10 +958,17 @@ const de: Record<keyof typeof en, string> = {
   settingsPreferences: "Einstellungen",
   settingsDailyGoal: "Tagesziel",
   settingsFocusLength: "Fokusdauer",
+  settingsSessionLength: "Quiz-/Tipp-Sitzungslänge",
   settingsStreakReminder: "Serien-Erinnerung",
   settingsReminderTime: "Erinnerungszeit",
   settingsHapticFeedback: "Haptisches Feedback",
+  settingsCardTextSize: "Kartentextgröße",
+  cardTextSizeSmall: "S",
+  cardTextSizeMedium: "M",
+  cardTextSizeLarge: "L",
+  cardTextSizeXLarge: "XL",
   settingsReplayIntro: "Einführung wiederholen",
+  settingsHomeScreen: "Startbildschirm",
   settingsWebUpload: "Web-Upload",
   settingsUploadFromComputer: "Vom Computer hochladen",
   settingsWebUploadHint:
@@ -1112,11 +1152,17 @@ const de: Record<keyof typeof en, string> = {
   speciesRose: "Rose",
   potClassic: "Offene Erde",
   potTerracotta: "Terrakotta",
+  potWoven: "Geflochtener Korb",
   potBowl: "Runde Schale",
+  potBarrel: "Fass",
   potHex: "Sechseck-Topf",
+  potUrn: "Klassische Urne",
   potScalloped: "Gewellter Topf",
   decorationStones: "Steinrand",
+  decorationPathway: "Steinweg",
+  decorationHedge: "Gestutzte Hecke",
   decorationLanterns: "Laternenreihe",
+  decorationTrellis: "Gartenspalier",
   decorationFence: "Lattenzaun",
 
   // Grove Screen
@@ -1422,7 +1468,17 @@ const de: Record<keyof typeof en, string> = {
   layoutBack: "Zurück",
   layoutPdfAdded: '"{name}" zu deiner Bibliothek hinzugefügt',
   layoutDeckImported: 'Deck "{name}" importiert · {n} Karten',
+  layoutAudioImported: '"{name}" zu deiner Audio-Bibliothek hinzugefügt',
   layoutImportFailed: "Diese Datei konnte nicht importiert werden",
+  layoutIncomingTitle: "Datei importieren",
+  layoutIncomingNameLabel: "Name",
+  layoutIncomingImportButton: "Importieren",
+
+  // Local notifications
+  notifFocusWiltedTitle: "Deine Fokus-Pflanze ist verwelkt!",
+  notifFocusWiltedBody: "Du hast die App während einer Fokus-Sitzung verlassen. Komm zurück, um neu zu pflanzen und weiterzulernen.",
+  notifStreakTitle: "Halte deine Serie am Leben!",
+  notifStreakBody: "Ein paar Karten heute halten deine Serie am Wachsen. Bereit für eine kurze Sitzung?",
 };
 
 export const translations: Record<Language, Record<keyof typeof en, string>> = {

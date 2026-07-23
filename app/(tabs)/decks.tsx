@@ -4,9 +4,9 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Icons from 'lucide-react-native';
-import { CalendarDays, ChevronRight, ClipboardPaste, FileUp, Folder as FolderIcon, Package, Plus, Search, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, ChevronRight, ClipboardPaste, FileUp, Folder as FolderIcon, MoreVertical, Package, Pin, Plus, Search, Trash2, X } from 'lucide-react-native';
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FolderCard } from '../../components/FolderCard';
 import { IconPicker } from '../../components/IconPicker';
@@ -19,8 +19,9 @@ import { useToast } from '../../components/ui/Toast';
 import * as FileSystem from 'expo-file-system/legacy';
 import { importApkg } from '../../utils/AnkiImport';
 import { parseFlashcardsText } from '../../utils/CsvParser';
+import { getPinnedDeckId, setPinnedDeckId } from '../../utils/PinnedDeck';
 import { importSprigDeck, isSprigFileName } from '../../utils/SprigDeck';
-import { createEmptyDeck, Deck, deleteDeck, deleteFolder, Folder, getDecks, getExamPlan, getFolders, importCsvToDeck, saveFolder, updateDeck } from '../../utils/Storage';
+import { createEmptyDeck, Deck, deleteDeck, deleteFolder, Folder, getDecks, getExamPlan, getFolders, importCsvToDeck, saveFolder, updateDeck, updateFolder } from '../../utils/Storage';
 
 export default function DecksScreen() {
   const router = useRouter();
@@ -57,6 +58,10 @@ export default function DecksScreen() {
   const [editDeckIcon, setEditDeckIcon] = useState('Book');
   const [editDeckFolderId, setEditDeckFolderId] = useState<string | null>(null);
 
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
+  const [editFolderName, setEditFolderName] = useState('');
+  const [pinnedDeckId, setPinnedDeckIdState] = useState<string | null>(null);
+
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
   const mutedForeground = useThemeColor({}, 'mutedForeground');
@@ -65,9 +70,10 @@ export default function DecksScreen() {
   const primaryForeground = useThemeColor({}, 'primaryForeground');
 
   const loadData = useCallback(async () => {
-    const [savedDecks, savedFolders] = await Promise.all([getDecks(), getFolders('deck')]);
+    const [savedDecks, savedFolders, pinned] = await Promise.all([getDecks(), getFolders('deck'), getPinnedDeckId()]);
     setDecks(savedDecks.filter(d => d.type === 'csv'));
     setFolders(savedFolders);
+    setPinnedDeckIdState(pinned);
   }, []);
 
   useFocusEffect(
@@ -290,6 +296,34 @@ export default function DecksScreen() {
     showToast({ message: t('folderDeleted').replace('{name}', name), type: 'info' });
   };
 
+  const handleOpenFolderMenu = (folder: Folder) => {
+    setEditingFolder(folder);
+    setEditFolderName(folder.name);
+  };
+
+  const handleSaveEditFolder = async () => {
+    if (!editingFolder || !editFolderName.trim()) return;
+    try {
+      await updateFolder(editingFolder.id, editFolderName.trim());
+      setEditingFolder(null);
+      loadData();
+      showToast({ message: t('folderRenamed').replace('{name}', editFolderName.trim()), type: 'success' });
+    } catch (e) {
+      console.error('Error renaming folder:', e);
+      showToast({ message: t('error'), type: 'error' });
+    }
+  };
+
+  const handleTogglePinWidget = async (deckId: string) => {
+    const next = pinnedDeckId === deckId ? null : deckId;
+    setPinnedDeckIdState(next);
+    await setPinnedDeckId(next);
+    showToast({
+      message: next ? t('decksPinnedToWidget') : t('decksUnpinnedFromWidget'),
+      type: 'success',
+    });
+  };
+
   const handleEditDeck = (deck: Deck) => {
     setEditingDeck(deck);
     setEditDeckName(deck.name);
@@ -335,15 +369,26 @@ export default function DecksScreen() {
           <View style={[styles.deckIconContainer, { backgroundColor: accentColor + '10' }]}>
             <IconComponent size={28} color={accentColor} strokeWidth={2.5} />
           </View>
-          <TouchableOpacity
-            style={styles.deleteButtonContainer}
-            onPress={() => handleDelete(item.id, item.name)}
-            activeOpacity={0.5}
-            accessibilityLabel={`Delete ${item.name}`}
-            accessibilityRole="button"
-          >
-            <Trash2 size={16} color={mutedForeground} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity
+              style={styles.deleteButtonContainer}
+              onPress={() => handleEditDeck(item)}
+              activeOpacity={0.5}
+              accessibilityLabel={`Options for ${item.name}`}
+              accessibilityRole="button"
+            >
+              <MoreVertical size={16} color={mutedForeground} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.deleteButtonContainer}
+              onPress={() => handleDelete(item.id, item.name)}
+              activeOpacity={0.5}
+              accessibilityLabel={`Delete ${item.name}`}
+              accessibilityRole="button"
+            >
+              <Trash2 size={16} color={mutedForeground} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.cardTop}>
@@ -411,7 +456,7 @@ export default function DecksScreen() {
     <FolderCard
       name={item.name}
       onOpen={() => setCurrentFolderId(item.id)}
-      onDelete={() => handleDeleteFolder(item.id, item.name)}
+      onMenu={() => handleOpenFolderMenu(item)}
     />
   );
 
@@ -762,6 +807,19 @@ export default function DecksScreen() {
                     ))}
                   </ScrollView>
 
+                  {Platform.OS === 'android' && editingDeck && (
+                    <View style={styles.pinWidgetRow}>
+                      <Pin size={18} color={accentColor} strokeWidth={2.5} />
+                      <Text style={[styles.pinWidgetLabel, { color: textColor }]}>{t('decksPinToWidget')}</Text>
+                      <Switch
+                        value={pinnedDeckId === editingDeck.id}
+                        onValueChange={() => handleTogglePinWidget(editingDeck.id)}
+                        trackColor={{ false: '#767577', true: accentColor }}
+                        thumbColor="#f4f3f4"
+                      />
+                    </View>
+                  )}
+
                   <Button
                     title={t('saveChanges')}
                     onPress={handleSaveEditDeck}
@@ -769,6 +827,46 @@ export default function DecksScreen() {
                   />
                 </View>
               </ScrollView>
+      </BottomSheet>
+
+      {/* Folder Options (rename / delete) */}
+      <BottomSheet
+        visible={editingFolder !== null}
+        onClose={() => setEditingFolder(null)}
+        sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
+      >
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: textColor }]}>
+                  {t('renameFolderTitle')}
+                </Text>
+                <TouchableOpacity onPress={() => setEditingFolder(null)} accessibilityLabel="Close" accessibilityRole="button">
+                  <X size={20} color={textColor} />
+                </TouchableOpacity>
+              </View>
+              <Input
+                label={t('folderName')}
+                value={editFolderName}
+                onChangeText={setEditFolderName}
+                placeholder={t('folderPlaceholder')}
+              />
+              <Button
+                title={t('saveChanges')}
+                onPress={handleSaveEditFolder}
+                style={{ marginTop: 24 }}
+              />
+              <TouchableOpacity
+                style={styles.deleteFolderRow}
+                onPress={() => {
+                  if (!editingFolder) return;
+                  const { id, name } = editingFolder;
+                  setEditingFolder(null);
+                  handleDeleteFolder(id, name);
+                }}
+                activeOpacity={0.7}
+              >
+                <Trash2 size={16} color="#ef4444" />
+                <Text style={styles.deleteFolderText}>{t('deleteFolder')}</Text>
+              </TouchableOpacity>
       </BottomSheet>
     </View>
   );
@@ -1172,6 +1270,30 @@ const styles = StyleSheet.create({
     marginTop: 12,
     height: 56,
     borderRadius: 18,
+  },
+  deleteFolderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 14,
+  },
+  deleteFolderText: {
+    color: '#ef4444',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  pinWidgetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 20,
+  },
+  pinWidgetLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
   },
   folderPickerContainer: {
     flexDirection: 'row',

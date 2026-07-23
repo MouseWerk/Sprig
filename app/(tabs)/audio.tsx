@@ -2,7 +2,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTabPressReset } from '@/hooks/use-tab-press-reset';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { AudioFile, deleteAudioFile, deleteFolder, Folder, getAudioFiles, getFolders, saveAudioFile, saveFolder, setAudioPosition, updateAudioFile } from '@/utils/Storage';
+import { AudioFile, deleteAudioFile, deleteFolder, Folder, getAudioFiles, getFolders, saveAudioFile, saveFolder, setAudioPosition, updateAudioFile, updateFolder } from '@/utils/Storage';
 import { subscribeWebServerSaves } from '@/utils/WebServer';
 import Slider from '@react-native-community/slider';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
@@ -17,6 +17,7 @@ import {
     FileMusic,
     Folder as FolderIcon,
     FolderInput,
+    MoreVertical,
     Music,
     Pause,
     Play,
@@ -75,6 +76,8 @@ export default function AudioPlayerScreen() {
     const [moveSheetVisible, setMoveSheetVisible] = useState(false);
     const [newFolderSheetVisible, setNewFolderSheetVisible] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
+    const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
+    const [editFolderName, setEditFolderName] = useState('');
 
     const [playbackRate, setPlaybackRateState] = useState(1);
     const lastSaveRef = useRef(0);
@@ -317,6 +320,24 @@ export default function AudioPlayerScreen() {
         showToast({ message: t('audioFolderDeleted').replace('{name}', name), type: 'info' });
     };
 
+    const handleOpenFolderMenu = (folder: Folder) => {
+        setEditingFolder(folder);
+        setEditFolderName(folder.name);
+    };
+
+    const handleSaveEditFolder = async () => {
+        if (!editingFolder || !editFolderName.trim()) return;
+        try {
+            await updateFolder(editingFolder.id, editFolderName.trim());
+            setEditingFolder(null);
+            loadAudios();
+            showToast({ message: t('folderRenamed').replace('{name}', editFolderName.trim()), type: 'success' });
+        } catch (e) {
+            console.error('Error renaming folder:', e);
+            showToast({ message: t('error'), type: 'error' });
+        }
+    };
+
     const openAudioMenu = (item: AudioFile) => {
         setEditAudio(item);
         setEditAudioName(item.name);
@@ -402,7 +423,7 @@ export default function AudioPlayerScreen() {
         <FolderCard
             name={item.name}
             onOpen={() => setCurrentFolderId(item.id)}
-            onDelete={selectMode ? undefined : () => handleDeleteFolder(item.id, item.name)}
+            onMenu={selectMode ? undefined : () => handleOpenFolderMenu(item)}
         />
     );
 
@@ -434,15 +455,26 @@ export default function AudioPlayerScreen() {
                             ? <CheckCircle2 size={20} color={accentColor} strokeWidth={2.5} />
                             : <Circle size={20} color={mutedForeground} strokeWidth={2} />
                     ) : (
-                        <TouchableOpacity
-                            style={styles.deleteButtonContainer}
-                            onPress={() => handleDelete(item.id)}
-                            activeOpacity={0.5}
-                            accessibilityLabel={`Delete ${item.name}`}
-                            accessibilityRole="button"
-                        >
-                            <Trash2 size={16} color={mutedForeground} />
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <TouchableOpacity
+                                style={styles.deleteButtonContainer}
+                                onPress={() => openAudioMenu(item)}
+                                activeOpacity={0.5}
+                                accessibilityLabel={`Options for ${item.name}`}
+                                accessibilityRole="button"
+                            >
+                                <MoreVertical size={16} color={mutedForeground} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.deleteButtonContainer}
+                                onPress={() => handleDelete(item.id)}
+                                activeOpacity={0.5}
+                                accessibilityLabel={`Delete ${item.name}`}
+                                accessibilityRole="button"
+                            >
+                                <Trash2 size={16} color={mutedForeground} />
+                            </TouchableOpacity>
+                        </View>
                     )}
                 </View>
 
@@ -710,6 +742,46 @@ export default function AudioPlayerScreen() {
                         <Text style={[styles.sheetActionText, { color: '#ef4444' }]}>{t('deleteAudio')}</Text>
                     </TouchableOpacity>
                 </ScrollView>
+            </BottomSheet>
+
+            {/* Folder Options (rename / delete) */}
+            <BottomSheet
+                visible={editingFolder !== null}
+                onClose={() => setEditingFolder(null)}
+                sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
+            >
+                <View style={styles.modalHeader}>
+                    <Text style={[styles.modalTitle, { color: textColor }]}>
+                        {t('renameFolderTitle')}
+                    </Text>
+                    <TouchableOpacity onPress={() => setEditingFolder(null)} accessibilityLabel="Close" accessibilityRole="button">
+                        <X size={20} color={textColor} />
+                    </TouchableOpacity>
+                </View>
+                <Input
+                    label={t('folderName')}
+                    value={editFolderName}
+                    onChangeText={setEditFolderName}
+                    placeholder={t('folderPlaceholder')}
+                />
+                <Button
+                    title={t('saveChanges')}
+                    onPress={handleSaveEditFolder}
+                    style={styles.saveButton}
+                />
+                <TouchableOpacity
+                    style={[styles.sheetAction, { backgroundColor: '#ef444415', marginTop: 12 }]}
+                    onPress={() => {
+                        if (!editingFolder) return;
+                        const { id, name } = editingFolder;
+                        setEditingFolder(null);
+                        handleDeleteFolder(id, name);
+                    }}
+                    activeOpacity={0.8}
+                >
+                    <Trash2 size={18} color="#ef4444" strokeWidth={2.5} />
+                    <Text style={[styles.sheetActionText, { color: '#ef4444' }]}>{t('deleteFolder')}</Text>
+                </TouchableOpacity>
             </BottomSheet>
 
             {/* Move-selected sheet */}

@@ -156,13 +156,16 @@ export const SPECIES_NAME_KEYS: TranslationKey[] = [
 // the bare soil mound every plant already had and stays free. Line-art only,
 // drawn in the same single soilColor as everything else so the grove keeps
 // its monochrome slate look — no new hues, just shape.
-export const POT_STYLES = ['classic', 'terracotta', 'bowl', 'hex', 'scalloped'] as const;
+export const POT_STYLES = ['classic', 'terracotta', 'woven', 'bowl', 'barrel', 'hex', 'urn', 'scalloped'] as const;
 export type PotStyle = typeof POT_STYLES[number];
 export const POT_NAME_KEYS: Record<PotStyle, TranslationKey> = {
     classic: 'potClassic',
     terracotta: 'potTerracotta',
+    woven: 'potWoven',
     bowl: 'potBowl',
+    barrel: 'potBarrel',
     hex: 'potHex',
+    urn: 'potUrn',
     scalloped: 'potScalloped',
 };
 
@@ -176,6 +179,17 @@ function Pot({ style, color }: { style: PotStyle; color: string }) {
                     <Path d="M40 106 L80 106" stroke={color} strokeWidth={3} strokeLinecap="round" opacity={0.85} />
                 </>
             );
+        case 'woven':
+            return (
+                <>
+                    <Path d="M44 107 L76 107 L70 120 L50 120 Z" fill={color} opacity={0.22} />
+                    <Path d="M44 107 L76 107 L70 120 L50 120 Z" stroke={color} strokeWidth={1.2} fill="none" opacity={0.7} />
+                    {[111, 114.5, 118].map((y, i) => (
+                        <Path key={y} d={`M${46 + i * 0.6} ${y} L${74 - i * 0.6} ${y}`} stroke={color} strokeWidth={1} opacity={0.5} />
+                    ))}
+                    <Path d="M41 107 L79 107" stroke={color} strokeWidth={2.6} strokeLinecap="round" opacity={0.85} />
+                </>
+            );
         case 'bowl':
             return (
                 <>
@@ -184,12 +198,29 @@ function Pot({ style, color }: { style: PotStyle; color: string }) {
                     <Ellipse cx={60} cy={106} rx={25} ry={3.4} fill={color} opacity={0.85} />
                 </>
             );
+        case 'barrel':
+            return (
+                <>
+                    <Path d="M40 106 Q40 122 47 122 L73 122 Q80 122 80 106 Z" fill={color} opacity={0.22} />
+                    <Path d="M40 106 Q40 122 47 122 L73 122 Q80 122 80 106 Z" stroke={color} strokeWidth={1.4} fill="none" opacity={0.7} />
+                    <Path d="M40 112 Q60 117 80 112" stroke={color} strokeWidth={1} fill="none" opacity={0.5} />
+                    <Path d="M40 117 Q60 122 80 117" stroke={color} strokeWidth={1} fill="none" opacity={0.5} />
+                </>
+            );
         case 'hex':
             return (
                 <>
                     <Path d="M45 106 L75 106 L82 113 L73 121 L47 121 L38 113 Z" fill={color} opacity={0.3} />
                     <Path d="M45 106 L75 106 L82 113 L73 121 L47 121 L38 113 Z" stroke={color} strokeWidth={1.4} fill="none" opacity={0.75} />
                     <Path d="M42 106 L78 106" stroke={color} strokeWidth={3} strokeLinecap="round" opacity={0.85} />
+                </>
+            );
+        case 'urn':
+            return (
+                <>
+                    <Path d="M52 106 L68 106 L71 111 L67 114 Q60 119 53 114 L49 111 Z" fill={color} opacity={0.3} />
+                    <Path d="M52 106 L68 106 L71 111 L67 114 Q60 119 53 114 L49 111 Z" stroke={color} strokeWidth={1.4} fill="none" opacity={0.8} />
+                    <Path d="M49 106 L71 106" stroke={color} strokeWidth={2.4} strokeLinecap="round" opacity={0.85} />
                 </>
             );
         case 'scalloped':

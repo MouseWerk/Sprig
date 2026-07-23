@@ -4,6 +4,7 @@ import { toDisplayText } from '@/utils/CardText';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
 import { getCachedData, recordConfusion, recordQuizCompleted, setCachedData, updateUserStats } from '@/utils/Storage';
 import * as Haptics from '@/utils/AppHaptics';
+import { getPrefsSync, subscribePrefs } from '@/utils/Preferences';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, FileWarning, Trophy, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -24,8 +25,6 @@ interface Question {
     options: QuizOption[]; // shuffled, includes correct
 }
 
-const MAX_QUESTIONS = 20;
-
 function shuffle<T>(arr: T[]): T[] {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
@@ -38,7 +37,7 @@ function shuffle<T>(arr: T[]): T[] {
 // Build multiple-choice questions: prompt = question, correct = its answer,
 // distractors = three other cards' answers (deduped). Each answer remembers
 // which card it came from so wrong picks can be logged as confusion pairs.
-function buildQuestions(cards: FlashcardData[]): Question[] {
+function buildQuestions(cards: FlashcardData[], maxQuestions: number): Question[] {
     const clean = cards
         .map((c, i) => ({ ...c, idx: i }))
         .filter(c => c.question?.trim() && c.answer?.trim());
@@ -54,7 +53,7 @@ function buildQuestions(cards: FlashcardData[]): Question[] {
     if (ownerByAnswer.size < 4) return [];
     const answerEntries = Array.from(ownerByAnswer.entries());
 
-    return shuffle(clean).slice(0, MAX_QUESTIONS).map(card => {
+    return shuffle(clean).slice(0, maxQuestions).map(card => {
         const correct = card.answer.trim();
         const correctKey = toDisplayText(correct).trim();
         const distractors: QuizOption[] = [];
@@ -80,6 +79,12 @@ export default function QuizScreen() {
 
     const [cards, setCards] = useState<FlashcardData[] | null>(null);
     const [loading, setLoading] = useState(true);
+    const [cardTextScale, setCardTextScale] = useState(getPrefsSync().cardTextScale);
+    const [studySessionLength, setStudySessionLength] = useState(getPrefsSync().studySessionLength);
+    useEffect(() => subscribePrefs(prefs => {
+        setCardTextScale(prefs.cardTextScale);
+        setStudySessionLength(prefs.studySessionLength);
+    }), []);
     const [index, setIndex] = useState(0);
     const [selected, setSelected] = useState<string | null>(null);
     const [score, setScore] = useState(0);
@@ -112,7 +117,7 @@ export default function QuizScreen() {
         })();
     }, [id, uri]);
 
-    const questions = useMemo(() => (cards ? buildQuestions(cards) : []), [cards]);
+    const questions = useMemo(() => (cards ? buildQuestions(cards, studySessionLength) : []), [cards, studySessionLength]);
     const current = questions[index];
 
     const handleSelect = (option: QuizOption) => {
@@ -217,7 +222,7 @@ export default function QuizScreen() {
             <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
                 <View style={[styles.questionCard, { backgroundColor: cardColor, borderColor: secondaryBg }]}>
                     <Text style={[styles.qLabel, { color: mutedForeground }]}>{t('quizQuestionN').replace('{n}', String(index + 1))}</Text>
-                    <MarkdownRenderer content={current.prompt} fontSize={20} />
+                    <MarkdownRenderer content={current.prompt} fontSize={20 * cardTextScale} />
                 </View>
 
                 <View style={{ gap: 12, marginTop: 20 }}>
@@ -240,7 +245,7 @@ export default function QuizScreen() {
                                 disabled={answered}
                             >
                                 <View style={{ flex: 1 }}>
-                                    <MarkdownRenderer content={option.text} fontSize={15} />
+                                    <MarkdownRenderer content={option.text} fontSize={15 * cardTextScale} />
                                 </View>
                                 {icon}
                             </TouchableOpacity>

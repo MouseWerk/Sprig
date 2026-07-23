@@ -51,18 +51,59 @@ function GroundDecoration({ id, color, width }: { id: string; color: string; wid
             </Svg>
         );
     }
+    if (id === 'pathway') {
+        return (
+            <Svg width={width} height={8} style={styles.decorationSvg}>
+                {items.map((x, i) => (
+                    <Path key={i} d={`M${x - 7} 1 L${x + 7} 1 L${x + 9} 7 L${x - 9} 7 Z`} fill={color} opacity={i % 2 === 0 ? 0.5 : 0.35} />
+                ))}
+            </Svg>
+        );
+    }
+    if (id === 'hedge') {
+        return (
+            <Svg width={width} height={16} style={styles.decorationSvg}>
+                {items.map((x, i) => (
+                    <Path key={i} d={`M${x - 10} 15 Q${x - 10} 3, ${x} 3 Q${x + 10} 3, ${x + 10} 15 Z`} stroke={color} strokeWidth={1.3} fill={color} opacity={0.42} />
+                ))}
+            </Svg>
+        );
+    }
+    if (id === 'trellis') {
+        return (
+            <Svg width={width} height={30} style={styles.decorationSvg}>
+                {items.map((x, i) => (
+                    <React.Fragment key={i}>
+                        <Path d={`M${x - 8} 30 L${x - 8} 4 L${x + 8} 4 L${x + 8} 30`} stroke={color} strokeWidth={1.2} fill="none" opacity={0.5} />
+                        <Path d={`M${x - 8} 10 L${x + 8} 18 M${x - 8} 18 L${x + 8} 10 M${x - 8} 22 L${x + 8} 30 M${x - 8} 30 L${x + 8} 22`} stroke={color} strokeWidth={1} opacity={0.4} />
+                    </React.Fragment>
+                ))}
+            </Svg>
+        );
+    }
     return null;
 }
+
+// Rough visual height per decoration, used to stack several at once above
+// the ground line without them overlapping.
+const DECORATION_HEIGHT: Record<string, number> = {
+    stones: 10,
+    pathway: 8,
+    hedge: 16,
+    lanterns: 26,
+    trellis: 30,
+    fence: 22,
+};
 
 interface GroveStripProps {
     plants: GrovePlant[];
     onPressPlant?: (plant: GrovePlant) => void;
     // large = Grove hero, compact = Home dashboard
     large?: boolean;
-    decoration?: string | null; // equipped grove-wide backdrop id
+    decorations?: string[]; // equipped grove-wide backdrop ids, stacked bottom-up
 }
 
-export function GroveStrip({ plants, onPressPlant, large = false, decoration = null }: GroveStripProps) {
+export function GroveStrip({ plants, onPressPlant, large = false, decorations = [] }: GroveStripProps) {
     const { t } = useLanguage();
     const textColor = useThemeColor({}, 'text');
     const mutedForeground = useThemeColor({}, 'mutedForeground');
@@ -124,11 +165,20 @@ export function GroveStrip({ plants, onPressPlant, large = false, decoration = n
                     pointerEvents="none"
                     style={[styles.ground, { backgroundColor: borderColor, bottom: large ? 36 : 32 }]}
                 />
-                {decoration && (
-                    <View pointerEvents="none" style={[styles.decorationWrap, { bottom: large ? 36 : 32 }]}>
-                        <GroundDecoration id={decoration} color={borderColor} width={stripWidth - 20} />
-                    </View>
-                )}
+                {(() => {
+                    const groundBottom = large ? 36 : 32;
+                    const gap = 4;
+                    let cumulative = 0;
+                    return decorations.map(id => {
+                        const bottom = groundBottom + cumulative;
+                        cumulative += (DECORATION_HEIGHT[id] || 16) + gap;
+                        return (
+                            <View key={id} pointerEvents="none" style={[styles.decorationWrap, { bottom }]}>
+                                <GroundDecoration id={id} color={borderColor} width={stripWidth - 20} />
+                            </View>
+                        );
+                    });
+                })()}
             </View>
         </ScrollView>
     );

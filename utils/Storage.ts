@@ -101,12 +101,16 @@ export const SUNSHINE_DURATION_MS = 30 * 60 * 1000; // 2x XP window
 
 // Cosmetic shop (phase 4 — collection layer). Planters are per-deck; a deck
 // with no entry renders bare soil ('classic', free). Decorations are
-// grove-wide and only one can be equipped at a time, matching how a single
-// shelf backdrop reads at a glance.
+// grove-wide and stack — any number of owned decorations can be shown at
+// once (see equippedDecorations below), so the shelf builds up over time
+// instead of each purchase replacing the last.
 export const POT_PRICES: Record<string, number> = {
     terracotta: 250,
+    woven: 350,
     bowl: 400,
+    barrel: 600,
     hex: 700,
+    urn: 900,
     scalloped: 1000,
 };
 
@@ -118,7 +122,10 @@ export interface DecorationDef {
 
 export const DECORATION_CATALOG: DecorationDef[] = [
     { id: 'stones', nameKey: 'decorationStones', price: 500 },
+    { id: 'pathway', nameKey: 'decorationPathway', price: 800 },
+    { id: 'hedge', nameKey: 'decorationHedge', price: 1200 },
     { id: 'lanterns', nameKey: 'decorationLanterns', price: 1500 },
+    { id: 'trellis', nameKey: 'decorationTrellis', price: 2200 },
     { id: 'fence', nameKey: 'decorationFence', price: 3000 },
 ];
 
@@ -134,7 +141,7 @@ export interface GroveEconomy {
     lastStages: Record<string, string>;       // deckId -> stage at last check, for grow celebrations
     planters: Record<string, string>;         // deckId -> owned pot style id
     ownedDecorations: string[];               // purchased grove-wide decoration ids
-    equippedDecoration: string | null;        // currently displayed decoration, if any
+    equippedDecorations: string[];            // owned decorations currently shown, any number at once
 }
 
 export async function getGroveEconomy(): Promise<GroveEconomy> {
@@ -155,7 +162,11 @@ export async function getGroveEconomy(): Promise<GroveEconomy> {
                 lastStages: parsed.lastStages || {},
                 planters: parsed.planters || {},
                 ownedDecorations: parsed.ownedDecorations || [],
-                equippedDecoration: parsed.equippedDecoration || null,
+                // Migrates the old single-slot field (a decoration id or null)
+                // into the new array so existing users keep their shelf.
+                equippedDecorations: Array.isArray(parsed.equippedDecorations)
+                    ? parsed.equippedDecorations
+                    : (parsed.equippedDecoration ? [parsed.equippedDecoration] : []),
             };
         }
     } catch (e) {
@@ -174,7 +185,7 @@ export async function getGroveEconomy(): Promise<GroveEconomy> {
         lastStages: {},
         planters: {},
         ownedDecorations: [],
-        equippedDecoration: null,
+        equippedDecorations: [],
     };
     await saveGroveEconomy(fresh).catch(() => { });
     return fresh;
@@ -230,19 +241,19 @@ export async function buyDecoration(decorationId: string): Promise<{ ok: boolean
     if (econ.dew < price) return { ok: false, reason: 'dew', dew: econ.dew, ownedDecorations: econ.ownedDecorations };
     econ.dew -= price;
     econ.ownedDecorations = [...econ.ownedDecorations, decorationId];
-    econ.equippedDecoration = decorationId;
+    econ.equippedDecorations = [...econ.equippedDecorations, decorationId];
     await saveGroveEconomy(econ);
     return { ok: true, dew: econ.dew, ownedDecorations: econ.ownedDecorations };
 }
 
-// Toggling an owned decoration on/off, or switching which one is shown —
-// free, since the dew was already spent to unlock it.
-export async function equipDecoration(decorationId: string | null): Promise<GroveEconomy> {
+// Toggles one owned decoration's visibility on the shelf — free, since the
+// dew was already spent to unlock it. Any number can be shown at once.
+export async function equipDecoration(decorationId: string): Promise<GroveEconomy> {
     const econ = await getGroveEconomy();
-    if (decorationId === null) {
-        econ.equippedDecoration = null;
-    } else if (econ.ownedDecorations.includes(decorationId)) {
-        econ.equippedDecoration = econ.equippedDecoration === decorationId ? null : decorationId;
+    if (econ.ownedDecorations.includes(decorationId)) {
+        econ.equippedDecorations = econ.equippedDecorations.includes(decorationId)
+            ? econ.equippedDecorations.filter(id => id !== decorationId)
+            : [...econ.equippedDecorations, decorationId];
     }
     await saveGroveEconomy(econ);
     return econ;
@@ -872,6 +883,13 @@ export async function deleteFolder(id: string): Promise<void> {
 export async function moveDeckToFolder(deckId: string, folderId: string | null): Promise<void> {
     const db = await getDb();
     await db.runAsync('UPDATE decks SET folder_id = ? WHERE id = ?', folderId, deckId);
+}
+
+export async function updateFolder(folderId: string, name?: string, parentId?: string | null): Promise<void> {
+    const db = await getDb();
+    if (name !== undefined) await db.runAsync('UPDATE folders SET name = ? WHERE id = ?', name, folderId);
+    // parentId: undefined = leave unchanged, null = move to root
+    if (parentId !== undefined) await db.runAsync('UPDATE folders SET parent_id = ? WHERE id = ?', parentId, folderId);
 }
 
 export async function updateDeck(deckId: string, name?: string, icon?: string, folderId?: string | null): Promise<void> {

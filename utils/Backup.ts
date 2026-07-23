@@ -177,7 +177,7 @@ function mergeGrove(current: GroveEconomy | null, incoming: GroveEconomy | null 
         lastStages: current.lastStages,
         planters: { ...(incoming.planters || {}), ...current.planters },
         ownedDecorations: Array.from(new Set([...(current.ownedDecorations || []), ...(incoming.ownedDecorations || [])])),
-        equippedDecoration: current.equippedDecoration ?? incoming.equippedDecoration ?? null,
+        equippedDecorations: Array.from(new Set([...(current.equippedDecorations || []), ...(incoming.equippedDecorations || [])])),
     };
 }
 

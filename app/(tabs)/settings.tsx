@@ -7,7 +7,7 @@ import { replayOnboarding } from '@/components/Onboarding';
 import { SprigLogo } from '@/components/SprigLogo';
 import { createBackup, importBackup } from '@/utils/Backup';
 import { cancelStreakReminder, scheduleStreakReminder } from '@/utils/Notifications';
-import { DAILY_GOAL_OPTIONS, FOCUS_MINUTES_OPTIONS, Preferences, REMINDER_HOUR_MAX, REMINDER_HOUR_MIN, getPrefsSync, setPref, subscribePrefs } from '@/utils/Preferences';
+import { CARD_TEXT_SCALE_OPTIONS, DAILY_GOAL_OPTIONS, FOCUS_MINUTES_OPTIONS, HomeSectionId, Preferences, REMINDER_HOUR_MAX, REMINDER_HOUR_MIN, STUDY_SESSION_LENGTH_OPTIONS, getPrefsSync, setPref, subscribePrefs } from '@/utils/Preferences';
 import { clearCardCache, wipeAllData } from '@/utils/Storage';
 import { getWebServerLog, getWebServerUrl, isWebServerRunning, isWebServerSupported, startWebServer, stopWebServer } from '@/utils/WebServer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,11 +15,25 @@ import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { Bell, ChevronRight, Clock, Coffee, Database, DownloadCloud, Github, Globe, Info, Monitor, Moon, PlayCircle, ScrollText, ShieldCheck, Smartphone, Star, Sun, Target, Timer, Trash2, UploadCloud, Vibrate, Wifi } from 'lucide-react-native';
+import { Bell, ChevronDown, ChevronRight, ChevronUp, Clock, Coffee, Database, DownloadCloud, Eye, EyeOff, Github, Globe, Hash, Info, Layers, Leaf, Monitor, Moon, PlayCircle, ScrollText, Sprout, ShieldCheck, Smartphone, Star, Sun, Target, Timer, Trash2, UploadCloud, Vibrate, Wifi } from 'lucide-react-native';
 import { DiscordIcon } from '@/components/DiscordIcon';
+import { TranslationKey } from '@/constants/translations';
 import React, { useEffect, useState } from 'react';
 import { Linking, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const HOME_SECTION_META: Record<HomeSectionId, { icon: typeof Sprout; labelKey: TranslationKey }> = {
+  grove: { icon: Sprout, labelKey: 'homeGroveTitle' },
+  focus: { icon: Leaf, labelKey: 'homeFocusSession' },
+  decks: { icon: Layers, labelKey: 'homeMyDecks' },
+};
+
+const CARD_TEXT_SCALE_LABEL_KEYS: Record<number, TranslationKey> = {
+  0.85: 'cardTextSizeSmall',
+  1: 'cardTextSizeMedium',
+  1.15: 'cardTextSizeLarge',
+  1.3: 'cardTextSizeXLarge',
+};
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -78,6 +92,22 @@ export default function SettingsScreen() {
   };
 
   const isDarkMode = theme === 'dark';
+
+  const moveHomeSection = (id: HomeSectionId, direction: -1 | 1) => {
+    const order = [...prefs.homeSectionOrder];
+    const idx = order.indexOf(id);
+    const swapWith = idx + direction;
+    if (idx === -1 || swapWith < 0 || swapWith >= order.length) return;
+    [order[idx], order[swapWith]] = [order[swapWith], order[idx]];
+    setPref('homeSectionOrder', order);
+  };
+
+  const toggleHomeSectionHidden = (id: HomeSectionId) => {
+    const hidden = prefs.homeSectionsHidden.includes(id)
+      ? prefs.homeSectionsHidden.filter(h => h !== id)
+      : [...prefs.homeSectionsHidden, id];
+    setPref('homeSectionsHidden', hidden);
+  };
 
   const toggleStreakReminder = async () => {
     const next = !prefs.streakReminderEnabled;
@@ -367,6 +397,26 @@ export default function SettingsScreen() {
               ))}
             </View>
           </View>
+          <View style={[styles.item, { backgroundColor: cardColor }]}>
+            <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
+              <Hash size={20} color={accentColor} strokeWidth={2.5} />
+            </View>
+            <Text style={[styles.itemLabel, { color: textColor }]}>{t('settingsSessionLength')}</Text>
+            <View style={styles.chipRow}>
+              {STUDY_SESSION_LENGTH_OPTIONS.map(n => (
+                <TouchableOpacity
+                  key={n}
+                  style={[styles.prefChip, { backgroundColor: prefs.studySessionLength === n ? accentColor : secondaryBg }]}
+                  onPress={() => setPref('studySessionLength', n)}
+                  accessibilityLabel={`Quiz and Type session length ${n} cards`}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: prefs.studySessionLength === n }}
+                >
+                  <Text style={[styles.prefChipText, { color: prefs.studySessionLength === n ? backgroundColor : mutedForeground }]}>{n}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
           <SettingItem
             icon={Bell}
             label={t('settingsStreakReminder')}
@@ -412,7 +462,74 @@ export default function SettingsScreen() {
             toggle={prefs.hapticsEnabled}
             onPress={() => setPref('hapticsEnabled', !prefs.hapticsEnabled)}
           />
+          <View style={[styles.item, { backgroundColor: cardColor }]}>
+            <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
+              <Text style={{ color: accentColor, fontSize: 16, fontWeight: '800' }}>Aa</Text>
+            </View>
+            <Text style={[styles.itemLabel, { color: textColor }]}>{t('settingsCardTextSize')}</Text>
+            <View style={styles.chipRow}>
+              {CARD_TEXT_SCALE_OPTIONS.map(scale => (
+                <TouchableOpacity
+                  key={scale}
+                  style={[styles.prefChip, { backgroundColor: prefs.cardTextScale === scale ? accentColor : secondaryBg }]}
+                  onPress={() => setPref('cardTextScale', scale)}
+                  accessibilityLabel={`Card text size ${t(CARD_TEXT_SCALE_LABEL_KEYS[scale])}`}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: prefs.cardTextScale === scale }}
+                >
+                  <Text style={[styles.prefChipText, { color: prefs.cardTextScale === scale ? backgroundColor : mutedForeground }]}>
+                    {t(CARD_TEXT_SCALE_LABEL_KEYS[scale])}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
           <SettingItem icon={PlayCircle} label={t('settingsReplayIntro')} onPress={replayOnboarding} />
+        </View>
+
+        <SectionHeader title={t('settingsHomeScreen')} />
+        <View style={styles.group}>
+          {prefs.homeSectionOrder.map((id, idx) => {
+            const meta = HOME_SECTION_META[id];
+            const Icon = meta.icon;
+            const hidden = prefs.homeSectionsHidden.includes(id);
+            return (
+              <View key={id} style={[styles.item, { backgroundColor: cardColor, opacity: hidden ? 0.5 : 1 }]}>
+                <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
+                  <Icon size={20} color={accentColor} strokeWidth={2.5} />
+                </View>
+                <Text style={[styles.itemLabel, { color: textColor }]}>{t(meta.labelKey)}</Text>
+                <View style={styles.chipRow}>
+                  <TouchableOpacity
+                    style={[styles.prefChip, { backgroundColor: secondaryBg }]}
+                    onPress={() => moveHomeSection(id, -1)}
+                    disabled={idx === 0}
+                    accessibilityLabel={`Move ${t(meta.labelKey)} up`}
+                    accessibilityRole="button"
+                  >
+                    <ChevronUp size={16} color={idx === 0 ? mutedForeground + '66' : mutedForeground} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.prefChip, { backgroundColor: secondaryBg }]}
+                    onPress={() => moveHomeSection(id, 1)}
+                    disabled={idx === prefs.homeSectionOrder.length - 1}
+                    accessibilityLabel={`Move ${t(meta.labelKey)} down`}
+                    accessibilityRole="button"
+                  >
+                    <ChevronDown size={16} color={idx === prefs.homeSectionOrder.length - 1 ? mutedForeground + '66' : mutedForeground} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.prefChip, { backgroundColor: hidden ? secondaryBg : accentColor }]}
+                    onPress={() => toggleHomeSectionHidden(id)}
+                    accessibilityLabel={hidden ? `Show ${t(meta.labelKey)} on Home` : `Hide ${t(meta.labelKey)} on Home`}
+                    accessibilityRole="button"
+                  >
+                    {hidden ? <EyeOff size={16} color={mutedForeground} /> : <Eye size={16} color={backgroundColor} />}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })}
         </View>
 
         <SectionHeader title={t('settingsWebUpload')} />

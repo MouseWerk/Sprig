@@ -50,6 +50,7 @@ play-service-account.json
 *.aab
 *.ipa
 build.json
+/build-output
 
 # signing keys & service credentials
 *.keystore

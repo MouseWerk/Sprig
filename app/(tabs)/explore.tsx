@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Icons from 'lucide-react-native';
-import { ArrowUpDown, BookOpen, Check, CheckCircle2, ChevronRight, Circle, FileText, FileUp, Folder as FolderIcon, FolderInput, Library, Plus, Trash2, X } from 'lucide-react-native';
+import { ArrowUpDown, BookOpen, Check, CheckCircle2, ChevronRight, Circle, FileText, FileUp, Folder as FolderIcon, FolderInput, Library, MoreVertical, Plus, Trash2, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +16,7 @@ import { Button } from '../../components/ui/Button';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { useToast } from '../../components/ui/Toast';
-import { Deck, deleteDeck, deleteFolder, Folder, getAllPdfProgress, getDecks, getFolders, PdfProgress, saveDeck, saveFolder, updateDeck } from '../../utils/Storage';
+import { Deck, deleteDeck, deleteFolder, Folder, getAllPdfProgress, getDecks, getFolders, PdfProgress, saveDeck, saveFolder, updateDeck, updateFolder } from '../../utils/Storage';
 import { migrateKey } from '../../utils/StorageMigration';
 import { subscribeWebServerSaves } from '../../utils/WebServer';
 
@@ -88,6 +88,9 @@ export default function LibraryScreen() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [moveSheetVisible, setMoveSheetVisible] = useState(false);
+
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
+  const [editFolderName, setEditFolderName] = useState('');
 
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
@@ -230,6 +233,24 @@ export default function LibraryScreen() {
     showToast({ message: t('exploreItemDeleted').replace('{name}', name), type: 'info' });
   };
 
+  const handleOpenFolderMenu = (folder: Folder) => {
+    setEditingFolder(folder);
+    setEditFolderName(folder.name);
+  };
+
+  const handleSaveEditFolder = async () => {
+    if (!editingFolder || !editFolderName.trim()) return;
+    try {
+      await updateFolder(editingFolder.id, editFolderName.trim());
+      setEditingFolder(null);
+      loadData();
+      showToast({ message: t('folderRenamed').replace('{name}', editFolderName.trim()), type: 'success' });
+    } catch (e) {
+      console.error('Error renaming folder:', e);
+      showToast({ message: t('error'), type: 'error' });
+    }
+  };
+
   const openDocMenu = (item: Deck) => {
     setEditDoc(item);
     setEditDocName(item.name);
@@ -349,14 +370,24 @@ export default function LibraryScreen() {
           )}
         </TouchableOpacity>
         {!selectMode && (
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => handleDelete(item.id, item.name)}
-            accessibilityLabel={`Delete ${item.name}`}
-            accessibilityRole="button"
-          >
-            <Trash2 size={18} color="#ef4444" />
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => openDocMenu(item)}
+              accessibilityLabel={`Options for ${item.name}`}
+              accessibilityRole="button"
+            >
+              <MoreVertical size={18} color={mutedForeground} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDelete(item.id, item.name)}
+              accessibilityLabel={`Delete ${item.name}`}
+              accessibilityRole="button"
+            >
+              <Trash2 size={18} color="#ef4444" />
+            </TouchableOpacity>
+          </>
         )}
       </View>
     );
@@ -367,7 +398,7 @@ export default function LibraryScreen() {
       layout="row"
       name={item.name}
       onOpen={() => setCurrentFolderId(item.id)}
-      onDelete={() => handleDeleteFolder(item.id, item.name)}
+      onMenu={() => handleOpenFolderMenu(item)}
     />
   );
 
@@ -724,6 +755,46 @@ export default function LibraryScreen() {
                   </TouchableOpacity>
                 </View>
               </ScrollView>
+      </BottomSheet>
+
+      {/* Folder Options (rename / delete) */}
+      <BottomSheet
+        visible={editingFolder !== null}
+        onClose={() => setEditingFolder(null)}
+        sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
+      >
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: textColor }]}>
+                  {t('renameFolderTitle')}
+                </Text>
+                <TouchableOpacity onPress={() => setEditingFolder(null)} accessibilityLabel="Close" accessibilityRole="button">
+                  <X size={20} color={textColor} />
+                </TouchableOpacity>
+              </View>
+              <Input
+                label={t('folderName')}
+                value={editFolderName}
+                onChangeText={setEditFolderName}
+                placeholder={t('folderPlaceholder')}
+              />
+              <Button
+                title={t('saveChanges')}
+                onPress={handleSaveEditFolder}
+                style={styles.saveButton}
+              />
+              <TouchableOpacity
+                style={[styles.sheetAction, { backgroundColor: '#ef444415', marginTop: 12 }]}
+                onPress={() => {
+                  if (!editingFolder) return;
+                  const { id, name } = editingFolder;
+                  setEditingFolder(null);
+                  handleDeleteFolder(id, name);
+                }}
+                activeOpacity={0.8}
+              >
+                <Trash2 size={18} color="#ef4444" strokeWidth={2.5} />
+                <Text style={[styles.sheetActionText, { color: '#ef4444' }]}>{t('deleteFolder')}</Text>
+              </TouchableOpacity>
       </BottomSheet>
 
       {/* Move-selected sheet */}
