@@ -60,6 +60,7 @@ GoogleService-Info.plist
 # env files
 .env
 .env.*
+!.env.example
 
 # test & tooling output
 coverage/

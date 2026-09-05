@@ -5,9 +5,23 @@ const { withXcodeProject } = require('@expo/config-plugins');
 // This plugin writes the team back into the generated project every time, so
 // archiving locally in Xcode works straight after a prebuild without clicking
 // through the signing UI again.
-const DEVELOPMENT_TEAM = '356QWVB6D4';
-
+//
+// The team id is an account identifier, not a secret, but it is nobody's
+// business in a public repo — it comes from the environment (see .env.example)
+// rather than living in the source.
 module.exports = function withSigning(config) {
+  const developmentTeam = process.env.EXPO_APPLE_TEAM_ID;
+  if (!developmentTeam) {
+    // Loud on purpose: prebuild would otherwise succeed and the failure would
+    // only surface much later, as an unsigned archive in Xcode.
+    console.warn(
+      '[withSigning] EXPO_APPLE_TEAM_ID is not set — the generated Xcode project ' +
+      'will have no signing team. Set it (see .env.example) and prebuild again, ' +
+      'or pick the team by hand in Xcode.'
+    );
+    return config;
+  }
+
   return withXcodeProject(config, (config) => {
     const project = config.modResults;
 
@@ -17,7 +31,7 @@ module.exports = function withSigning(config) {
       // Only the app target carries PRODUCT_NAME; skip the project-level and
       // Pods configurations so we don't sign every dependency separately.
       if (!settings || settings.PRODUCT_NAME == null) continue;
-      settings.DEVELOPMENT_TEAM = DEVELOPMENT_TEAM;
+      settings.DEVELOPMENT_TEAM = developmentTeam;
       settings.CODE_SIGN_STYLE = 'Automatic';
     }
 
@@ -26,7 +40,7 @@ module.exports = function withSigning(config) {
     const attributes = project.getFirstProject().firstProject.attributes;
     const targetAttributes = attributes.TargetAttributes ?? (attributes.TargetAttributes = {});
     for (const targetKey of Object.keys(targetAttributes)) {
-      targetAttributes[targetKey].DevelopmentTeam = DEVELOPMENT_TEAM;
+      targetAttributes[targetKey].DevelopmentTeam = developmentTeam;
       targetAttributes[targetKey].ProvisioningStyle = 'Automatic';
     }
 
