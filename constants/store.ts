@@ -1,7 +1,7 @@
-// Fill this in with the numeric App Store ID once the App Store Connect
-// listing exists (Settings screen "Rate" / "Share" links need it to deep-link
-// straight to the listing instead of falling back to the web page).
-export const IOS_APP_STORE_ID = '';
+// Numeric App Store ID of the "Sprig - Study Companion" listing. The Settings
+// screen's "Rate" / "Share" links need it to deep-link straight to the App
+// Store; without it they fall back to the website.
+export const IOS_APP_STORE_ID = '6809030673';
 
 const IOS_WEB_FALLBACK = 'https://mousewerk.de/sprig';
 const ANDROID_STORE_URL = 'https://play.google.com/store/apps/details?id=com.mousewerk.sprig';

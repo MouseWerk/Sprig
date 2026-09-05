@@ -31,10 +31,10 @@
         "track": "internal"
       },
       "ios": {
-        "ascApiKeyPath": "./appstore-connect-api-key.p8",
-        "ascApiKeyIssuerId": "REPLACE_WITH_ISSUER_ID",
-        "ascApiKeyId": "REPLACE_WITH_KEY_ID",
-        "appleTeamId": "REPLACE_WITH_TEAM_ID"
+        "ascApiKeyPath": "~/.appstoreconnect/private_keys/AuthKey_9UY94WN8XC.p8",
+        "ascApiKeyIssuerId": "ede7516f-c0d6-49e2-9086-3bbdf4e569ef",
+        "ascApiKeyId": "9UY94WN8XC",
+        "appleTeamId": "356QWVB6D4"
       }
     }
   }
