@@ -485,6 +485,7 @@ const en = {
   swipeEmptyCsvError:
     "This CSV file seems to be empty or formatted incorrectly. Expected: Question, Answer.",
   swipeFailedToLoad: "Failed to load cards.",
+  swipeNoDeckProvided: "No deck was provided to study.",
   swipeFailedToRead:
     "Failed to read the flashcard file. Ensure it is a valid CSV.",
   swipeFreezeUsed: "Streak freeze used — your streak is safe!",
@@ -1228,6 +1229,7 @@ const de: Record<keyof typeof en, string> = {
   swipeEmptyCsvError:
     "Diese CSV-Datei scheint leer oder falsch formatiert zu sein. Erwartet: Frage, Antwort.",
   swipeFailedToLoad: "Karten konnten nicht geladen werden.",
+  swipeNoDeckProvided: "Es wurde kein Deck zum Lernen übergeben.",
   swipeFailedToRead:
     "Die Karteikarten-Datei konnte nicht gelesen werden. Stelle sicher, dass es eine gültige CSV-Datei ist.",
   swipeFreezeUsed: "Serien-Freeze benutzt — deine Serie ist sicher!",

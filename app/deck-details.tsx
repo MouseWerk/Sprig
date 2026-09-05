@@ -1,8 +1,9 @@
 import { useToast } from '@/components/ui/Toast';
+import { TranslationKey } from '@/constants/translations';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
-import { ConfusionPair, Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getConfusionPairs, getDecks, importCsvToDeck, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckExamDate, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
+import { ConfusionPair, Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getConfusionPairs, getDecks, importCsvToDeck, localDateKey, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckExamDate, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
@@ -34,7 +35,7 @@ export default function DeckDetailsScreen() {
     const [deck, setDeck] = useState<Deck | null>(null);
     const [cards, setCards] = useState<FlashcardData[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<TranslationKey | null>(null);
 
     const [addCardModalVisible, setAddCardModalVisible] = useState(false);
     const [newQuestion, setNewQuestion] = useState('');
@@ -69,7 +70,7 @@ export default function DeckDetailsScreen() {
                     const currentDeck = decks.find(d => d.id === id);
 
                     if (!currentDeck) {
-                        setError(t('deckDetailsNotFound'));
+                        setError('deckDetailsNotFound');
                         setLoading(false);
                         return;
                     }
@@ -88,7 +89,7 @@ export default function DeckDetailsScreen() {
                     setConfusions(await getConfusionPairs(id));
                 } catch (e) {
                     console.error('Error loading deck data:', e);
-                    setError(t('deckDetailsLoadFailed'));
+                    setError('deckDetailsLoadFailed');
                 } finally {
                     setLoading(false);
                 }
@@ -226,8 +227,7 @@ export default function DeckDetailsScreen() {
     const onExamDatePicked = async (event: DateTimePickerEvent, date?: Date) => {
         setShowExamPicker(false);
         if (event.type !== 'set' || !date || !id) return;
-        // Format in local time — toISOString would shift the day near midnight
-        const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        const dateKey = localDateKey(date);
         await updateDeckExamDate(id, dateKey);
         setDeck(d => (d ? { ...d, examDate: dateKey } : d));
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -384,7 +384,7 @@ export default function DeckDetailsScreen() {
         return (
             <View style={[styles.container, { backgroundColor, padding: 24 }]}>
                 <FileWarning size={48} color="#ef4444" />
-                <Text style={[styles.errorText, { color: textColor }]}>{error || t('deckDetailsSomethingWrong')}</Text>
+                <Text style={[styles.errorText, { color: textColor }]}>{t(error ?? 'deckDetailsSomethingWrong')}</Text>
                 <Button title={t('swipeGoBack')} onPress={() => router.back()} />
             </View>
         );

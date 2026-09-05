@@ -17,6 +17,7 @@ export interface DetectedIncomingFile {
     kind: IncomingFileKind;
     tmpUri: string;
     suggestedName: string;
+    sourceUrl: string;
 }
 
 export interface IncomingImportResult {
@@ -25,6 +26,11 @@ export interface IncomingImportResult {
     cards?: number;
 }
 
+// URLs currently being handled. This exists only to swallow the cold-start
+// race, where getInitialURL() and the 'url' event both deliver the same URL —
+// so an entry is released again as soon as the file has been imported,
+// discarded, or failed to detect. Leaving it in place permanently would make
+// a failed import unretryable, and re-opening the same file a silent no-op.
 const handled = new Set<string>();
 const AUDIO_EXT_RE = /\.(mp3|m4a|wav|aac|ogg|flac)$/i;
 
@@ -60,29 +66,37 @@ export async function detectIncomingFile(url: string): Promise<DetectedIncomingF
     if (handled.has(url)) return null;
     handled.add(url);
 
-    const tmp = `${FileSystem.cacheDirectory}incoming_${Date.now()}`;
-    await FileSystem.copyAsync({ from: url, to: tmp });
+    try {
+        const tmp = `${FileSystem.cacheDirectory}incoming_${Date.now()}`;
+        await FileSystem.copyAsync({ from: url, to: tmp });
 
-    // Sniff the first bytes: "%PDF" -> base64 "JVBER...", ZIP -> "UEsDB..."
-    const head = await FileSystem.readAsStringAsync(tmp, { encoding: 'base64', length: 8, position: 0 } as any);
+        // Sniff the first bytes: "%PDF" -> base64 "JVBER...", ZIP -> "UEsDB..."
+        const head = await FileSystem.readAsStringAsync(tmp, { encoding: 'base64', length: 8, position: 0 } as any);
 
-    if (head.startsWith('JVBER')) {
-        return { kind: 'pdf', tmpUri: tmp, suggestedName: nameFromUrl(url, `Imported PDF ${new Date().toLocaleDateString()}`) };
+        if (head.startsWith('JVBER')) {
+            return { kind: 'pdf', tmpUri: tmp, sourceUrl: url, suggestedName: nameFromUrl(url, `Imported PDF ${new Date().toLocaleDateString()}`) };
+        }
+
+        if (AUDIO_EXT_RE.test(extFromUrl(url))) {
+            return { kind: 'audio', tmpUri: tmp, sourceUrl: url, suggestedName: nameFromUrl(url, `Imported Audio ${new Date().toLocaleDateString()}`) };
+        }
+
+        if (looksLikeZipBase64Head(head)) {
+            // Could be an Anki .apkg/.colpkg export or a shared .sprig deck — both
+            // are ZIPs, resolved at commit time (Anki's collection DB is tried
+            // first, falling back to the Sprig format).
+            return { kind: 'zip', tmpUri: tmp, sourceUrl: url, suggestedName: nameFromUrl(url, `Imported Deck ${new Date().toLocaleDateString()}`) };
+        }
+
+        // Treat anything else as CSV/text
+        return { kind: 'csv', tmpUri: tmp, sourceUrl: url, suggestedName: nameFromUrl(url, `Imported Deck ${new Date().toLocaleDateString()}`) };
+    } catch (e) {
+        // Copying or sniffing failed (unreadable URI, permission, out of space).
+        // Release the URL so opening the same file again actually retries
+        // instead of silently doing nothing.
+        handled.delete(url);
+        throw e;
     }
-
-    if (AUDIO_EXT_RE.test(extFromUrl(url))) {
-        return { kind: 'audio', tmpUri: tmp, suggestedName: nameFromUrl(url, `Imported Audio ${new Date().toLocaleDateString()}`) };
-    }
-
-    if (looksLikeZipBase64Head(head)) {
-        // Could be an Anki .apkg/.colpkg export or a shared .sprig deck — both
-        // are ZIPs, resolved at commit time (Anki's collection DB is tried
-        // first, falling back to the Sprig format).
-        return { kind: 'zip', tmpUri: tmp, suggestedName: nameFromUrl(url, `Imported Deck ${new Date().toLocaleDateString()}`) };
-    }
-
-    // Treat anything else as CSV/text
-    return { kind: 'csv', tmpUri: tmp, suggestedName: nameFromUrl(url, `Imported Deck ${new Date().toLocaleDateString()}`) };
 }
 
 // Performs the actual import once the user has confirmed a name and folder.
@@ -143,10 +157,12 @@ export async function commitIncomingImport(
         }
         return { kind: 'csv', name, cards: count };
     } finally {
+        handled.delete(detected.sourceUrl);
         await FileSystem.deleteAsync(tmp, { idempotent: true }).catch(() => { });
     }
 }
 
 export async function discardIncomingFile(detected: DetectedIncomingFile): Promise<void> {
+    handled.delete(detected.sourceUrl);
     await FileSystem.deleteAsync(detected.tmpUri, { idempotent: true }).catch(() => { });
 }

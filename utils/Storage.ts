@@ -1,6 +1,7 @@
 import { TranslationKey } from '@/constants/translations';
 import * as FileSystem from 'expo-file-system/legacy';
 import { ACHIEVEMENTS, AchievementDef, evaluateAchievements } from './Achievements';
+import { CARD_IMG_DIR, extractImageFiles } from './CardImages';
 import { parseFlashcardsCsv, repairMispairedArrowCards } from './CsvParser';
 import { getDb } from './Database';
 import { levelForXp, rankForLevel, xpForGrade } from './Levels';
@@ -176,7 +177,7 @@ export async function getGroveEconomy(): Promise<GroveEconomy> {
     const fresh: GroveEconomy = {
         dew: 0,
         lastCollectedAt: Date.now(),
-        burstDate: new Date().toISOString().split('T')[0],
+        burstDate: localDateKey(),
         burstDewToday: 0,
         boostUntil: 0,
         seeds: 0,
@@ -260,6 +261,15 @@ export async function equipDecoration(decorationId: string): Promise<GroveEconom
 }
 
 // Whole days between two "YYYY-MM-DD" strings (b - a)
+// Local calendar date as "YYYY-MM-DD". Deliberately not toISOString(), which
+// yields the *UTC* date: everywhere west of UTC that files an evening study
+// session under tomorrow, and everywhere east of it files after-midnight study
+// under yesterday — so the daily goal, the heatmap and the streak all roll
+// over at the wrong moment for anyone outside UTC.
+export function localDateKey(d: Date = new Date()): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function daysBetweenDateKeys(a: string, b: string): number {
     const da = Date.parse(a + 'T00:00:00Z');
     const db = Date.parse(b + 'T00:00:00Z');
@@ -504,9 +514,40 @@ export async function updateDeckProgress(id: string, learnedIndices: number[], u
     );
 }
 
+// Card images live in a shared directory and are referenced from card text by
+// token, so nothing removes them when the card or deck that referenced them
+// goes away. Deleting a deck full of Anki-imported media would otherwise leak
+// every one of its images for the lifetime of the install. Only files that no
+// surviving card still references are removed.
+async function deleteUnreferencedCardImages(
+    removed: { question: string; answer: string }[],
+    kept: { question: string; answer: string }[]
+): Promise<void> {
+    const doomed = new Set<string>();
+    for (const c of removed) {
+        for (const f of extractImageFiles(c.question)) doomed.add(f);
+        for (const f of extractImageFiles(c.answer)) doomed.add(f);
+    }
+    if (doomed.size === 0) return;
+
+    for (const c of kept) {
+        for (const f of extractImageFiles(c.question)) doomed.delete(f);
+        for (const f of extractImageFiles(c.answer)) doomed.delete(f);
+    }
+
+    for (const file of doomed) {
+        await FileSystem.deleteAsync(CARD_IMG_DIR + file, { idempotent: true }).catch(() => { });
+    }
+}
+
 export async function deleteDeck(id: string): Promise<void> {
     const db = await getDb();
     const deck = await db.getFirstAsync<DeckRow>('SELECT * FROM decks WHERE id = ?', id);
+
+    // Before the deck file goes away: getCachedData can self-heal a deck and
+    // rewrite its CSV, which would recreate the very file we just deleted.
+    const doomedCards = await getCachedData<{ question: string; answer: string }[]>(id);
+    if (doomedCards) await deleteUnreferencedCardImages(doomedCards, []);
 
     if (deck) {
         try {
@@ -705,7 +746,7 @@ export async function updateUserStats(
     activity?: { focusSession?: boolean; quizCompleted?: boolean }
 ): Promise<StatsUpdateResult> {
     const stats = await getUserStats();
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateKey();
     const lastStudy = stats.lastStudyDate.split('T')[0];
 
     const prevXp = stats.totalXp || 0;
@@ -744,7 +785,7 @@ export async function updateUserStats(
     }
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 370);
-    const cutoffKey = cutoff.toISOString().split('T')[0];
+    const cutoffKey = localDateKey(cutoff);
     for (const key of Object.keys(stats.dailyReviews)) {
         if (key < cutoffKey) delete stats.dailyReviews[key];
     }
@@ -759,7 +800,10 @@ export async function updateUserStats(
             stats.currentStreak = 1;
         } else {
             const gap = daysBetweenDateKeys(lastStudy, today);
-            if (gap === 1) {
+            if (gap <= 0) {
+                // Last study date is today or (from an older UTC-keyed build)
+                // ahead of it — nothing to extend, and nothing to punish.
+            } else if (gap === 1) {
                 // Studied yesterday — streak continues
                 stats.currentStreak += 1;
             } else if (gap === 2 && stats.streakFreezes > 0) {
@@ -784,7 +828,7 @@ export async function updateUserStats(
         }
     }
 
-    stats.lastStudyDate = new Date().toISOString();
+    stats.lastStudyDate = localDateKey();
 
     // Award XP and detect a level-up
     stats.totalXp = prevXp + xpGained;
@@ -959,8 +1003,9 @@ export async function deleteCardFromDeck(deckId: string, cardIndex: number): Pro
     // 1. Remove from cache and reindex
     const cards = await getCachedData<{ question: string; answer: string }[]>(deckId);
     if (!cards) return;
-    cards.splice(cardIndex, 1);
+    const [removedCard] = cards.splice(cardIndex, 1);
     await replaceCardCache(deckId, cards);
+    if (removedCard) await deleteUnreferencedCardImages([removedCard], cards);
 
     // 2. Rewrite CSV
     try {
@@ -1124,7 +1169,7 @@ export interface ExamPlan {
 // exam day. "Learned" uses the mastery list the swipe modes already maintain.
 export function getExamPlan(deck: Deck): ExamPlan | null {
     if (!deck.examDate) return null;
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateKey();
     const daysLeft = daysBetweenDateKeys(today, deck.examDate);
     if (isNaN(daysLeft)) return null;
 
@@ -1272,9 +1317,16 @@ export async function getAudioFiles(): Promise<AudioFile[]> {
     }
 }
 
+// The display name doubles as part of the on-disk file name, and it can come
+// from a LAN upload or a restored backup — strip anything that could steer the
+// write out of the audio directory.
+export function safeAudioFileName(name: string): string {
+    return name.replace(/[/\\:*?"<>|]/g, '_').replace(/^\.+/, '').slice(0, 120) || 'audio';
+}
+
 export async function saveAudioFile(sourceUri: string, name: string, folderId: string | null = null): Promise<AudioFile> {
     const id = Date.now().toString();
-    const localUri = `${FileSystem.documentDirectory}audio/${id}_${name}`;
+    const localUri = `${FileSystem.documentDirectory}audio/${id}_${safeAudioFileName(name)}`;
 
     const dirInfo = await FileSystem.getInfoAsync(`${FileSystem.documentDirectory}audio/`);
     if (!dirInfo.exists) {

@@ -50,7 +50,11 @@ function configureHandler() {
 
 export async function ensureNotificationPermissions(): Promise<boolean> {
     if (Platform.OS === 'web') return false;
-    if (permissionGranted !== null) return permissionGranted;
+    // Only a grant is cached. Caching a denial too would mean a user who says
+    // no, then turns notifications on in the system settings, gets nothing
+    // until the app is restarted — and re-asking after a denial never shows a
+    // second system prompt anyway.
+    if (permissionGranted === true) return true;
     try {
         configureHandler();
         const current = await Notifications.getPermissionsAsync();

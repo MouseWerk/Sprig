@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
+import { CARD_IMG_DIR } from './CardImages';
 import {
     AudioFile,
     Deck,
@@ -15,12 +16,13 @@ import {
     importDeckRecord,
     importFolderRecord,
     mergePdfProgress,
+    safeAudioFileName,
     saveGroveEconomy,
     saveUserStats,
     UserStats,
 } from './Storage';
 
-const BACKUP_VERSION = 1;
+const BACKUP_VERSION = 2;
 const PREF_KEYS = ['sprig_library_sort', 'sprig_focus_mode', 'sprig_onboarded', 'sprig_prefs'];
 
 // Backups written before the "csvtudyapp" -> "sprig" AsyncStorage key rename
@@ -54,6 +56,10 @@ interface BackupPayload {
     files: {
         decks: Record<string, FileEntry>;
         audio: Record<string, FileEntry>;
+        // Card images, keyed by the file name the card text references them
+        // by. Added in version 2 — a version 1 backup restores without them
+        // and its image tokens stay broken.
+        images?: Record<string, FileEntry>;
     };
 }
 
@@ -85,7 +91,7 @@ export async function createBackup(): Promise<string> {
         getGroveEconomy(),
     ]);
 
-    const files: BackupPayload['files'] = { decks: {}, audio: {} };
+    const files: BackupPayload['files'] = { decks: {}, audio: {}, images: {} };
 
     for (const d of decks) {
         try {
@@ -106,6 +112,25 @@ export async function createBackup(): Promise<string> {
         } catch (e) {
             console.warn('Backup: could not read audio file', a.id, e);
         }
+    }
+
+    try {
+        const imgDir = await FileSystem.getInfoAsync(CARD_IMG_DIR);
+        if (imgDir.exists) {
+            for (const fileName of await FileSystem.readDirectoryAsync(CARD_IMG_DIR)) {
+                try {
+                    files.images![fileName] = {
+                        ext: '',
+                        encoding: 'base64',
+                        content: await FileSystem.readAsStringAsync(CARD_IMG_DIR + fileName, { encoding: 'base64' }),
+                    };
+                } catch (e) {
+                    console.warn('Backup: could not read card image', fileName, e);
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Backup: could not list card images', e);
     }
 
     const prefs: Record<string, string> = {};
@@ -198,6 +223,25 @@ export async function importBackup(uri: string): Promise<ImportSummary> {
 
     const summary: ImportSummary = { decksAdded: 0, foldersAdded: 0, audioAdded: 0, statsMerged: false, groveMerged: false };
 
+    // Card images first: decks reference them by file name from their card
+    // text, so they have to exist before a restored deck is opened. Names are
+    // generated (timestamp_seq.ext) and an existing file with the same name is
+    // therefore the same image — never overwrite one.
+    const imageEntries = Object.entries(backup.files?.images || {});
+    if (imageEntries.length > 0) {
+        await ensureDir(CARD_IMG_DIR);
+        for (const [fileName, entry] of imageEntries) {
+            if (fileName.includes('/') || fileName.includes('\\')) continue; // never escape the store
+            const target = CARD_IMG_DIR + fileName;
+            try {
+                if ((await FileSystem.getInfoAsync(target)).exists) continue;
+                await FileSystem.writeAsStringAsync(target, entry.content, { encoding: 'base64' });
+            } catch (e) {
+                console.warn('Restore: could not write card image', fileName, e);
+            }
+        }
+    }
+
     // Decks
     const deckIds = new Set((await getDecks()).map(d => d.id));
     const decksDir = `${FileSystem.documentDirectory}decks/`;
@@ -235,7 +279,7 @@ export async function importBackup(uri: string): Promise<ImportSummary> {
         if (audioIds.has(a.id)) continue;
         const entry = backup.files?.audio?.[a.id];
         if (!entry) continue;
-        const newUri = `${audioDir}${a.id}_${a.name}`;
+        const newUri = `${audioDir}${a.id}_${safeAudioFileName(a.name)}`;
         try {
             await FileSystem.writeAsStringAsync(newUri, entry.content, { encoding: 'base64' });
             await importAudioRecord({ ...a, uri: newUri });

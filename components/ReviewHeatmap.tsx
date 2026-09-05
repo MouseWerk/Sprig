@@ -1,4 +1,5 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { localDateKey } from '@/utils/Storage';
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -11,13 +12,6 @@ const CELL = 14;
 const GAP = 3;
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function toKey(date: Date): string {
-    const y = date.getFullYear();
-    const m = `${date.getMonth() + 1}`.padStart(2, '0');
-    const d = `${date.getDate()}`.padStart(2, '0');
-    return `${y}-${m}-${d}`;
-}
 
 function intensityColor(count: number, emptyColor: string): string {
     if (count <= 0) return emptyColor;
@@ -51,7 +45,7 @@ export const ReviewHeatmap: React.FC<ReviewHeatmapProps> = ({ data = {}, weeks =
                 if (cursor > today) {
                     col.push({ key: `future-${w}-${d}`, count: null });
                 } else {
-                    const key = toKey(cursor);
+                    const key = localDateKey(cursor);
                     if (cursor.getDate() === 1) label = MONTH_NAMES[cursor.getMonth()];
                     col.push({ key, count: data[key] || 0 });
                     cursor = new Date(cursor);

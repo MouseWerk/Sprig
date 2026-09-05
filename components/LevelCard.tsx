@@ -2,7 +2,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { getLevelInfo } from '@/utils/Levels';
 import { getPrefsSync, subscribePrefs } from '@/utils/Preferences';
-import { UserStats } from '@/utils/Storage';
+import { localDateKey, UserStats } from '@/utils/Storage';
 import { Flame, Snowflake, Target, Zap } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -28,7 +28,7 @@ export function LevelCard({ stats, displayStreak }: LevelCardProps) {
 
     const info = getLevelInfo(stats.totalXp || 0);
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateKey();
     const todayCount = stats.dailyReviews?.[today] || 0;
     const goalProgress = Math.min(1, todayCount / dailyGoal);
     const goalMet = todayCount >= dailyGoal;

@@ -6,7 +6,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { buildGrovePlants, GrovePlant, pendingDew } from '@/utils/Grove';
 import { getPrefsSync, subscribePrefs } from '@/utils/Preferences';
 import { refreshWidgetSnapshot } from '@/utils/PinnedDeck';
-import { Deck, getDecks, getGroveEconomy, getUserStats, UserStats } from '@/utils/Storage';
+import { Deck, getDecks, getGroveEconomy, getUserStats, localDateKey, UserStats } from '@/utils/Storage';
 import { buildTodayPlan, startTodaySession, TodayPlan } from '@/utils/TodayPlan';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { CalendarCheck, ChevronRight, Layers, Leaf, Play } from 'lucide-react-native';
@@ -85,10 +85,10 @@ export default function HomeScreen() {
   const displayStreak = (() => {
     if (!stats?.lastStudyDate) return 0;
     const last = stats.lastStudyDate.split('T')[0];
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateKey();
     const y = new Date();
     y.setDate(y.getDate() - 1);
-    const yesterday = y.toISOString().split('T')[0];
+    const yesterday = localDateKey(y);
     return (last === today || last === yesterday) ? stats.currentStreak : 0;
   })();
 

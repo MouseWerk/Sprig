@@ -1,3 +1,4 @@
+import { TranslationKey } from '@/constants/translations';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -87,7 +88,7 @@ export default function SwipeScreen() {
     const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
     const [isFlipped, setIsFlipped] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<TranslationKey | null>(null);
     const [learnedIndices, setLearnedIndices] = useState<number[]>([]);
     const [unsureIndices, setUnsureIndices] = useState<number[]>([]);
     const [srsData, setSrsData] = useState<Record<number, SRSCardData>>({});
@@ -115,7 +116,7 @@ export default function SwipeScreen() {
     useEffect(() => {
         async function loadData() {
             if (!uri || !id) {
-                setError('No file or deck ID provided');
+                setError('swipeNoDeckProvided');
                 setLoading(false);
                 return;
             }
@@ -141,7 +142,7 @@ export default function SwipeScreen() {
                 }
 
                 if (parsedCards && parsedCards.length === 0) {
-                    setError(t('swipeEmptyCsvError'));
+                    setError('swipeEmptyCsvError');
                 } else if (parsedCards) {
                     // Enrich with original index + per-deck study direction
                     const direction = currentDeck?.studyDirection || 'normal';
@@ -153,11 +154,11 @@ export default function SwipeScreen() {
                     setCards(enrichedCards);
                     setShuffledCards(shuffleArray(enrichedCards));
                 } else {
-                    setError(t('swipeFailedToLoad'));
+                    setError('swipeFailedToLoad');
                 }
             } catch (e) {
                 console.error(e);
-                setError(t('swipeFailedToRead'));
+                setError('swipeFailedToRead');
             } finally {
                 setLoading(false);
             }
@@ -451,7 +452,7 @@ export default function SwipeScreen() {
                 <View style={[styles.errorCard, { backgroundColor: secondaryBg }]}>
                     <FileWarning size={48} color="#ef4444" strokeWidth={2.5} />
                     <Text style={[styles.errorTitle, { color: textColor }]}>{t('swipeImportError')}</Text>
-                    <Text style={[styles.errorSub, { color: mutedForeground }]}>{error}</Text>
+                    <Text style={[styles.errorSub, { color: mutedForeground }]}>{t(error)}</Text>
                     <Button
                         title={t('swipeGoBack')}
                         onPress={() => router.back()}

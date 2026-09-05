@@ -5,7 +5,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { ACHIEVEMENTS, unlockedCount } from '@/utils/Achievements';
 import { toDisplayText } from '@/utils/CardText';
 import { getLevelInfo } from '@/utils/Levels';
-import { getDecks, getHardestCards, getUserStats, HardCard, UserStats } from '@/utils/Storage';
+import { getDecks, getHardestCards, getUserStats, HardCard, localDateKey, UserStats } from '@/utils/Storage';
 import { startTodaySession, TodayDeckEntry } from '@/utils/TodayPlan';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Award, BookOpen, Brain, ChevronRight, Clock, Database, Flame, Snowflake, TrendingUp, Zap } from 'lucide-react-native';
@@ -32,7 +32,7 @@ function computeWeekRecap(dailyReviews: Record<string, number> | undefined): Wee
     for (let i = 0; i < 14; i++) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const key = d.toISOString().split('T')[0];
+        const key = localDateKey(d);
         const n = dailyReviews[key] || 0;
         if (i < 7) {
             recap.thisWeek += n;
@@ -120,10 +120,10 @@ export default function StatsScreen() {
     const displayStreak = (() => {
         if (!stats?.lastStudyDate) return 0;
         const last = stats.lastStudyDate.split('T')[0];
-        const today = new Date().toISOString().split('T')[0];
+        const today = localDateKey();
         const y = new Date();
         y.setDate(y.getDate() - 1);
-        const yesterday = y.toISOString().split('T')[0];
+        const yesterday = localDateKey(y);
         return (last === today || last === yesterday) ? stats.currentStreak : 0;
     })();
 
