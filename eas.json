@@ -29,6 +29,12 @@
       "android": {
         "serviceAccountKeyPath": "./play-service-account.json",
         "track": "internal"
+      },
+      "ios": {
+        "ascApiKeyPath": "./appstore-connect-api-key.p8",
+        "ascApiKeyIssuerId": "REPLACE_WITH_ISSUER_ID",
+        "ascApiKeyId": "REPLACE_WITH_KEY_ID",
+        "appleTeamId": "REPLACE_WITH_TEAM_ID"
       }
     }
   }

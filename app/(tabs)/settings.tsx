@@ -10,6 +10,7 @@ import { cancelStreakReminder, scheduleStreakReminder } from '@/utils/Notificati
 import { CARD_TEXT_SCALE_OPTIONS, DAILY_GOAL_OPTIONS, FOCUS_MINUTES_OPTIONS, HomeSectionId, Preferences, REMINDER_HOUR_MAX, REMINDER_HOUR_MIN, STUDY_SESSION_LENGTH_OPTIONS, getPrefsSync, setPref, subscribePrefs } from '@/utils/Preferences';
 import { clearCardCache, wipeAllData } from '@/utils/Storage';
 import { getWebServerLog, getWebServerUrl, isWebServerRunning, isWebServerSupported, startWebServer, stopWebServer } from '@/utils/WebServer';
+import { STORE_URLS } from '@/constants/store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
@@ -19,7 +20,7 @@ import { Bell, ChevronDown, ChevronRight, ChevronUp, Clock, Coffee, Database, Do
 import { DiscordIcon } from '@/components/DiscordIcon';
 import { TranslationKey } from '@/constants/translations';
 import React, { useEffect, useState } from 'react';
-import { Linking, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, Platform, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const HOME_SECTION_META: Record<HomeSectionId, { icon: typeof Sprout; labelKey: TranslationKey }> = {
@@ -148,8 +149,9 @@ export default function SettingsScreen() {
 
   const handleShare = async () => {
     try {
+      const storeUrl = Platform.OS === 'ios' ? STORE_URLS.ios : STORE_URLS.android;
       await Share.share({
-        message: t('settingsShareMessage'),
+        message: `${t('settingsShareMessage')}\n\n${storeUrl}`,
       });
     } catch (error) {
       console.error(error);
@@ -178,11 +180,15 @@ export default function SettingsScreen() {
   };
 
   const handleRate = async () => {
+    if (Platform.OS === 'ios') {
+      await openUrl(STORE_URLS.iosReview);
+      return;
+    }
     // Try the Play Store app first, fall back to the web listing
     try {
-      await Linking.openURL('market://details?id=com.mousewerk.sprig');
+      await Linking.openURL(STORE_URLS.androidMarket);
     } catch {
-      await openUrl('https://play.google.com/store/apps/details?id=com.mousewerk.sprig');
+      await openUrl(STORE_URLS.android);
     }
   };
 

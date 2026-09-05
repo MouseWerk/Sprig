@@ -12,10 +12,13 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mousewerk.sprig",
+      "buildNumber": "1",
       "infoPlist": {
         "UIBackgroundModes": ["audio"],
         "LSSupportsOpeningDocumentsInPlace": true,
         "UISupportsDocumentBrowser": true,
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocalNetworkUsageDescription": "Sprig starts a local web server so you can drop PDFs and audio files in from a computer on the same WiFi network.",
         "CFBundleDocumentTypes": [
           {
             "CFBundleTypeName": "PDF Document",
@@ -24,7 +27,11 @@
           },
           {
             "CFBundleTypeName": "CSV File",
-            "LSItemContentTypes": ["public.comma-separated-values-text", "public.plain-text"],
+            "LSItemContentTypes": [
+              "public.comma-separated-values-text",
+              "public.plain-text",
+              "public.text"
+            ],
             "LSHandlerRank": "Alternate"
           },
           {
@@ -159,7 +166,6 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications",
       [
         "expo-splash-screen",
         {
@@ -196,7 +202,9 @@
             }
           ]
         }
-      ]
+      ],
+      "./plugins/withoutPushEntitlement",
+      "./plugins/withSigning"
     ],
     "experiments": {
       "typedRoutes": true,

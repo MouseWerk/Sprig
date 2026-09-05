@@ -260,7 +260,7 @@ const en = {
   settingsConnectWifiFirst: "Connect to WiFi first",
   settingsCouldNotStartServer: "Could not start the upload server",
   settingsShareMessage:
-    "Check out Sprig — a calm study companion for flashcards, PDFs and focus sessions!\n\nhttps://play.google.com/store/apps/details?id=com.mousewerk.sprig",
+    "Check out Sprig — a calm study companion for flashcards, PDFs and focus sessions!",
   settingsPrivacyTitle: "Your data stays on your device",
   settingsPrivacyMessage:
     "Sprig keeps everything local — your decks, PDFs, audio, and study stats are stored only on this phone and are never uploaded to any server. Notifications and reminders are scheduled on-device.",
@@ -1000,7 +1000,7 @@ const de: Record<keyof typeof en, string> = {
   settingsConnectWifiFirst: "Zuerst mit WLAN verbinden",
   settingsCouldNotStartServer: "Upload-Server konnte nicht gestartet werden",
   settingsShareMessage:
-    "Schau dir Sprig an — ein ruhiger Lernbegleiter für Karteikarten, PDFs und Fokus-Sitzungen!\n\nhttps://play.google.com/store/apps/details?id=com.mousewerk.sprig",
+    "Schau dir Sprig an — ein ruhiger Lernbegleiter für Karteikarten, PDFs und Fokus-Sitzungen!",
   settingsPrivacyTitle: "Deine Daten bleiben auf deinem Gerät",
   settingsPrivacyMessage:
     "Sprig speichert alles lokal — deine Decks, PDFs, Audios und Lernstatistiken werden nur auf diesem Handy gespeichert und nie auf einen Server hochgeladen. Benachrichtigungen und Erinnerungen werden direkt auf dem Gerät geplant.",
