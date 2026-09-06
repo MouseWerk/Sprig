@@ -87,8 +87,12 @@ export default function FeedScreen() {
         if (!item || item.index == null) return;
         currentIndexRef.current = item.index;
         setCurrentIndex(item.index);
-        if (!seenRef.current.has(item.index)) {
-            seenRef.current.add(item.index);
+        // Key by the card, not its position in the list: shuffling reorders
+        // the list, so position-based bookkeeping would credit cards that were
+        // already counted and skip ones that weren't.
+        const cardKey = (item.item as FeedCard | undefined)?.originalIndex;
+        if (cardKey != null && !seenRef.current.has(cardKey)) {
+            seenRef.current.add(cardKey);
             if (seenRef.current.size > 1) {
                 Haptics.selectionAsync().catch(() => { });
             }
@@ -104,7 +108,8 @@ export default function FeedScreen() {
     const handleShuffle = () => {
         if (!cards || cards.length < 2) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
-        seenRef.current = new Set();
+        // seenRef deliberately survives a shuffle — each card still counts
+        // once per visit to this screen, so re-shuffling can't farm XP.
         setRevealed(new Set());
         setCards(shuffleCards(cards));
         currentIndexRef.current = 0;

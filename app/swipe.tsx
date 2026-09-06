@@ -18,12 +18,13 @@ import { useToast } from '../components/ui/Toast';
 import { FlashcardData, parseFlashcardsCsv } from '../utils/CsvParser';
 import { xpForGrade } from '../utils/Levels';
 import { scheduleStreakReminder } from '../utils/Notifications';
-import { applySwipeResult, getCachedData, getDecks, restoreCardSRS, setCachedData, SRSCardData, updateCardInDeck, updateDeckProgress, updateUserStats } from '../utils/Storage';
+import { applySwipeResult, getCachedData, getDecks, restoreCardSRS, revertUserStats, setCachedData, SRSCardData, updateCardInDeck, updateDeckProgress, updateUserStats } from '../utils/Storage';
 import { migrateKey } from '../utils/StorageMigration';
 import { getPrefsSync, subscribePrefs } from '../utils/Preferences';
 import { nextTodayEntry, peekNextTodayEntry } from '../utils/TodayPlan';
 
 interface UndoEntry {
+    swipeId: number;
     originalIndex: number;
     grade: number;
     prevSrs?: SRSCardData;
@@ -105,6 +106,13 @@ export default function SwipeScreen() {
     // Serialized background persistence chain - swipes advance the UI
     // immediately while writes complete in order behind the scenes.
     const pendingPersistRef = useRef<Promise<void>>(Promise.resolve());
+    // Lifetime-stats writes are serialized separately from the SRS chain, and
+    // what each swipe actually added is remembered so undo can take exactly
+    // that back out (a sunshine boost doubles the XP, so it isn't derivable).
+    const pendingStatsRef = useRef<Promise<void>>(Promise.resolve());
+    const swipeSeqRef = useRef(0);
+    const statsBySwipeRef = useRef<Map<number, { seconds: number; xpGained: number }>>(new Map());
+    const completedOnSwipeRef = useRef<Map<number, boolean>>(new Map());
 
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
@@ -228,9 +236,11 @@ export default function SwipeScreen() {
     const handleSwipe = (grade: number) => {
         if (!currentCard || !id) return;
         const originalIndex = currentCard.originalIndex;
+        const swipeId = ++swipeSeqRef.current;
 
         // Snapshot state for undo before mutating anything
         setUndoStack(stack => [...stack, {
+            swipeId,
             originalIndex,
             grade,
             prevSrs: liveSrsRef.current[originalIndex],
@@ -274,12 +284,16 @@ export default function SwipeScreen() {
         Speech.stop();
         setIsFlipped(false);
 
-        // Advance the UI immediately - persistence happens in the background
-        if (currentIndex + 1 < filteredCards.length) {
+        // Advance the UI immediately - persistence happens in the background.
+        // A swipe that ends the session leaves the index on the card it just
+        // graded, so undo must not step back again (see handleUndo).
+        const advanced = currentIndex + 1 < filteredCards.length;
+        if (advanced) {
             setCurrentIndex(i => i + 1);
         } else {
             setSessionComplete(true);
         }
+        completedOnSwipeRef.current.set(swipeId, !advanced);
 
         // One read + one write per swipe, serialized so writes never race
         pendingPersistRef.current = pendingPersistRef.current
@@ -291,8 +305,11 @@ export default function SwipeScreen() {
             scheduleStreakReminder();
         }
 
-        updateUserStats(1, deltaSeconds, grade)
+        statsBySwipeRef.current.set(swipeId, { seconds: deltaSeconds, xpGained: 0 });
+        pendingStatsRef.current = pendingStatsRef.current
+            .then(() => updateUserStats(1, deltaSeconds, grade))
             .then(result => {
+                statsBySwipeRef.current.set(swipeId, { seconds: deltaSeconds, xpGained: result.xpGained });
                 if (result.dewEarned > 0) setSessionDew(d => d + result.dewEarned);
                 if (result.boostActive) {
                     setSessionBoosted(true);
@@ -337,6 +354,15 @@ export default function SwipeScreen() {
 
         // Wait for in-flight swipe writes so the restore isn't overwritten
         await pendingPersistRef.current;
+        await pendingStatsRef.current;
+
+        // Take this review back out of the lifetime totals too, otherwise the
+        // daily goal, heatmap and XP keep counting a card the user undid.
+        const written = statsBySwipeRef.current.get(last.swipeId);
+        statsBySwipeRef.current.delete(last.swipeId);
+        if (written) {
+            await revertUserStats(1, written.seconds, written.xpGained).catch(() => { });
+        }
 
         // Restore SRS + mastery to their pre-swipe values
         await restoreCardSRS(id, last.originalIndex, last.prevSrs);
@@ -356,11 +382,18 @@ export default function SwipeScreen() {
         else if (last.grade === 3) setSessionHard(c => Math.max(0, c - 1));
         else setSessionAgain(c => Math.max(0, c - 1));
         setSessionReviewed(s => Math.max(0, s - 1));
-        setSessionXp(x => Math.max(0, x - xpForGrade(last.grade)));
+        // Use what was actually awarded — a sunshine boost doubled it.
+        const sessionXpBack = written?.xpGained || xpForGrade(last.grade);
+        setSessionXp(x => Math.max(0, x - sessionXpBack));
 
         setUndoStack(stack => stack.slice(0, -1));
+        // A swipe that finished the session never advanced the index, so it
+        // already points at the card being undone — stepping back there would
+        // skip over it and land on an already-graded card.
+        const endedSession = completedOnSwipeRef.current.get(last.swipeId) === true;
+        completedOnSwipeRef.current.delete(last.swipeId);
         setSessionComplete(false);
-        setCurrentIndex(i => Math.max(0, i - 1));
+        if (!endedSession) setCurrentIndex(i => Math.max(0, i - 1));
         setIsFlipped(false);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     };
@@ -377,6 +410,8 @@ export default function SwipeScreen() {
         setSessionBoosted(false);
         setStageUp(null);
         setUndoStack([]);
+        statsBySwipeRef.current.clear();
+        completedOnSwipeRef.current.clear();
         setSessionComplete(false);
         setIsFlipped(false);
         lastActionRef.current = Date.now();

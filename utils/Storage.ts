@@ -734,6 +734,30 @@ export async function saveUserStats(stats: UserStats): Promise<void> {
     await db.runAsync('INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)', 'stats', JSON.stringify(stats));
 }
 
+// Takes a review back out of lifetime stats — the session-undo counterpart to
+// updateUserStats. Only the countable things are reversed: cards, study time,
+// today's review count and the exact XP that review granted (passed in by the
+// caller, since a sunshine boost may have doubled it). Streak, banked freezes
+// and unlocked achievements are deliberately left alone: they are one-way
+// milestones, and re-locking an achievement mid-session would be worse than
+// the small over-count.
+export async function revertUserStats(cardsReviewed: number, seconds: number, xpGained: number): Promise<void> {
+    const stats = await getUserStats();
+    const today = localDateKey();
+
+    stats.totalCardsReviewed = Math.max(0, (stats.totalCardsReviewed || 0) - Math.max(0, cardsReviewed));
+    stats.totalStudyTime = Math.max(0, (stats.totalStudyTime || 0) - Math.max(0, seconds));
+    stats.totalXp = Math.max(0, (stats.totalXp || 0) - Math.max(0, xpGained));
+
+    if (stats.dailyReviews?.[today] !== undefined) {
+        const left = stats.dailyReviews[today] - Math.max(0, cardsReviewed);
+        if (left > 0) stats.dailyReviews[today] = left;
+        else delete stats.dailyReviews[today];
+    }
+
+    await saveUserStats(stats);
+}
+
 // Applies a review to lifetime stats. Returns the newly-unlocked achievements
 // and any level-up so the UI can celebrate them. Pass the SM-2 grade so XP
 // can scale with how well the card went; pass bonusXp for non-card activity
@@ -1292,16 +1316,22 @@ export async function resetDeckProgress(deckId: string): Promise<void> {
     );
 }
 
-export async function updateCardSRS(deckId: string, cardIndex: number, grade: number): Promise<void> {
+// Returns the card's SRS state from *before* this grade (null when the card
+// had never been reviewed), so a caller that may need to take the grade back
+// — typing mode's "I was right" override — can restore it exactly.
+export async function updateCardSRS(deckId: string, cardIndex: number, grade: number): Promise<SRSCardData | null> {
     const db = await getDb();
     const prevRow = await db.getFirstAsync<SrsRow>(
         'SELECT * FROM srs WHERE deck_id = ? AND card_index = ?', deckId, cardIndex
     );
-    const prevData: SRSCardData = prevRow
+    const previous: SRSCardData | null = prevRow
         ? { interval: prevRow.interval, repetition: prevRow.repetition, easeFactor: prevRow.ease_factor, nextReview: prevRow.next_review }
-        : { interval: 0, repetition: 0, easeFactor: 2.5, nextReview: new Date().toISOString() };
+        : null;
+    const prevData: SRSCardData = previous
+        ?? { interval: 0, repetition: 0, easeFactor: 2.5, nextReview: new Date().toISOString() };
 
     await upsertSrsRow(deckId, cardIndex, calculateSM2(grade, prevData.interval, prevData.repetition, prevData.easeFactor));
+    return previous;
 }
 
 // Audio Management

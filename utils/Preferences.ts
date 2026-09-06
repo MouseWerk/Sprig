@@ -48,21 +48,29 @@ export const CARD_TEXT_SCALE_OPTIONS = [0.85, 1, 1.15, 1.3];
 export const STUDY_SESSION_LENGTH_OPTIONS = [10, 20, 30, 50];
 
 let cache: Preferences = { ...DEFAULT_PREFS };
-let loaded = false;
 const listeners = new Set<(prefs: Preferences) => void>();
 
-async function load(): Promise<void> {
-    if (loaded) return;
-    loaded = true;
-    try {
-        const raw = await migrateKey(LEGACY_PREFS_KEY, PREFS_STORAGE_KEY);
-        if (raw) {
-            cache = { ...DEFAULT_PREFS, ...JSON.parse(raw) };
-            notify();
-        }
-    } catch {
-        // keep defaults
+// Memoized rather than guarded by a boolean: a flag set before the await lets
+// a second caller through while the read is still in flight, so `setPref`
+// could write on top of the defaults and then be overwritten when the stored
+// value finally lands.
+let loadPromise: Promise<void> | null = null;
+
+function load(): Promise<void> {
+    if (!loadPromise) {
+        loadPromise = (async () => {
+            try {
+                const raw = await migrateKey(LEGACY_PREFS_KEY, PREFS_STORAGE_KEY);
+                if (raw) {
+                    cache = { ...DEFAULT_PREFS, ...JSON.parse(raw) };
+                    notify();
+                }
+            } catch {
+                // keep defaults
+            }
+        })();
     }
+    return loadPromise;
 }
 
 function notify() {
@@ -97,6 +105,15 @@ export function subscribePrefs(listener: (prefs: Preferences) => void): () => vo
     listeners.add(listener);
     load().then(() => listener({ ...cache }));
     return () => { listeners.delete(listener); };
+}
+
+// Full data wipe: AsyncStorage is cleared underneath us, so the in-memory
+// mirror has to go back to defaults too — otherwise the next setPref would
+// persist the old values again and the wipe would look like it failed.
+export function resetPrefsCache(): void {
+    cache = { ...DEFAULT_PREFS };
+    loadPromise = Promise.resolve();
+    notify();
 }
 
 // Kick off the initial load as soon as the module is imported

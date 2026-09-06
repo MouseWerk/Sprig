@@ -99,6 +99,20 @@ export async function scheduleFocusWarning(seconds: number): Promise<string | nu
     }
 }
 
+// Drops every notification this app has scheduled with the OS and forgets the
+// cached permission. Needed by the full data wipe: that clears AsyncStorage,
+// including the stored reminder id, so afterwards nothing could ever cancel
+// the daily reminder again and it would keep firing forever.
+export async function cancelAllNotifications(): Promise<void> {
+    permissionGranted = null;
+    if (Platform.OS === 'web') return;
+    try {
+        await Notifications.cancelAllScheduledNotificationsAsync();
+    } catch {
+        // ignore
+    }
+}
+
 export async function cancelNotification(id: string | null): Promise<void> {
     if (!id) return;
     try {

@@ -69,9 +69,17 @@ export default function DecksScreen() {
   const accentColor = useThemeColor({}, 'primary');
   const primaryForeground = useThemeColor({}, 'primaryForeground');
 
+  // Deletion is deferred so the toast's "Undo" can still call it off; these
+  // ids are in the database but must not appear in the list meanwhile.
+  const pendingDeleteRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const UNDO_WINDOW_MS = 5000;
+
   const loadData = useCallback(async () => {
     const [savedDecks, savedFolders, pinned] = await Promise.all([getDecks(), getFolders('deck'), getPinnedDeckId()]);
-    setDecks(savedDecks.filter(d => d.type === 'csv'));
+    // A deck awaiting the undo window is still in the database. Without this
+    // filter, leaving and re-entering the tab within those seconds brings it
+    // back into the list, and it then vanishes when the timer fires.
+    setDecks(savedDecks.filter(d => d.type === 'csv' && !pendingDeleteRef.current[d.id]));
     setFolders(savedFolders);
     setPinnedDeckIdState(pinned);
   }, []);
@@ -239,8 +247,6 @@ export default function DecksScreen() {
   // Deck content (cards + years of SRS history) is the most expensive thing
   // in the app to lose, so this gets a second line of defense beyond the
   // confirm dialog.
-  const pendingDeleteRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const UNDO_WINDOW_MS = 5000;
 
   const handleDelete = async (id: string, name: string) => {
     const ok = await confirm({
@@ -252,7 +258,6 @@ export default function DecksScreen() {
     });
     if (!ok) return;
 
-    const removed = decks.find(d => d.id === id);
     setDecks(prev => prev.filter(d => d.id !== id));
 
     showToast({
@@ -267,17 +272,20 @@ export default function DecksScreen() {
             clearTimeout(timer);
             delete pendingDeleteRef.current[id];
           }
-          if (removed) setDecks(prev => [removed, ...prev]);
+          // Re-read rather than splicing the snapshot back in, so the deck
+          // returns in its proper sort position with fresh counts.
+          loadData();
         },
       },
     });
 
     pendingDeleteRef.current[id] = setTimeout(async () => {
-      delete pendingDeleteRef.current[id];
       try {
         await deleteDeck(id);
       } catch (e) {
         console.error('Error deleting deck:', e);
+      } finally {
+        delete pendingDeleteRef.current[id];
       }
     }, UNDO_WINDOW_MS);
   };

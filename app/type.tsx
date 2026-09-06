@@ -5,7 +5,7 @@ import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
 import { stripImageTokens } from '@/utils/CardImages';
 import { AnswerVerdict, checkAnswer } from '@/utils/Fuzzy';
 import { getPrefsSync, subscribePrefs } from '@/utils/Preferences';
-import { getCachedData, setCachedData, updateCardSRS, updateUserStats } from '@/utils/Storage';
+import { getCachedData, restoreCardSRS, setCachedData, SRSCardData, updateCardSRS, updateUserStats } from '@/utils/Storage';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, FileWarning, Keyboard, Trophy, X } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
@@ -83,9 +83,16 @@ export default function TypeScreen() {
     const total = cards?.length ?? 0;
     const current = cards?.[index];
 
+    // SRS state from before the current card was graded, so "I was right" can
+    // undo the wrong grade instead of stacking a second one on top of it.
+    const preGradeSrsRef = useRef<SRSCardData | null | undefined>(undefined);
+
     const applyResult = (grade: number) => {
         if (!id || !current) return;
-        updateCardSRS(id, current.originalIndex, grade).catch(() => { });
+        preGradeSrsRef.current = undefined;
+        updateCardSRS(id, current.originalIndex, grade)
+            .then(previous => { preGradeSrsRef.current = previous; })
+            .catch(() => { });
         const now = Date.now();
         const delta = Math.min(Math.round((now - lastTickRef.current) / 1000), 60);
         lastTickRef.current = now;
@@ -113,7 +120,16 @@ export default function TypeScreen() {
         if (verdict !== 'wrong' || overridden) return;
         setOverridden(true);
         setScore(s => s + 1);
-        if (id && current) updateCardSRS(id, current.originalIndex, 4).catch(() => { });
+        if (id && current) {
+            const cardIndex = current.originalIndex;
+            // Roll the wrong grade back first. Grading again on top of it would
+            // leave the ease factor carrying the full "Again" penalty and the
+            // interval reset to one day — the opposite of what the button says.
+            (async () => {
+                await restoreCardSRS(id, cardIndex, preGradeSrsRef.current ?? undefined);
+                await updateCardSRS(id, cardIndex, 4);
+            })().catch(() => { });
+        }
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
 
