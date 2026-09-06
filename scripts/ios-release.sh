@@ -28,6 +28,13 @@ done
 KEY_PATH=$(eval echo "$EXPO_ASC_API_KEY_PATH")
 if [ ! -f "$KEY_PATH" ]; then echo "error: API key not found at $KEY_PATH" >&2; exit 1; fi
 
+# /ios is generated and gitignored, so app.json changes — a bumped buildNumber
+# above all — only reach the Xcode project through a prebuild. Without this the
+# archive would quietly carry the previous CFBundleVersion and App Store Connect
+# would reject the upload as a duplicate.
+echo "==> Syncing the native project with app.json"
+npx expo prebuild -p ios
+
 BUILD_DIR=${BUILD_DIR:-build-output/ios}
 ARCHIVE="$BUILD_DIR/Sprig.xcarchive"
 EXPORT_DIR="$BUILD_DIR/export"
