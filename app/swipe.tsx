@@ -111,8 +111,9 @@ export default function SwipeScreen() {
     // that back out (a sunshine boost doubles the XP, so it isn't derivable).
     const pendingStatsRef = useRef<Promise<void>>(Promise.resolve());
     const swipeSeqRef = useRef(0);
+    const undoStackRef = useRef<UndoEntry[]>([]);
+    const filteredCardsRef = useRef<FlashcardWithIndex[]>([]);
     const statsBySwipeRef = useRef<Map<number, { seconds: number; xpGained: number }>>(new Map());
-    const completedOnSwipeRef = useRef<Map<number, boolean>>(new Map());
 
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
@@ -201,6 +202,9 @@ export default function SwipeScreen() {
             })
             : shuffledCards;
 
+    undoStackRef.current = undoStack;
+    filteredCardsRef.current = filteredCards;
+
     const currentCard = filteredCards[currentIndex];
     const accuracy = sessionReviewed > 0 ? Math.round((sessionCorrect / sessionReviewed) * 100) : 0;
 
@@ -284,16 +288,12 @@ export default function SwipeScreen() {
         Speech.stop();
         setIsFlipped(false);
 
-        // Advance the UI immediately - persistence happens in the background.
-        // A swipe that ends the session leaves the index on the card it just
-        // graded, so undo must not step back again (see handleUndo).
-        const advanced = currentIndex + 1 < filteredCards.length;
-        if (advanced) {
+        // Advance the UI immediately - persistence happens in the background
+        if (currentIndex + 1 < filteredCards.length) {
             setCurrentIndex(i => i + 1);
         } else {
             setSessionComplete(true);
         }
-        completedOnSwipeRef.current.set(swipeId, !advanced);
 
         // One read + one write per swipe, serialized so writes never race
         pendingPersistRef.current = pendingPersistRef.current
@@ -349,8 +349,9 @@ export default function SwipeScreen() {
     };
 
     const handleUndo = async () => {
-        if (undoStack.length === 0 || !id) return;
-        const last = undoStack[undoStack.length - 1];
+        const stack = undoStackRef.current;
+        if (stack.length === 0 || !id) return;
+        const last = stack[stack.length - 1];
 
         // Wait for in-flight swipe writes so the restore isn't overwritten
         await pendingPersistRef.current;
@@ -387,13 +388,13 @@ export default function SwipeScreen() {
         setSessionXp(x => Math.max(0, x - sessionXpBack));
 
         setUndoStack(stack => stack.slice(0, -1));
-        // A swipe that finished the session never advanced the index, so it
-        // already points at the card being undone — stepping back there would
-        // skip over it and land on an already-graded card.
-        const endedSession = completedOnSwipeRef.current.get(last.swipeId) === true;
-        completedOnSwipeRef.current.delete(last.swipeId);
         setSessionComplete(false);
-        if (!endedSession) setCurrentIndex(i => Math.max(0, i - 1));
+        // Go to the card that was just undone, wherever it sits in the queue.
+        // Stepping back by one only works when the swipe advanced the index —
+        // the swipe that ends a session does not, so that card would be
+        // skipped and an already-graded one shown instead.
+        const undoneAt = filteredCardsRef.current.findIndex(c => c.originalIndex === last.originalIndex);
+        setCurrentIndex(undoneAt >= 0 ? undoneAt : i => Math.max(0, i - 1));
         setIsFlipped(false);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     };
@@ -411,7 +412,6 @@ export default function SwipeScreen() {
         setStageUp(null);
         setUndoStack([]);
         statsBySwipeRef.current.clear();
-        completedOnSwipeRef.current.clear();
         setSessionComplete(false);
         setIsFlipped(false);
         lastActionRef.current = Date.now();
