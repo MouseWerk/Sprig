@@ -233,6 +233,8 @@ const en = {
   settingsUploadFromComputer: "Upload from Computer",
   settingsWebUploadHint:
     "Open this address in a browser on the same WiFi to drop PDFs and audio files into Sprig. Keep the app open while transferring.",
+  settingsWebUploadCodeHint:
+    "Type this code on the computer before uploading. It changes every time you start the server, so nobody else on the network can drop files into Sprig.",
   settingsRecentRequests: "Recent requests",
   settingsBackupRestore: "Backup & Restore",
   settingsWorking: "Working…",
@@ -974,6 +976,8 @@ const de: Record<keyof typeof en, string> = {
   settingsUploadFromComputer: "Vom Computer hochladen",
   settingsWebUploadHint:
     "Öffne diese Adresse in einem Browser im selben WLAN, um PDFs und Audiodateien in Sprig abzulegen. Halte die App während der Übertragung geöffnet.",
+  settingsWebUploadCodeHint:
+    "Gib diesen Code am Computer ein, bevor du hochlädst. Er ändert sich bei jedem Serverstart, damit niemand sonst im Netzwerk Dateien in Sprig ablegen kann.",
   settingsRecentRequests: "Letzte Anfragen",
   settingsBackupRestore: "Sichern & Wiederherstellen",
   settingsWorking: "Arbeitet…",

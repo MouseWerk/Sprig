@@ -4,6 +4,7 @@ import { ACHIEVEMENTS, AchievementDef, evaluateAchievements } from './Achievemen
 import { CARD_IMG_DIR, extractImageFiles } from './CardImages';
 import { parseFlashcardsCsv, repairMispairedArrowCards } from './CsvParser';
 import { getDb } from './Database';
+import type { SQLiteDatabase } from 'expo-sqlite';
 import { levelForXp, rankForLevel, xpForGrade } from './Levels';
 
 export type DeckType = 'csv' | 'pdf';
@@ -657,14 +658,38 @@ export async function getCachedData<T>(id: string): Promise<T | null> {
         // Self-heal decks imported before arrow-separator support: their
         // cached cards hold two "q -> a" lines each. Re-split them and
         // persist the fix so every study mode sees the intended cards.
+        //
+        // The detection is a heuristic and cannot distinguish a genuinely
+        // broken deck from one whose content simply uses arrows on both sides
+        // (a deck of chemical reactions, say). Repairing rewrites the cards and
+        // drops the SRS rows, because the old indices no longer line up — so it
+        // is only ever applied to a deck that has no review history to lose.
+        // A deck already studied keeps its cards and its progress untouched.
         const repaired = repairMispairedArrowCards(cards);
-        if (repaired) {
+        if (repaired && await hasNoReviewHistory(db, id)) {
             await persistRepairedDeck(id, repaired);
             return repaired as unknown as T;
         }
         return cards as unknown as T;
     } catch {
         return null;
+    }
+}
+
+// True when nothing would be lost by re-indexing this deck's cards: no SM-2
+// rows, and no cards marked learned or unsure.
+async function hasNoReviewHistory(db: SQLiteDatabase, deckId: string): Promise<boolean> {
+    try {
+        const srs = await db.getFirstAsync<{ n: number }>(
+            'SELECT COUNT(*) AS n FROM srs WHERE deck_id = ?', deckId
+        );
+        if ((srs?.n ?? 0) > 0) return false;
+        const deck = await db.getFirstAsync<DeckRow>('SELECT * FROM decks WHERE id = ?', deckId);
+        if (!deck) return false;
+        return parseIndices(deck.learned_indices).length === 0
+            && parseIndices(deck.unsure_indices).length === 0;
+    } catch {
+        return false; // when in doubt, leave the deck alone
     }
 }
 

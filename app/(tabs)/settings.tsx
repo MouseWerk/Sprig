@@ -9,14 +9,14 @@ import { createBackup, importBackup } from '@/utils/Backup';
 import { cancelAllNotifications, cancelStreakReminder, scheduleStreakReminder } from '@/utils/Notifications';
 import { CARD_TEXT_SCALE_OPTIONS, DAILY_GOAL_OPTIONS, FOCUS_MINUTES_OPTIONS, HomeSectionId, Preferences, REMINDER_HOUR_MAX, REMINDER_HOUR_MIN, STUDY_SESSION_LENGTH_OPTIONS, getPrefsSync, resetPrefsCache, setPref, subscribePrefs } from '@/utils/Preferences';
 import { clearCardCache, wipeAllData } from '@/utils/Storage';
-import { getWebServerLog, getWebServerUrl, isWebServerRunning, isWebServerSupported, startWebServer, stopWebServer } from '@/utils/WebServer';
+import { getWebServerCode, getWebServerLog, getWebServerUrl, isWebServerRunning, isWebServerSupported, startWebServer, stopWebServer } from '@/utils/WebServer';
 import { STORE_URLS } from '@/constants/store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { Bell, ChevronDown, ChevronRight, ChevronUp, Clock, Coffee, Database, DownloadCloud, Eye, EyeOff, Github, Globe, Hash, Info, Layers, Leaf, Monitor, Moon, PlayCircle, ScrollText, Sprout, ShieldCheck, Smartphone, Star, Sun, Target, Timer, Trash2, UploadCloud, Vibrate, Wifi } from 'lucide-react-native';
+import { Bell, ChevronDown, ChevronRight, ChevronUp, Clock, Coffee, Database, DownloadCloud, Eye, EyeOff, Github, Globe, Hash, Info, KeyRound, Layers, Leaf, Monitor, Moon, PlayCircle, ScrollText, Sprout, ShieldCheck, Smartphone, Star, Sun, Target, Timer, Trash2, UploadCloud, Vibrate, Wifi } from 'lucide-react-native';
 import { DiscordIcon } from '@/components/DiscordIcon';
 import { TranslationKey } from '@/constants/translations';
 import React, { useEffect, useState } from 'react';
@@ -59,11 +59,15 @@ export default function SettingsScreen() {
   const [webServerOn, setWebServerOn] = useState(isWebServerRunning());
   const [webServerUrl, setWebServerUrl] = useState<string | null>(null);
   const [webServerLog, setWebServerLog] = useState<string[]>([]);
+  const [webServerCode, setWebServerCode] = useState<string | null>(null);
   useEffect(() => {
     if (!webServerOn) return;
     getWebServerUrl().then(setWebServerUrl);
     // Poll the request log so incoming connections are visible right here
-    const timer = setInterval(() => setWebServerLog(getWebServerLog()), 2000);
+    const timer = setInterval(() => {
+      setWebServerLog(getWebServerLog());
+      setWebServerCode(getWebServerCode());
+    }, 2000);
     return () => clearInterval(timer);
   }, [webServerOn]);
 
@@ -563,6 +567,19 @@ export default function SettingsScreen() {
               </View>
             </View>
           )}
+          {webServerOn && webServerCode && (
+            <View style={[styles.item, { backgroundColor: cardColor }]}>
+              <View style={[styles.iconContainer, { backgroundColor: secondaryBg }]}>
+                <KeyRound size={20} color={accentColor} strokeWidth={2.5} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.webServerCode, { color: textColor }]}>{webServerCode}</Text>
+                <Text style={[styles.itemHint, { color: mutedForeground }]}>
+                  {t('settingsWebUploadCodeHint')}
+                </Text>
+              </View>
+            </View>
+          )}
           {webServerOn && webServerLog.length > 0 && (
             <View style={[styles.item, { backgroundColor: cardColor, alignItems: 'flex-start' }]}>
               <View style={{ flex: 1 }}>
@@ -675,6 +692,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
+  },
+  webServerCode: {
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: 8,
+    fontVariant: ['tabular-nums'],
   },
   itemLabel: {
     flex: 1,

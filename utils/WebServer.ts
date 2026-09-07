@@ -22,6 +22,15 @@ export const WEB_SERVER_PORT = 8765;
 const MAX_BODY_BYTES = 4 * 1024 * 1024;         // per request
 const MAX_FILE_BYTES = 300 * 1024 * 1024;       // per assembled file
 const UPLOAD_TTL_MS = 5 * 60 * 1000;            // drop stale partial uploads
+// Anyone on the same network can reach this port, so a client has to know a
+// code shown on the phone before it can write anything. Not a secret worth
+// defending against a determined attacker on your own WiFi — it is there so a
+// stranger on a university or café network cannot drop files into your app.
+const PAIRING_CODE_LENGTH = 4;
+// Ceilings on work a client can make the phone hold open. Without them a peer
+// could open unlimited uploads and fill the device's storage with temp files.
+const MAX_CONCURRENT_UPLOADS = 3;
+const MAX_PENDING_BYTES = 400 * 1024 * 1024;
 
 type Kind = 'pdf' | 'audio';
 
@@ -36,6 +45,26 @@ interface PendingUpload {
 }
 
 let server: { close: () => void } | null = null;
+let pairingCode: string | null = null;
+
+// The code the user must type on the computer. Regenerated every time the
+// server starts, so stopping and restarting invalidates the old one.
+export function getWebServerCode(): string | null {
+    return pairingCode;
+}
+
+function newPairingCode(): string {
+    let code = '';
+    for (let i = 0; i < PAIRING_CODE_LENGTH; i++) code += Math.floor(Math.random() * 10);
+    return code;
+}
+
+function pendingBytes(): number {
+    let total = 0;
+    for (const u of uploads.values()) total += u.bytes;
+    return total;
+}
+
 const uploads = new Map<string, PendingUpload>();
 let sweepTimer: ReturnType<typeof setInterval> | null = null;
 let tempSeq = 0;
@@ -112,10 +141,21 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
         const toBuffer = (data: unknown): Buffer => {
             if (Buffer.isBuffer(data)) return data;
             if (data instanceof Uint8Array) return Buffer.from(data);
+            if (Array.isArray(data)) return Buffer.from(data as number[]);
             const s = String(data);
             if (base64Mode) return Buffer.from(s.replace(/\s+/g, ''), 'base64');
             return Buffer.from(s, 'utf8');
         };
+
+        // Buffer.subarray() does not preserve the Buffer prototype in this
+        // runtime: the result is a plain Uint8Array, whose toString() ignores
+        // the encoding argument and renders "80,79,83,..." instead of decoding
+        // the bytes. Every request therefore failed the "is this HTTP?" check
+        // and silently fell back to serving the upload page, so no upload could
+        // ever complete on iOS. Read ranges through Buffer#toString(enc, s, e),
+        // which never goes through subarray.
+        const readText = (b: Buffer, start = 0, end = b.length): string =>
+            b.toString('utf8', start, end);
 
         let loggedFirstChunk = false;
 
@@ -124,7 +164,7 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
                 if (!loggedFirstChunk) {
                     loggedFirstChunk = true;
                     const kind = Buffer.isBuffer(data) ? 'buffer' : data instanceof Uint8Array ? 'bytes' : typeof data;
-                    const preview = toBuffer(data).subarray(0, 60).toString('utf8').replace(/[^\x20-\x7e]/g, '·');
+                    const preview = readText(toBuffer(data), 0, 60).replace(/[^\x20-\x7e]/g, '·');
                     logRequest(`in (${kind}): ${preview}`);
                 }
 
@@ -132,9 +172,9 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
 
                 // If the first chunk was a string that doesn't look like HTTP,
                 // it is almost certainly base64-encoded — reinterpret once.
-                if (!base64Mode && typeof data === 'string' && headerEnd < 0 && !buf.subarray(0, 200).toString('utf8').includes('HTTP/')) {
+                if (!base64Mode && typeof data === 'string' && headerEnd < 0 && !readText(buf, 0, 200).includes('HTTP/')) {
                     const decoded = Buffer.from(buf.toString('utf8').replace(/\s+/g, ''), 'base64');
-                    if (decoded.subarray(0, 200).toString('utf8').includes('HTTP/')) {
+                    if (readText(decoded, 0, 200).includes('HTTP/')) {
                         base64Mode = true;
                         buf = decoded;
                         logRequest('note: chunks arrive base64-encoded');
@@ -146,14 +186,16 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
                     // seen from some clients between keep-alive requests).
                     let skip = 0;
                     while (skip < buf.length && (buf[skip] === 13 || buf[skip] === 10)) skip++;
-                    if (skip > 0) buf = buf.subarray(skip);
+                    // Buffer.from() because subarray() would hand back a plain
+                    // Uint8Array, losing indexOf('\r\n\r\n') and toString(enc).
+                    if (skip > 0) buf = Buffer.from(buf.subarray(skip));
 
                     headerEnd = buf.indexOf('\r\n\r\n');
                     if (headerEnd < 0) {
                         if (buf.length > 64 * 1024) socket.destroy();
                         return;
                     }
-                    const head = buf.subarray(0, headerEnd).toString('utf8');
+                    const head = readText(buf, 0, headerEnd);
                     const m = /content-length:\s*(\d+)/i.exec(head);
                     contentLength = m ? parseInt(m[1], 10) : 0;
                     if (contentLength > MAX_BODY_BYTES) {
@@ -165,8 +207,8 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
                 const bodyStart = headerEnd + 4;
                 if (buf.length < bodyStart + contentLength) return; // wait for more
 
-                const head = buf.subarray(0, headerEnd).toString('utf8');
-                const body = buf.subarray(bodyStart, bodyStart + contentLength).toString('utf8');
+                const head = readText(buf, 0, headerEnd);
+                const body = readText(buf, bodyStart, bodyStart + contentLength);
                 const requestLine = head.split('\r\n').map(l => l.trim()).find(l => l.length > 0) || '';
 
                 if (!/HTTP\//i.test(requestLine)) {
@@ -197,6 +239,7 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
     (server as any).on?.('error', (e: unknown) => {
         logRequest(`server error: ${String(e).slice(0, 80)}`);
     });
+    pairingCode = newPairingCode();
     (server as any).listen({ port: WEB_SERVER_PORT, host: '0.0.0.0' });
     logRequest(`server listening on :${WEB_SERVER_PORT}`);
 
@@ -216,6 +259,7 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
 }
 
 export function stopWebServer(): void {
+    pairingCode = null;
     if (server) {
         try { server.close(); } catch { /* already closed */ }
         server = null;
@@ -228,7 +272,12 @@ export function stopWebServer(): void {
 }
 
 function respond(socket: any, status: number, type: string, body: string) {
-    const statusText = status === 200 ? 'OK' : status === 404 ? 'Not Found' : status === 409 ? 'Conflict' : status === 413 ? 'Payload Too Large' : 'Error';
+    const statusText = status === 200 ? 'OK'
+        : status === 401 ? 'Unauthorized'
+            : status === 404 ? 'Not Found'
+                : status === 409 ? 'Conflict'
+                    : status === 413 ? 'Payload Too Large'
+                        : status === 429 ? 'Too Many Requests' : 'Error';
     const payload = Buffer.from(body, 'utf8');
     socket.write(
         `HTTP/1.1 ${status} ${statusText}\r\n` +
@@ -268,14 +317,22 @@ async function handleRequest(
     }
 
     if (method === 'POST' && path === '/upload') {
-        let msg: { uploadId?: string; name?: string; kind?: string; index?: number; total?: number; data?: string };
+        let msg: { uploadId?: string; name?: string; kind?: string; index?: number; total?: number; data?: string; code?: string };
         try {
             msg = JSON.parse(body);
         } catch {
             respond(socket, 400, 'application/json', '{"error":"bad json"}');
             return;
         }
-        const { uploadId, name, kind, index, total, data } = msg;
+        const { uploadId, name, kind, index, total, data, code } = msg;
+
+        // Nothing is written before the client proves it can see the phone.
+        if (!pairingCode || code !== pairingCode) {
+            logRequest('rejected: wrong or missing code');
+            respond(socket, 401, 'application/json', '{"error":"wrong code — check the four digits shown in Sprig"}');
+            return;
+        }
+
         if (!uploadId || !name || (kind !== 'pdf' && kind !== 'audio') || typeof index !== 'number' || typeof total !== 'number' || typeof data !== 'string') {
             respond(socket, 400, 'application/json', '{"error":"missing fields"}');
             return;
@@ -283,6 +340,14 @@ async function handleRequest(
 
         let u = uploads.get(uploadId);
         if (!u) {
+            if (uploads.size >= MAX_CONCURRENT_UPLOADS) {
+                respond(socket, 429, 'application/json', '{"error":"too many uploads at once — let the current ones finish"}');
+                return;
+            }
+            if (pendingBytes() >= MAX_PENDING_BYTES) {
+                respond(socket, 429, 'application/json', '{"error":"too much data in flight — let the current ones finish"}');
+                return;
+            }
             if (index !== 0) {
                 // The server lost this upload's state (restart, expiry). Tell
                 // the page honestly instead of counting from scratch.
@@ -396,6 +461,10 @@ const UPLOAD_PAGE = `<!DOCTYPE html>
   :root { --ink:#0f172a; --muted:#f1f5f9; --muted-fg:#64748b; --border:#e2e8f0; --green:#22c55e; --red:#ef4444; }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { background:#fff; color:var(--ink); font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .code { display:flex; align-items:center; gap:12px; margin:0 0 18px; padding:12px 14px; border:1px solid var(--border); border-radius:14px; }
+  .code span { color:var(--muted-fg); font-size:14px; }
+  .code input { margin-left:auto; width:96px; padding:8px 10px; border:1px solid var(--border); border-radius:10px; font:600 18px/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:4px; text-align:center; color:var(--ink); }
+  .code input:focus { outline:2px solid var(--ink); outline-offset:1px; }
   .card { width:100%; max-width:520px; }
   h1 { font-size:1.6rem; letter-spacing:-.02em; margin-bottom:6px; }
   p.sub { color:var(--muted-fg); margin-bottom:28px; }
@@ -419,6 +488,11 @@ const UPLOAD_PAGE = `<!DOCTYPE html>
   <h1>Drop files into Sprig</h1>
   <p class="sub">Files land directly on your phone — nothing leaves your network.</p>
 
+  <label class="code">
+    <span>Code shown in Sprig</span>
+    <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="0000" autocomplete="off">
+  </label>
+
   <div class="zone" id="zonePdf">
     <strong>Add PDFs</strong>
     <span>Click or drag PDF documents here</span>
@@ -437,6 +511,8 @@ const UPLOAD_PAGE = `<!DOCTYPE html>
 <script>
 const CHUNK = 1050000; // ~1MB and a multiple of 3, so per-chunk base64 strings concatenate into valid base64
 const list = document.getElementById('list');
+const codeInput = document.getElementById('code');
+codeInput.addEventListener('input', () => { codeInput.value = codeInput.value.replace(/\D/g, ''); });
 
 function wire(zoneId, inputId, kind) {
   const zone = document.getElementById(zoneId);
@@ -463,6 +539,13 @@ function row(name) {
 }
 
 async function upload(file, kind) {
+  if (codeInput.value.length !== 4) {
+    codeInput.focus();
+    const el = row(file.name);
+    el.classList.add('error');
+    el.querySelector('.status').textContent = 'Enter the code first';
+    return;
+  }
   const el = row(file.name);
   const bar = el.querySelector('.bar i');
   const status = el.querySelector('.status');
@@ -476,7 +559,7 @@ async function upload(file, kind) {
       const res = await fetch('/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uploadId: id, name: file.name, kind, index: i, total, data: b64 })
+        body: JSON.stringify({ uploadId: id, name: file.name, kind, index: i, total, data: b64, code: codeInput.value })
       });
       let json = null;
       try { json = await res.json(); } catch (e) { /* non-JSON reply */ }
