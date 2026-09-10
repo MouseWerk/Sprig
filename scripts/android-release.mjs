@@ -146,9 +146,19 @@ async function main() {
       }
     }
 
-    await api(token, 'PUT', `${API}/edits/${edit.id}/tracks/${args.track}`, {
-      body: { track: args.track, releases: [{ name: versionName, versionCodes: [String(bundle.versionCode)], status: args.status, releaseNotes: notes }] },
-    });
+    try {
+      await api(token, 'PUT', `${API}/edits/${edit.id}/tracks/${args.track}`, {
+        body: { track: args.track, releases: [{ name: versionName, versionCodes: [String(bundle.versionCode)], status: args.status, releaseNotes: notes }] },
+      });
+    } catch (err) {
+      if (args.track === 'production' && /FAILED_PRECONDITION/.test(err.message)) {
+        throw new Error(`${err.message}\n\nPlay refuses writes to the production track — for a personal developer account ` +
+          `that almost always means production access hasn't been granted yet (Play Console → Dashboard → ` +
+          `"Zugriff auf die Produktionsversion beantragen"; Google reviews the request for up to ~7 days). ` +
+          `Nothing was changed. Re-run this command once the approval email arrives.`);
+      }
+      throw err;
+    }
     console.log(`Track:    "${args.track}" now points at ${bundle.versionCode}`);
 
     await api(token, 'POST', `${API}/edits/${edit.id}:validate`);
