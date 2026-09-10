@@ -18,7 +18,7 @@ import {
 } from '@/utils/Storage';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { CalendarDays, Check, ChevronRight, Droplet, Droplets, Fence, Flower2, Footprints, Grid3x3, Lamp, Moon, Snowflake, Sprout, Stone, Sun, TreeDeciduous, X } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -83,11 +83,17 @@ export default function GroveScreen() {
     const boostActive = econ ? Date.now() < econ.boostUntil : false;
     const boostMinutesLeft = econ && boostActive ? Math.max(1, Math.ceil((econ.boostUntil - Date.now()) / 60000)) : 0;
 
+    const collectingRef = useRef(false);
     const handleCollect = async () => {
-        if (pending <= 0) return;
-        const result = await collectDew(plants);
-        setEcon(prev => prev ? { ...prev, dew: result.balance, lastCollectedAt: Date.now() } : prev);
-        showToast({ message: t('groveCollected').replace('{n}', String(result.collected)), type: 'success' });
+        if (pending <= 0 || collectingRef.current) return;
+        collectingRef.current = true;
+        try {
+            const result = await collectDew(plants);
+            setEcon(prev => prev ? { ...prev, dew: result.balance, lastCollectedAt: Date.now() } : prev);
+            showToast({ message: t('groveCollected').replace('{n}', String(result.collected)), type: 'success' });
+        } finally {
+            collectingRef.current = false;
+        }
     };
 
     const handleBuyFreeze = async () => {

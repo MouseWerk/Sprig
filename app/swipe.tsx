@@ -7,7 +7,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { CheckCircle2, Droplet, Edit3, FileWarning, HelpCircle, Sprout, Sun, Trophy, Undo2, Volume2, XCircle, Zap } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashcardSwipe } from '../components/FlashcardSwipe';
 import { FocusPlant } from '../components/FocusPlant';
@@ -18,7 +18,8 @@ import { useToast } from '../components/ui/Toast';
 import { FlashcardData, parseFlashcardsCsv } from '../utils/CsvParser';
 import { xpForGrade } from '../utils/Levels';
 import { scheduleStreakReminder } from '../utils/Notifications';
-import { applySwipeResult, getCachedData, getDecks, restoreCardSRS, revertUserStats, setCachedData, SRSCardData, updateCardInDeck, updateDeckProgress, updateUserStats } from '../utils/Storage';
+import { refreshAllPinnedWidgets } from '../utils/PinnedDeck';
+import { applySwipeResult, getCachedData, getDecks, restoreCardSRS, revertUserStats, saveReflection, setCachedData, SRSCardData, updateCardInDeck, updateDeckProgress, updateUserStats } from '../utils/Storage';
 import { migrateKey } from '../utils/StorageMigration';
 import { getPrefsSync, subscribePrefs } from '../utils/Preferences';
 import { nextTodayEntry, peekNextTodayEntry } from '../utils/TodayPlan';
@@ -56,6 +57,16 @@ export default function SwipeScreen() {
     const isTodaySession = today === '1';
     const nextToday = isTodaySession ? peekNextTodayEntry() : null;
 
+    // "Done" / "Stop for today" / the error screen's back button. A session
+    // opened straight from the home-screen widget on a cold start (see
+    // app/study.tsx) has nothing beneath it in the stack, so a plain
+    // router.back() would silently do nothing — fall back to Home, whose
+    // focus effect also pushes the fresh due count out to the widgets.
+    const leaveSession = () => {
+        if (router.canGoBack()) router.back();
+        else router.replace('/');
+    };
+
     const handleNextTodayDeck = () => {
         const next = nextTodayEntry();
         if (!next) return;
@@ -86,6 +97,8 @@ export default function SwipeScreen() {
     const [sessionBoosted, setSessionBoosted] = useState(false);
     const [stageUp, setStageUp] = useState<StageUp | null>(null);
     const [sessionComplete, setSessionComplete] = useState(false);
+    const [reflectionNote, setReflectionNote] = useState('');
+    const [reflectionSaved, setReflectionSaved] = useState(false);
     const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
     const [isFlipped, setIsFlipped] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -231,6 +244,16 @@ export default function SwipeScreen() {
             newShuffled[currentShuffledIdx] = updatedCard;
             setShuffledCards(newShuffled);
         }
+
+        // Also update the base list "Study Again" reshuffles from, so the
+        // edit survives a session restart instead of reverting.
+        setCards(prev => {
+            const idx = prev.findIndex(c => c.originalIndex === originalIndex);
+            if (idx === -1) return prev;
+            const next = [...prev];
+            next[idx] = updatedCard;
+            return next;
+        });
 
         // 2. Persist to disk (only the card fields, not session metadata)
         await updateCardInDeck(id, originalIndex, { question: updatedCard.question, answer: updatedCard.answer });
@@ -400,6 +423,7 @@ export default function SwipeScreen() {
     };
 
     const handleRestartSession = () => {
+        handleSaveReflection();
         setShuffledCards(shuffleArray(cards));
         setCurrentIndex(0);
         setSessionReviewed(0);
@@ -414,8 +438,39 @@ export default function SwipeScreen() {
         statsBySwipeRef.current.clear();
         setSessionComplete(false);
         setIsFlipped(false);
+        setReflectionNote('');
+        setReflectionSaved(false);
         lastActionRef.current = Date.now();
     };
+
+    const handleSaveReflection = () => {
+        const note = reflectionNote.trim();
+        if (!note || reflectionSaved || !id) return;
+        setReflectionSaved(true);
+        saveReflection({
+            deckId: id,
+            deckName: name || t('swipeFlashcards'),
+            note,
+            cardsReviewed: sessionReviewed,
+            accuracy,
+        }).catch(() => setReflectionSaved(false));
+    };
+
+    // Safety net for the hardware back button / swipe-back gesture: those can
+    // unmount this screen without the reflection field's onBlur ever firing,
+    // silently dropping the note. Mirror the latest values into a ref every
+    // render so the unmount cleanup (registered once) can still flush them.
+    const reflectionFlushRef = useRef({ note: '', saved: false, deckId: id, deckName: name, reviewed: sessionReviewed, accuracy });
+    reflectionFlushRef.current = { note: reflectionNote, saved: reflectionSaved, deckId: id, deckName: name, reviewed: sessionReviewed, accuracy };
+    useEffect(() => {
+        return () => {
+            const { note, saved, deckId, deckName, reviewed, accuracy: acc } = reflectionFlushRef.current;
+            const trimmed = note.trim();
+            if (trimmed && !saved && deckId) {
+                saveReflection({ deckId, deckName: deckName || 'Flashcards', note: trimmed, cardsReviewed: reviewed, accuracy: acc }).catch(() => { });
+            }
+        };
+    }, []);
 
     // When the session ends, check whether this deck's grove plant grew a
     // stage — wait for the last swipe's SRS write to land first.
@@ -425,6 +480,9 @@ export default function SwipeScreen() {
         (async () => {
             try {
                 await pendingPersistRef.current;
+                // The due count just changed — push it to any home-screen
+                // widgets now rather than waiting for the next visit to Home.
+                refreshAllPinnedWidgets().catch(() => { });
                 const ups = await detectStageUps();
                 if (cancelled) return;
                 const mine = ups.find(u => u.deckId === id);
@@ -490,7 +548,7 @@ export default function SwipeScreen() {
                     <Text style={[styles.errorSub, { color: mutedForeground }]}>{t(error)}</Text>
                     <Button
                         title={t('swipeGoBack')}
-                        onPress={() => router.back()}
+                        onPress={leaveSession}
                         style={styles.errorButton}
                     />
                 </View>
@@ -572,20 +630,36 @@ export default function SwipeScreen() {
                     <Text style={[styles.resultSub, { color: mutedForeground }]}>
                         {t(sessionReviewed === 1 ? 'swipeReviewedOne' : 'swipeReviewedMany').replace('{n}', String(sessionReviewed))}
                     </Text>
+                    <View style={[styles.reflectionCard, { backgroundColor: secondaryBg }]}>
+                        <Text style={[styles.reflectionLabel, { color: mutedForeground }]}>
+                            {reflectionSaved ? t('swipeReflectionSaved') : t('swipeReflectionPrompt')}
+                        </Text>
+                        <TextInput
+                            style={[styles.reflectionInput, { color: textColor }]}
+                            value={reflectionNote}
+                            onChangeText={(text) => { setReflectionNote(text); setReflectionSaved(false); }}
+                            onBlur={handleSaveReflection}
+                            onSubmitEditing={handleSaveReflection}
+                            placeholder={t('swipeReflectionPlaceholder')}
+                            placeholderTextColor={mutedForeground}
+                            selectionColor={primaryColor}
+                            returnKeyType="done"
+                        />
+                    </View>
                     <View style={[styles.buttonGroup, { gap: 12 }]}>
                         {isTodaySession && nextToday ? (
                             <>
                                 <Button
                                     title={t('swipeNext').replace('{name}', nextToday.deckName).replace('{n}', String(nextToday.cardIndices.length))}
-                                    onPress={handleNextTodayDeck}
+                                    onPress={() => { handleSaveReflection(); handleNextTodayDeck(); }}
                                     style={styles.actionButton}
                                 />
-                                <Button title={t('swipeStopForToday')} variant="secondary" onPress={() => router.back()} style={styles.actionButton} />
+                                <Button title={t('swipeStopForToday')} variant="secondary" onPress={() => { handleSaveReflection(); leaveSession(); }} style={styles.actionButton} />
                             </>
                         ) : (
                             <>
                                 <Button title={t('swipeStudyAgain')} onPress={handleRestartSession} style={styles.actionButton} />
-                                <Button title={t('swipeDone')} variant="secondary" onPress={() => router.back()} style={styles.actionButton} />
+                                <Button title={t('swipeDone')} variant="secondary" onPress={() => { handleSaveReflection(); leaveSession(); }} style={styles.actionButton} />
                             </>
                         )}
                     </View>
@@ -830,6 +904,22 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         marginTop: 32,
         marginBottom: 16,
+    },
+    reflectionCard: {
+        width: '100%',
+        borderRadius: 20,
+        padding: 16,
+        marginBottom: 20,
+    },
+    reflectionLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        marginBottom: 6,
+    },
+    reflectionInput: {
+        fontSize: 15,
+        fontWeight: '500',
+        padding: 0,
     },
     earnRow: {
         flexDirection: 'row',

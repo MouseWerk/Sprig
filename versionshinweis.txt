@@ -1,14 +1,12 @@
 <en-US>
-- Added an Android home-screen widget: pin a deck in Sprig and see its due count right on your home screen, tap to jump straight into studying
-- Expanded the Grove shop: 3 new planters and 3 new grove decorations, and you can now display multiple decorations on your shelf at once instead of just one
-- Added Settings controls to customize Quiz/Type session length and to reorder or hide the Grove, Focus Session and My Decks sections on Home
-- Added a Card Text Size setting (S/M/L/XL) for study sessions
-- Fixed rename/create text fields (decks, folders, PDFs, audio) sitting misaligned in their input box
+- Fixed the Android home-screen widget being invisible and redesigned it: deck icon, live due count, mastery progress, and a tap that reliably opens your session
+- Widgets can be pinned to different decks, as many as you like, and shrink to a compact icon-only size
+- Added a per-deck Notebook, and an optional post-session reflection with a log in Stats
+- Fixed bugs where editing/deleting a card, fast swiping, or collecting Grove dew could corrupt or double-count progress
 </en-US>
 <de-DE>
-- Android-Startbildschirm-Widget hinzugefügt: Hefte ein Deck in Sprig an und sieh die Anzahl fälliger Karten direkt auf deinem Startbildschirm — antippen startet sofort das Lernen
-- Garten-Shop erweitert: 3 neue Pflanzgefäße und 3 neue Garten-Dekorationen; außerdem können jetzt mehrere Dekorationen gleichzeitig angezeigt werden statt nur einer
-- Einstellungen hinzugefügt, um die Quiz-/Tipp-Sitzungslänge anzupassen und die Bereiche Garten, Fokus-Sitzung und Meine Decks auf der Startseite neu zu ordnen oder auszublenden
-- Einstellung für die Kartentextgröße (S/M/L/XL) für Lernsitzungen hinzugefügt
-- Fehler behoben: Text in Umbenennen-/Erstellen-Feldern (Decks, Ordner, PDFs, Audio) war im Eingabefeld falsch ausgerichtet
+- Android-Widget war unsichtbar — behoben und neu gestaltet: Symbol, stets aktuelle fällige Karten, Fortschritt, und Antippen startet die Sitzung zuverlässig
+- Widgets lassen sich an verschiedene Decks anheften, beliebig viele, und bis auf Symbolgröße verkleinern
+- Neues Notizbuch pro Deck, plus optionale Reflexion nach der Lernsitzung mit Verlauf in den Statistiken
+- Fehler behoben: Karten bearbeiten/löschen, schnelles Wischen und Tau sammeln konnten den Fortschritt verfälschen
 </de-DE>

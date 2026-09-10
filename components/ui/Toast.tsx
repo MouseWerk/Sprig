@@ -48,8 +48,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 duration: 250,
                 useNativeDriver: true,
             }),
-        ]).start(() => {
-            setToast(null);
+        ]).start(({ finished }) => {
+            // A newer showToast() interrupts this animation (same shared
+            // opacity/translateY values) to play its own show animation —
+            // that invokes this callback with finished:false. Nulling the
+            // toast in that case would erase the new toast that showToast()
+            // just set, right after it set it.
+            if (finished) setToast(null);
         });
     }, [opacity, translateY]);
 

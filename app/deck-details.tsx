@@ -3,14 +3,14 @@ import { TranslationKey } from '@/constants/translations';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
-import { ConfusionPair, Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getConfusionPairs, getDecks, importCsvToDeck, localDateKey, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckExamDate, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
+import { ConfusionPair, Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getConfusionPairs, getDecks, importCsvToDeck, localDateKey, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckExamDate, updateDeckNotes, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from '@/utils/AppHaptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { ArrowLeftRight, CalendarDays, CheckCircle2, Circle, Edit2, FileUp, FileWarning, GalleryVerticalEnd, HelpCircle, Keyboard, ListChecks, Play, Plus, RotateCcw, Search, Share2, Trash2, X, Zap } from 'lucide-react-native';
+import { ArrowLeftRight, CalendarDays, CheckCircle2, Circle, Edit2, FileUp, FileWarning, GalleryVerticalEnd, HelpCircle, Keyboard, ListChecks, NotebookPen, Play, Plus, RotateCcw, Search, Share2, Trash2, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import MarkdownRenderer from '../components/MarkdownRenderer';
 import { isImageToken } from '@/utils/CardImages';
 import { toDisplayText } from '@/utils/CardText';
 import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 import { BottomSheet } from '../components/ui/BottomSheet';
 import { useConfirm } from '../components/ui/ConfirmDialog';
 
@@ -51,6 +52,10 @@ export default function DeckDetailsScreen() {
     const [cardSearch, setCardSearch] = useState('');
     const [filterMode, setFilterMode] = useState<'all' | 'learned' | 'unsure' | 'new'>('all');
     const [confusions, setConfusions] = useState<ConfusionPair[]>([]);
+
+    const [notebookVisible, setNotebookVisible] = useState(false);
+    const [notebookEditing, setNotebookEditing] = useState(false);
+    const [notesDraft, setNotesDraft] = useState('');
 
     const backgroundColor = useThemeColor({}, 'background');
     const cardColor = useThemeColor({}, 'card');
@@ -97,6 +102,25 @@ export default function DeckDetailsScreen() {
             loadDeckData();
         }, [id])
     );
+
+    const openNotebook = () => {
+        setNotesDraft(deck?.notes || '');
+        setNotebookEditing(!deck?.notes);
+        setNotebookVisible(true);
+    };
+
+    const handleSaveNotebook = async () => {
+        if (!id) return;
+        try {
+            await updateDeckNotes(id, notesDraft);
+            setDeck(prev => prev ? { ...prev, notes: notesDraft } : prev);
+            setNotebookEditing(false);
+            showToast({ message: t('deckDetailsNotebookSaved'), type: 'success' });
+        } catch (e) {
+            console.error('Error saving deck notes:', e);
+            showToast({ message: t('error'), type: 'error' });
+        }
+    };
 
     const handleAddCard = async () => {
         if (!newQuestion.trim() || !newAnswer.trim() || !id) return;
@@ -178,6 +202,8 @@ export default function DeckDetailsScreen() {
         });
         if (!ok || !id) return;
         await deleteCardFromDeck(id, index);
+        setEditModalVisible(false);
+        setEditingIndex(null);
         const updatedCards = await getCachedData<FlashcardData[]>(id);
         if (updatedCards) setCards(updatedCards);
 
@@ -486,6 +512,14 @@ export default function DeckDetailsScreen() {
                                 <View style={styles.deckTitleRow}>
                                     <Text style={[styles.deckTitleLarge, { color: textColor }]} numberOfLines={2}>{deck.name}</Text>
                                     <View style={styles.deckActions}>
+                                        <TouchableOpacity
+                                            style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
+                                            onPress={openNotebook}
+                                            accessibilityLabel={t('deckDetailsNotebook')}
+                                            accessibilityRole="button"
+                                        >
+                                            <NotebookPen size={15} color={accentColor} strokeWidth={3} />
+                                        </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
                                             onPress={handleExportDeck}
@@ -940,6 +974,65 @@ export default function DeckDetailsScreen() {
                             </View>
                         </ScrollView>
             </BottomSheet>
+
+            {/* Notebook */}
+            <BottomSheet
+                visible={notebookVisible}
+                onClose={() => setNotebookVisible(false)}
+                sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
+            >
+                <View style={styles.modalHeader}>
+                    <Text style={[styles.modalTitle, { color: textColor }]}>{t('deckDetailsNotebook')}</Text>
+                    <TouchableOpacity onPress={() => setNotebookVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+                        <X size={20} color={textColor} />
+                    </TouchableOpacity>
+                </View>
+
+                <View style={[styles.notebookToggleRow, { backgroundColor: secondaryBg }]}>
+                    <TouchableOpacity
+                        style={[styles.notebookToggleBtn, notebookEditing && { backgroundColor: accentColor }]}
+                        onPress={() => setNotebookEditing(true)}
+                    >
+                        <Text style={[styles.notebookToggleText, { color: notebookEditing ? primaryForeground : mutedForeground }]}>
+                            {t('deckDetailsNotebookEdit')}
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.notebookToggleBtn, !notebookEditing && { backgroundColor: accentColor }]}
+                        onPress={() => setNotebookEditing(false)}
+                    >
+                        <Text style={[styles.notebookToggleText, { color: !notebookEditing ? primaryForeground : mutedForeground }]}>
+                            {t('deckDetailsNotebookPreview')}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 16 }}>
+                    {notebookEditing ? (
+                        <Input
+                            value={notesDraft}
+                            onChangeText={setNotesDraft}
+                            placeholder={t('deckDetailsNotebookPlaceholder')}
+                            multiline
+                            inputStyle={{ minHeight: 260 }}
+                        />
+                    ) : notesDraft.trim().length > 0 ? (
+                        <MarkdownRenderer content={notesDraft} fontSize={16} />
+                    ) : (
+                        <Text style={{ color: mutedForeground, fontSize: 14, textAlign: 'center', marginTop: 24 }}>
+                            {t('deckDetailsNotebookEmpty')}
+                        </Text>
+                    )}
+                </ScrollView>
+
+                {notebookEditing && (
+                    <Button
+                        title={t('saveChanges')}
+                        onPress={handleSaveNotebook}
+                        style={{ marginTop: 16, height: 56, borderRadius: 16 }}
+                    />
+                )}
+            </BottomSheet>
         </View>
     );
 }
@@ -1258,6 +1351,22 @@ const styles = StyleSheet.create({
         fontSize: 22,
         fontWeight: '900',
         letterSpacing: -0.5,
+    },
+    notebookToggleRow: {
+        flexDirection: 'row',
+        borderRadius: 12,
+        padding: 4,
+        gap: 4,
+    },
+    notebookToggleBtn: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 10,
+        borderRadius: 9,
+    },
+    notebookToggleText: {
+        fontSize: 14,
+        fontWeight: '700',
     },
     modalSubtitle: {
         fontSize: 12,

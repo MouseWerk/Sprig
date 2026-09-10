@@ -139,7 +139,13 @@ export default function QuizScreen() {
         updateUserStats(1, delta, correct ? 5 : 0).catch(() => { });
     };
 
+    const advancingRef = useRef(false);
     const handleNext = () => {
+        // A fast double-tap can fire before the re-render that hides this
+        // button (once `answered` flips false) reaches the screen, which
+        // would otherwise advance `index` by 2 and silently skip a question.
+        if (advancingRef.current) return;
+        advancingRef.current = true;
         if (index + 1 >= questions.length) {
             setDone(true);
             // Count the finished round for achievements + a small XP bonus
@@ -147,6 +153,7 @@ export default function QuizScreen() {
         } else {
             setIndex(i => i + 1);
             setSelected(null);
+            advancingRef.current = false;
         }
     };
 
@@ -155,6 +162,7 @@ export default function QuizScreen() {
         setSelected(null);
         setScore(0);
         setDone(false);
+        advancingRef.current = false;
         lastTickRef.current = Date.now();
         // Re-shuffle by nudging cards reference
         setCards(c => (c ? [...c] : c));

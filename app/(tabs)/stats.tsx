@@ -5,7 +5,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { ACHIEVEMENTS, unlockedCount } from '@/utils/Achievements';
 import { toDisplayText } from '@/utils/CardText';
 import { getLevelInfo } from '@/utils/Levels';
-import { getDecks, getHardestCards, getUserStats, HardCard, localDateKey, UserStats } from '@/utils/Storage';
+import { getDecks, getHardestCards, getRecentReflections, getUserStats, HardCard, localDateKey, ReflectionEntry, UserStats } from '@/utils/Storage';
 import { startTodaySession, TodayDeckEntry } from '@/utils/TodayPlan';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Award, BookOpen, Brain, ChevronRight, Clock, Database, Flame, Snowflake, TrendingUp, Zap } from 'lucide-react-native';
@@ -66,18 +66,31 @@ export default function StatsScreen() {
     const [stats, setStats] = useState<UserStats | null>(null);
     const [deckCount, setDeckCount] = useState(0);
     const [hardest, setHardest] = useState<HardCard[]>([]);
+    const [reflections, setReflections] = useState<ReflectionEntry[]>([]);
 
     useFocusEffect(
         useCallback(() => {
-            Promise.all([getUserStats(), getDecks(), getHardestCards(8)])
-                .then(([userStats, decks, hard]) => {
+            Promise.all([getUserStats(), getDecks(), getHardestCards(8), getRecentReflections(5)])
+                .then(([userStats, decks, hard, recentReflections]) => {
                     setStats(userStats);
                     setDeckCount(decks.length);
                     setHardest(hard);
+                    setReflections(recentReflections);
                 })
                 .catch(() => { });
         }, [])
     );
+
+    const formatReflectionDate = (ts: number): string => {
+        const date = new Date(ts);
+        const today = new Date();
+        const yesterday = new Date();
+        yesterday.setDate(today.getDate() - 1);
+        const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+        if (sameDay(date, today)) return t('statsToday');
+        if (sameDay(date, yesterday)) return t('statsYesterday');
+        return date.toLocaleDateString();
+    };
 
     // Drill all listed hard cards, grouped per deck and chained like a
     // Today session.
@@ -216,6 +229,24 @@ export default function StatsScreen() {
                                     <View style={{ flex: 1 }}>
                                         <Text style={[styles.hardQuestion, { color: textColor }]} numberOfLines={1}>{toDisplayText(c.question)}</Text>
                                         <Text style={[styles.hardDeck, { color: mutedForeground }]} numberOfLines={1}>{c.deckName}</Text>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    </>
+                )}
+
+                {reflections.length > 0 && (
+                    <>
+                        <SectionHeader title={t('statsReflectionsTitle')} />
+                        <View style={styles.group}>
+                            {reflections.map(r => (
+                                <View key={r.id} style={[styles.item, { backgroundColor: cardColor }]}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.hardQuestion, { color: textColor }]} numberOfLines={2}>{r.note}</Text>
+                                        <Text style={[styles.hardDeck, { color: mutedForeground }]} numberOfLines={1}>
+                                            {r.deckName} · {formatReflectionDate(r.createdAt)}
+                                        </Text>
                                     </View>
                                 </View>
                             ))}

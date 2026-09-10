@@ -135,6 +135,25 @@ export async function cancelStreakReminder(): Promise<void> {
     }
 }
 
+// On Android the app deliberately drops expo-notifications' BOOT_COMPLETED
+// receiver (see plugins/withoutBootCompletedForegroundServices.js), so a
+// reboot silently clears the daily reminder's alarm. Re-arm it on every app
+// launch instead — but only when notifications are already granted, so this
+// never surfaces the system permission prompt on its own; that stays with
+// the moments that already ask (finishing a session, toggling the setting).
+export async function rearmStreakReminderOnLaunch(): Promise<void> {
+    if (Platform.OS !== 'android') return;
+    try {
+        const prefs = await getPrefs();
+        if (!prefs.streakReminderEnabled) return;
+        const { status } = await Notifications.getPermissionsAsync();
+        if (status !== 'granted') return;
+        await scheduleStreakReminder();
+    } catch {
+        // ignore — nice-to-have
+    }
+}
+
 // Keep the daily "study reminder" in sync with the preferences: a repeating
 // notification at the user's chosen hour, replacing any previously scheduled
 // one. No-op (and clears any pending one) when the preference is off.

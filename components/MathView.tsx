@@ -10,8 +10,17 @@ interface MathViewProps {
 }
 
 const MathView: React.FC<MathViewProps> = ({ math, inline = false, color = '#000', fontSize = 16 }) => {
-    // Escape backslashes for JS string
-    const escapedMath = math.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    // Escape for embedding inside a single-quoted JS string literal in the
+    // generated HTML below: backslashes/quotes for JS syntax, raw newlines
+    // (e.g. from a pasted multi-line LaTeX block) which would otherwise
+    // produce an unterminated string literal and silently break the whole
+    // <script> block, and any literal `</script>` in the source which would
+    // otherwise close the tag early regardless of JS string context.
+    const escapedMath = math
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/\r\n|\r|\n/g, '\\n')
+        .replace(/<\/script/gi, '<\\/script');
 
     const html = `
     <!DOCTYPE html>

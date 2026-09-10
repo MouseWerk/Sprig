@@ -1,46 +1,59 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Deck, getDecks } from './Storage';
 
-// The Android home-screen widget shows one "pinned" deck's due count. The
-// widget's task handler runs in a headless JS context where native modules
-// like expo-sqlite aren't reliably available, so it never touches Storage.ts
-// directly — it only reads a small AsyncStorage snapshot that the main app
-// keeps fresh (see refreshWidgetSnapshot). This keeps the widget side of the
-// app dependency-free and safe to run headless.
+// Each Android home-screen widget instance can be pinned to a different deck
+// (picked via the widget's own configuration screen when it's added — see
+// widget/WidgetConfigScreen.tsx). Every instance keeps a small per-widget
+// AsyncStorage snapshot of what it shows. The running app refreshes those
+// from live deck data (refreshAllPinnedWidgets — on Home focus and when a
+// study session ends); the widget's own headless task handler tries the same
+// live recompute on its periodic update and falls back to the cached
+// snapshot if the database isn't usable in that context, so a widget never
+// goes blank just because it woke up without the app (see
+// refreshCachedSnapshot).
 
-const PINNED_DECK_ID_KEY = 'sprig_pinned_widget_deck_id';
-const WIDGET_SNAPSHOT_KEY = 'sprig_widget_snapshot';
+const WIDGET_DECK_MAP_KEY = 'sprig_widget_deck_map'; // Record<widgetId, deckId>
+const WIDGET_SNAPSHOT_PREFIX = 'sprig_widget_snapshot_';
 
 export interface WidgetSnapshot {
     deckId: string;
     deckName: string;
+    deckIcon: string;
     dueCount: number;
     totalCards: number;
+    masteryPercent: number;
 }
 
-export async function getPinnedDeckId(): Promise<string | null> {
+async function getDeckMap(): Promise<Record<string, string>> {
     try {
-        return await AsyncStorage.getItem(PINNED_DECK_ID_KEY);
+        const raw = await AsyncStorage.getItem(WIDGET_DECK_MAP_KEY);
+        return raw ? JSON.parse(raw) : {};
     } catch {
-        return null;
+        return {};
     }
 }
 
-export async function setPinnedDeckId(deckId: string | null): Promise<void> {
-    try {
-        if (deckId === null) await AsyncStorage.removeItem(PINNED_DECK_ID_KEY);
-        else await AsyncStorage.setItem(PINNED_DECK_ID_KEY, deckId);
-    } catch {
-        // best effort — widget will just show its empty state
-    }
-    await refreshWidgetSnapshot();
+async function setDeckMap(map: Record<string, string>): Promise<void> {
+    await AsyncStorage.setItem(WIDGET_DECK_MAP_KEY, JSON.stringify(map));
 }
 
-export async function getWidgetSnapshot(): Promise<WidgetSnapshot | null> {
+function snapshotKey(widgetId: number): string {
+    return `${WIDGET_SNAPSHOT_PREFIX}${widgetId}`;
+}
+
+export async function getDeckIdForWidget(widgetId: number): Promise<string | null> {
+    const map = await getDeckMap();
+    return map[String(widgetId)] ?? null;
+}
+
+// Reads the cached snapshot for one widget instance — safe to call from the
+// widget's headless task handler (AsyncStorage-only, no live deck data).
+export async function getCachedWidgetSnapshot(widgetId: number): Promise<WidgetSnapshot | null> {
     try {
-        const raw = await AsyncStorage.getItem(WIDGET_SNAPSHOT_KEY);
+        const raw = await AsyncStorage.getItem(snapshotKey(widgetId));
         return raw ? JSON.parse(raw) : null;
-    } catch {
+    } catch (err) {
+        if (__DEV__) console.warn('[PinnedDeck] getCachedWidgetSnapshot failed', err);
         return null;
     }
 }
@@ -56,55 +69,114 @@ function dueCountFor(deck: Deck): number {
     return due;
 }
 
-// Recomputes the pinned deck's snapshot from live data and pushes it to
-// AsyncStorage (and the widget itself, if one is placed). Call this after
-// pinning/unpinning a deck, finishing a study session, or opening Home —
-// cheap enough to run opportunistically.
-export async function refreshWidgetSnapshot(): Promise<void> {
+function snapshotFromDeck(deck: Deck): WidgetSnapshot {
+    const totalCards = deck.totalCards || 0;
+    const learnedCount = deck.learnedIndices?.length || 0;
+    return {
+        deckId: deck.id,
+        deckName: deck.name,
+        deckIcon: deck.icon,
+        dueCount: dueCountFor(deck),
+        totalCards,
+        masteryPercent: totalCards > 0 ? Math.round((learnedCount / totalCards) * 100) : 0,
+    };
+}
+
+async function buildSnapshotForDeck(deckId: string): Promise<WidgetSnapshot | null> {
+    const decks = await getDecks();
+    const deck = decks.find(d => d.id === deckId && d.type === 'csv');
+    return deck ? snapshotFromDeck(deck) : null;
+}
+
+// Live refresh for the widget's own headless task handler (periodic
+// WIDGET_UPDATE / resize), so the due count doesn't go stale between visits
+// to Home. Recomputes from the database when it can and re-caches the result.
+// Returns `undefined` when live data can't be trusted — the database threw
+// in the headless context, or it came back with no decks at all, which is
+// indistinguishable from a failed read — so the caller shows the last cached
+// snapshot instead of blanking a widget whose deck still exists.
+export async function refreshCachedSnapshot(widgetId: number): Promise<WidgetSnapshot | null | undefined> {
+    const deckId = await getDeckIdForWidget(widgetId);
+    if (!deckId) return null;
+
+    let decks: Deck[];
     try {
-        const deckId = await getPinnedDeckId();
-        if (!deckId) {
-            await AsyncStorage.removeItem(WIDGET_SNAPSHOT_KEY);
-            return;
-        }
-        const decks = await getDecks();
-        const deck = decks.find(d => d.id === deckId && d.type === 'csv');
-        if (!deck) {
-            await AsyncStorage.removeItem(WIDGET_SNAPSHOT_KEY);
-            return;
-        }
-        const snapshot: WidgetSnapshot = {
-            deckId: deck.id,
-            deckName: deck.name,
-            dueCount: dueCountFor(deck),
-            totalCards: deck.totalCards || 0,
-        };
-        await AsyncStorage.setItem(WIDGET_SNAPSHOT_KEY, JSON.stringify(snapshot));
+        decks = await getDecks();
     } catch {
-        // widget just shows stale/empty state until the next successful refresh
+        return undefined;
     }
+    if (decks.length === 0) return undefined;
+
+    const deck = decks.find(d => d.id === deckId && d.type === 'csv');
+    const snapshot = deck ? snapshotFromDeck(deck) : null;
+    if (snapshot) await AsyncStorage.setItem(snapshotKey(widgetId), JSON.stringify(snapshot));
+    else await AsyncStorage.removeItem(snapshotKey(widgetId));
+    return snapshot;
+}
+
+// Only safe to call from the running app (live deck data + native widget
+// module), never from the widget's own headless task handler.
+async function cacheSnapshotForWidget(widgetId: number, deckId: string | null): Promise<WidgetSnapshot | null> {
+    if (!deckId) {
+        await AsyncStorage.removeItem(snapshotKey(widgetId));
+        return null;
+    }
+    const snapshot = await buildSnapshotForDeck(deckId);
+    if (snapshot) await AsyncStorage.setItem(snapshotKey(widgetId), JSON.stringify(snapshot));
+    else await AsyncStorage.removeItem(snapshotKey(widgetId));
+    return snapshot;
+}
+
+// Called from the widget's configuration screen once the user picks a deck
+// for a newly-placed widget instance.
+export async function setDeckIdForWidget(widgetId: number, deckId: string): Promise<WidgetSnapshot | null> {
+    const map = await getDeckMap();
+    map[String(widgetId)] = deckId;
+    await setDeckMap(map);
+    return cacheSnapshotForWidget(widgetId, deckId);
+}
+
+export async function removeWidgetMapping(widgetId: number): Promise<void> {
+    const map = await getDeckMap();
+    delete map[String(widgetId)];
+    await setDeckMap(map);
+    await AsyncStorage.removeItem(snapshotKey(widgetId));
+}
+
+// Recomputes every placed widget instance's snapshot from live data and
+// pushes it to both AsyncStorage and the widget itself. Call this after
+// finishing a study session or opening Home — cheap enough to run
+// opportunistically.
+export async function refreshAllPinnedWidgets(): Promise<void> {
+    const map = await getDeckMap();
+    const widgetIds = Object.keys(map);
+    if (widgetIds.length === 0) return;
 
     try {
-        // Native module — only safe to call from the running app, never from
-        // the widget's own headless task handler.
-        const { requestWidgetUpdate } = await import('react-native-android-widget');
+        const { requestWidgetUpdateById } = await import('react-native-android-widget');
         const { renderPinnedDeckWidget } = await import('../widget/PinnedDeckWidget');
-        const snapshot = await getWidgetSnapshot();
-        await requestWidgetUpdate({
-            widgetName: 'PinnedDeck',
-            renderWidget: () => renderPinnedDeckWidget(snapshot),
-        });
-    } catch {
-        // Android-only / no widget placed yet — fine to ignore.
+
+        for (const widgetIdStr of widgetIds) {
+            const widgetId = Number(widgetIdStr);
+            const snapshot = await cacheSnapshotForWidget(widgetId, map[widgetIdStr]);
+            await requestWidgetUpdateById({
+                widgetName: 'PinnedDeck',
+                widgetId,
+                renderWidget: (info) => renderPinnedDeckWidget(snapshot, info.width, info.height),
+                widgetNotFound: () => { removeWidgetMapping(widgetId).catch(() => { }); },
+            });
+        }
+    } catch (err) {
+        // Android-only / no widget placed yet — usually fine to ignore, but
+        // log so a real native-module failure doesn't disappear silently.
+        if (__DEV__) console.warn('[PinnedDeck] refreshAllPinnedWidgets failed', err);
     }
 }
 
-// Computes the pinned deck's due card indices right now, for starting a
-// study session from the widget's "open app" tap. Returns null if there's
-// no pinned deck or it has vanished since the widget last showed it.
-export async function buildPinnedDeckSession(): Promise<{ deckId: string; deckName: string; uri: string; cardIndices: number[] } | null> {
-    const deckId = await getPinnedDeckId();
-    if (!deckId) return null;
+// Computes a deck's due card indices right now, for starting a study session
+// from a widget's tap. Returns null if the deck has vanished since the
+// widget last showed it.
+export async function buildDeckStudySession(deckId: string): Promise<{ deckId: string; deckName: string; uri: string; cardIndices: number[] } | null> {
     const decks = await getDecks();
     const deck = decks.find(d => d.id === deckId && d.type === 'csv');
     if (!deck) return null;

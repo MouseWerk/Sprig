@@ -104,6 +104,7 @@ async function initDb(): Promise<SQLite.SQLiteDatabase> {
     `);
 
     await addColumnIfMissing(db, 'decks', 'exam_date', 'TEXT');
+    await addColumnIfMissing(db, 'decks', 'notes', 'TEXT');
     await addColumnIfMissing(db, 'audio_files', 'folder_id', 'TEXT');
     await addColumnIfMissing(db, 'audio_files', 'position', 'REAL');
     // Reading progress display needs the page count and recency, not just the page

@@ -37,6 +37,7 @@ export interface Deck {
     studyDirection?: StudyDirection; // which side of the card is shown first
     createdAt?: number; // epoch ms; older items fall back to parsing their id
     examDate?: string; // "YYYY-MM-DD" — exam countdown target for this deck
+    notes?: string; // freeform markdown notebook, not graded — mnemonics/reference material
 }
 
 export interface AudioFile {
@@ -200,26 +201,37 @@ export async function saveGroveEconomy(econ: GroveEconomy): Promise<void> {
 
 export type PurchaseFailure = 'dew' | 'max' | 'active';
 
+// These grove-economy reads+writes are wrapped in `serialized()` (not just
+// the raw INSERT/UPDATE) because each one does a read-modify-write against
+// the single 'grove' kv row: without serializing the whole read..write span,
+// two overlapping calls (e.g. a double-tap on "Buy") can both read the same
+// pre-purchase dew balance, both pass the affordability check, and then the
+// second write clobbers the first — net effect is a purchase that's charged
+// once but granted twice.
 export async function buyStreakFreezeWithDew(): Promise<{ ok: boolean; reason?: PurchaseFailure; dew: number; streakFreezes: number }> {
-    const [econ, stats] = await Promise.all([getGroveEconomy(), getUserStats()]);
-    const owned = stats.streakFreezes || 0;
-    if (owned >= MAX_STREAK_FREEZES) return { ok: false, reason: 'max', dew: econ.dew, streakFreezes: owned };
-    if (econ.dew < DEW_COST_FREEZE) return { ok: false, reason: 'dew', dew: econ.dew, streakFreezes: owned };
-    econ.dew -= DEW_COST_FREEZE;
-    stats.streakFreezes = owned + 1;
-    await Promise.all([saveGroveEconomy(econ), saveUserStats(stats)]);
-    return { ok: true, dew: econ.dew, streakFreezes: stats.streakFreezes };
+    return serialized(async () => {
+        const [econ, stats] = await Promise.all([getGroveEconomy(), getUserStats()]);
+        const owned = stats.streakFreezes || 0;
+        if (owned >= MAX_STREAK_FREEZES) return { ok: false, reason: 'max' as const, dew: econ.dew, streakFreezes: owned };
+        if (econ.dew < DEW_COST_FREEZE) return { ok: false, reason: 'dew' as const, dew: econ.dew, streakFreezes: owned };
+        econ.dew -= DEW_COST_FREEZE;
+        stats.streakFreezes = owned + 1;
+        await Promise.all([saveGroveEconomy(econ), saveUserStats(stats)]);
+        return { ok: true, dew: econ.dew, streakFreezes: stats.streakFreezes };
+    });
 }
 
 export async function buySunshineBoost(): Promise<{ ok: boolean; reason?: PurchaseFailure; dew: number; boostUntil: number }> {
-    const econ = await getGroveEconomy();
-    const now = Date.now();
-    if (now < econ.boostUntil) return { ok: false, reason: 'active', dew: econ.dew, boostUntil: econ.boostUntil };
-    if (econ.dew < DEW_COST_SUNSHINE) return { ok: false, reason: 'dew', dew: econ.dew, boostUntil: econ.boostUntil };
-    econ.dew -= DEW_COST_SUNSHINE;
-    econ.boostUntil = now + SUNSHINE_DURATION_MS;
-    await saveGroveEconomy(econ);
-    return { ok: true, dew: econ.dew, boostUntil: econ.boostUntil };
+    return serialized(async () => {
+        const econ = await getGroveEconomy();
+        const now = Date.now();
+        if (now < econ.boostUntil) return { ok: false, reason: 'active' as const, dew: econ.dew, boostUntil: econ.boostUntil };
+        if (econ.dew < DEW_COST_SUNSHINE) return { ok: false, reason: 'dew' as const, dew: econ.dew, boostUntil: econ.boostUntil };
+        econ.dew -= DEW_COST_SUNSHINE;
+        econ.boostUntil = now + SUNSHINE_DURATION_MS;
+        await saveGroveEconomy(econ);
+        return { ok: true, dew: econ.dew, boostUntil: econ.boostUntil };
+    });
 }
 
 // Buying a planter both purchases and assigns it in one step — pots are a
@@ -227,38 +239,44 @@ export async function buySunshineBoost(): Promise<{ ok: boolean; reason?: Purcha
 // later. Re-buying a style you already own on another deck is still full
 // price; each deck's pot is its own purchase.
 export async function buyPlanter(deckId: string, potId: string): Promise<{ ok: boolean; reason?: PurchaseFailure; dew: number; planters: Record<string, string> }> {
-    const econ = await getGroveEconomy();
-    const price = POT_PRICES[potId] || 0;
-    if (econ.dew < price) return { ok: false, reason: 'dew', dew: econ.dew, planters: econ.planters };
-    econ.dew -= price;
-    econ.planters = { ...econ.planters, [deckId]: potId };
-    await saveGroveEconomy(econ);
-    return { ok: true, dew: econ.dew, planters: econ.planters };
+    return serialized(async () => {
+        const econ = await getGroveEconomy();
+        const price = POT_PRICES[potId] || 0;
+        if (econ.dew < price) return { ok: false, reason: 'dew' as const, dew: econ.dew, planters: econ.planters };
+        econ.dew -= price;
+        econ.planters = { ...econ.planters, [deckId]: potId };
+        await saveGroveEconomy(econ);
+        return { ok: true, dew: econ.dew, planters: econ.planters };
+    });
 }
 
 export async function buyDecoration(decorationId: string): Promise<{ ok: boolean; reason?: PurchaseFailure; dew: number; ownedDecorations: string[] }> {
-    const econ = await getGroveEconomy();
-    if (econ.ownedDecorations.includes(decorationId)) return { ok: false, reason: 'max', dew: econ.dew, ownedDecorations: econ.ownedDecorations };
-    const price = DECORATION_CATALOG.find(d => d.id === decorationId)?.price || 0;
-    if (econ.dew < price) return { ok: false, reason: 'dew', dew: econ.dew, ownedDecorations: econ.ownedDecorations };
-    econ.dew -= price;
-    econ.ownedDecorations = [...econ.ownedDecorations, decorationId];
-    econ.equippedDecorations = [...econ.equippedDecorations, decorationId];
-    await saveGroveEconomy(econ);
-    return { ok: true, dew: econ.dew, ownedDecorations: econ.ownedDecorations };
+    return serialized(async () => {
+        const econ = await getGroveEconomy();
+        if (econ.ownedDecorations.includes(decorationId)) return { ok: false, reason: 'max' as const, dew: econ.dew, ownedDecorations: econ.ownedDecorations };
+        const price = DECORATION_CATALOG.find(d => d.id === decorationId)?.price || 0;
+        if (econ.dew < price) return { ok: false, reason: 'dew' as const, dew: econ.dew, ownedDecorations: econ.ownedDecorations };
+        econ.dew -= price;
+        econ.ownedDecorations = [...econ.ownedDecorations, decorationId];
+        econ.equippedDecorations = [...econ.equippedDecorations, decorationId];
+        await saveGroveEconomy(econ);
+        return { ok: true, dew: econ.dew, ownedDecorations: econ.ownedDecorations };
+    });
 }
 
 // Toggles one owned decoration's visibility on the shelf — free, since the
 // dew was already spent to unlock it. Any number can be shown at once.
 export async function equipDecoration(decorationId: string): Promise<GroveEconomy> {
-    const econ = await getGroveEconomy();
-    if (econ.ownedDecorations.includes(decorationId)) {
-        econ.equippedDecorations = econ.equippedDecorations.includes(decorationId)
-            ? econ.equippedDecorations.filter(id => id !== decorationId)
-            : [...econ.equippedDecorations, decorationId];
-    }
-    await saveGroveEconomy(econ);
-    return econ;
+    return serialized(async () => {
+        const econ = await getGroveEconomy();
+        if (econ.ownedDecorations.includes(decorationId)) {
+            econ.equippedDecorations = econ.equippedDecorations.includes(decorationId)
+                ? econ.equippedDecorations.filter(id => id !== decorationId)
+                : [...econ.equippedDecorations, decorationId];
+        }
+        await saveGroveEconomy(econ);
+        return econ;
+    });
 }
 
 // Whole days between two "YYYY-MM-DD" strings (b - a)
@@ -281,7 +299,7 @@ function daysBetweenDateKeys(a: string, b: string): number {
 // Serialize write transactions: expo-sqlite shares one connection, so two
 // overlapping BEGIN/COMMIT blocks from concurrent async calls would collide.
 let writeChain: Promise<unknown> = Promise.resolve();
-function serialized<T>(fn: () => Promise<T>): Promise<T> {
+export function serialized<T>(fn: () => Promise<T>): Promise<T> {
     const run = writeChain.then(fn, fn);
     writeChain = run.catch(() => { });
     return run;
@@ -300,6 +318,7 @@ interface DeckRow {
     unsure_indices: string;
     created_at: number | null;
     exam_date: string | null;
+    notes: string | null;
 }
 
 interface SrsRow {
@@ -335,6 +354,7 @@ function rowToDeck(row: DeckRow, srs: Record<number, SRSCardData>): Deck {
         studyDirection: (row.study_direction as StudyDirection) ?? undefined,
         createdAt: row.created_at ?? undefined,
         examDate: row.exam_date ?? undefined,
+        notes: row.notes ?? undefined,
     };
 }
 
@@ -381,12 +401,12 @@ export async function getDecks(): Promise<Deck[]> {
 async function insertDeckRow(deck: Deck): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-        `INSERT OR REPLACE INTO decks (id, name, uri, icon, type, total_cards, folder_id, study_direction, learned_indices, unsure_indices, created_at, exam_date)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO decks (id, name, uri, icon, type, total_cards, folder_id, study_direction, learned_indices, unsure_indices, created_at, exam_date, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         deck.id, deck.name, deck.uri, deck.icon, deck.type,
         deck.totalCards ?? 0, deck.folderId, deck.studyDirection ?? null,
         JSON.stringify(deck.learnedIndices ?? []), JSON.stringify(deck.unsureIndices ?? []),
-        deck.createdAt ?? null, deck.examDate ?? null
+        deck.createdAt ?? null, deck.examDate ?? null, deck.notes ?? null
     );
 }
 
@@ -794,6 +814,21 @@ export async function updateUserStats(
     bonusXp: number = 0,
     activity?: { focusSession?: boolean; quizCompleted?: boolean }
 ): Promise<StatsUpdateResult> {
+    // Callers (swipe/quiz/type/focus sessions) fire this without awaiting or
+    // chaining it behind other persistence, so back-to-back reviews can call
+    // in overlapping — serialize the whole read-modify-write span or the
+    // second call's write silently clobbers XP/streak/review-count progress
+    // from the first.
+    return serialized(() => updateUserStatsUnserialized(cardsReviewed, studyTime, grade, bonusXp, activity));
+}
+
+async function updateUserStatsUnserialized(
+    cardsReviewed: number,
+    studyTime: number,
+    grade?: number,
+    bonusXp: number = 0,
+    activity?: { focusSession?: boolean; quizCompleted?: boolean }
+): Promise<StatsUpdateResult> {
     const stats = await getUserStats();
     const today = localDateKey();
     const lastStudy = stats.lastStudyDate.split('T')[0];
@@ -917,6 +952,43 @@ export async function recordFocusSession(minutes: number): Promise<StatsUpdateRe
 // Records a finished quiz round (any score) with a small XP bonus.
 export async function recordQuizCompleted(): Promise<StatsUpdateResult> {
     return updateUserStats(0, 0, undefined, 10, { quizCompleted: true });
+}
+
+// Study Journal — a one-line optional reflection prompted after a session
+// ends ("what was hard today?"). Purely a personal log, not graded and not
+// fed into SRS; stored as a capped JSON array in the same `kv` table as
+// stats/grove.
+export interface ReflectionEntry {
+    id: string;
+    deckId: string;
+    deckName: string;
+    note: string;
+    cardsReviewed: number;
+    accuracy: number; // 0-100
+    createdAt: number; // epoch ms
+}
+
+const REFLECTIONS_KV_KEY = 'reflections';
+const MAX_REFLECTIONS = 200;
+
+export async function saveReflection(entry: Omit<ReflectionEntry, 'id' | 'createdAt'>): Promise<void> {
+    const db = await getDb();
+    const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM kv WHERE key = ?', REFLECTIONS_KV_KEY);
+    const list: ReflectionEntry[] = row ? JSON.parse(row.value) : [];
+    list.unshift({ ...entry, id: generateId(), createdAt: Date.now() });
+    if (list.length > MAX_REFLECTIONS) list.length = MAX_REFLECTIONS;
+    await db.runAsync('INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)', REFLECTIONS_KV_KEY, JSON.stringify(list));
+}
+
+export async function getRecentReflections(limit: number = 10): Promise<ReflectionEntry[]> {
+    try {
+        const db = await getDb();
+        const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM kv WHERE key = ?', REFLECTIONS_KV_KEY);
+        const list: ReflectionEntry[] = row ? JSON.parse(row.value) : [];
+        return list.slice(0, limit);
+    } catch {
+        return [];
+    }
 }
 
 // Folder Management
@@ -1205,6 +1277,13 @@ export async function restoreCardSRS(deckId: string, cardIndex: number, data?: S
 export async function updateDeckExamDate(deckId: string, examDate: string | null): Promise<void> {
     const db = await getDb();
     await db.runAsync('UPDATE decks SET exam_date = ? WHERE id = ?', examDate, deckId);
+}
+
+// Freeform per-deck notebook — mnemonics/summaries/reference material kept
+// alongside the cards. Not graded, not synced to SRS, purely for context.
+export async function updateDeckNotes(deckId: string, notes: string): Promise<void> {
+    const db = await getDb();
+    await db.runAsync('UPDATE decks SET notes = ? WHERE id = ?', notes, deckId);
 }
 
 export interface ExamPlan {

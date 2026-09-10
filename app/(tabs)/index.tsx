@@ -5,12 +5,12 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { buildGrovePlants, GrovePlant, pendingDew } from '@/utils/Grove';
 import { getPrefsSync, subscribePrefs } from '@/utils/Preferences';
-import { refreshWidgetSnapshot } from '@/utils/PinnedDeck';
+import { refreshAllPinnedWidgets } from '@/utils/PinnedDeck';
 import { Deck, getDecks, getGroveEconomy, getUserStats, localDateKey, UserStats } from '@/utils/Storage';
 import { buildTodayPlan, startTodaySession, TodayPlan } from '@/utils/TodayPlan';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { CalendarCheck, ChevronRight, Layers, Leaf, Play } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
@@ -47,8 +47,13 @@ export default function HomeScreen() {
     setSectionsHidden(prefs.homeSectionsHidden);
   }), []);
 
+  const startingTodayRef = useRef(false);
+
   useFocusEffect(
     useCallback(() => {
+      // Refocusing means we're back from wherever "Today" navigated to (or
+      // the user never left) — safe to allow starting it again.
+      startingTodayRef.current = false;
       Promise.all([getDecks(), getUserStats(), getGroveEconomy()])
         .then(([savedDecks, savedStats, econ]) => {
           const csvDecks = savedDecks.filter(d => d.type === 'csv');
@@ -60,14 +65,16 @@ export default function HomeScreen() {
         })
         .catch(() => { });
       buildTodayPlan().then(setTodayPlan).catch(() => setTodayPlan(null));
-      refreshWidgetSnapshot().catch(() => { });
+      refreshAllPinnedWidgets().catch(() => { });
     }, [])
   );
 
   const handleStartToday = () => {
     if (!todayPlan || todayPlan.totalCards === 0) return;
+    if (startingTodayRef.current) return;
     const first = startTodaySession(todayPlan);
     if (!first) return;
+    startingTodayRef.current = true;
     router.push({
       pathname: '/swipe',
       params: {

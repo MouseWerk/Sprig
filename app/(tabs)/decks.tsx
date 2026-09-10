@@ -4,9 +4,9 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Icons from 'lucide-react-native';
-import { CalendarDays, ChevronRight, ClipboardPaste, FileUp, Folder as FolderIcon, MoreVertical, Package, Pin, Plus, Search, Trash2, X } from 'lucide-react-native';
+import { CalendarDays, ChevronRight, ClipboardPaste, FileUp, Folder as FolderIcon, MoreVertical, Package, Plus, Search, Trash2, X } from 'lucide-react-native';
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FolderCard } from '../../components/FolderCard';
 import { IconPicker } from '../../components/IconPicker';
@@ -19,7 +19,6 @@ import { useToast } from '../../components/ui/Toast';
 import * as FileSystem from 'expo-file-system/legacy';
 import { importApkg } from '../../utils/AnkiImport';
 import { parseFlashcardsText } from '../../utils/CsvParser';
-import { getPinnedDeckId, setPinnedDeckId } from '../../utils/PinnedDeck';
 import { importSprigDeck, isSprigFileName } from '../../utils/SprigDeck';
 import { createEmptyDeck, Deck, deleteDeck, deleteFolder, Folder, getDecks, getExamPlan, getFolders, importCsvToDeck, saveFolder, updateDeck, updateFolder } from '../../utils/Storage';
 
@@ -60,7 +59,6 @@ export default function DecksScreen() {
 
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
   const [editFolderName, setEditFolderName] = useState('');
-  const [pinnedDeckId, setPinnedDeckIdState] = useState<string | null>(null);
 
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
@@ -75,13 +73,12 @@ export default function DecksScreen() {
   const UNDO_WINDOW_MS = 5000;
 
   const loadData = useCallback(async () => {
-    const [savedDecks, savedFolders, pinned] = await Promise.all([getDecks(), getFolders('deck'), getPinnedDeckId()]);
+    const [savedDecks, savedFolders] = await Promise.all([getDecks(), getFolders('deck')]);
     // A deck awaiting the undo window is still in the database. Without this
     // filter, leaving and re-entering the tab within those seconds brings it
     // back into the list, and it then vanishes when the timer fires.
     setDecks(savedDecks.filter(d => d.type === 'csv' && !pendingDeleteRef.current[d.id]));
     setFolders(savedFolders);
-    setPinnedDeckIdState(pinned);
   }, []);
 
   useFocusEffect(
@@ -320,16 +317,6 @@ export default function DecksScreen() {
       console.error('Error renaming folder:', e);
       showToast({ message: t('error'), type: 'error' });
     }
-  };
-
-  const handleTogglePinWidget = async (deckId: string) => {
-    const next = pinnedDeckId === deckId ? null : deckId;
-    setPinnedDeckIdState(next);
-    await setPinnedDeckId(next);
-    showToast({
-      message: next ? t('decksPinnedToWidget') : t('decksUnpinnedFromWidget'),
-      type: 'success',
-    });
   };
 
   const handleEditDeck = (deck: Deck) => {
@@ -815,19 +802,6 @@ export default function DecksScreen() {
                     ))}
                   </ScrollView>
 
-                  {Platform.OS === 'android' && editingDeck && (
-                    <View style={styles.pinWidgetRow}>
-                      <Pin size={18} color={accentColor} strokeWidth={2.5} />
-                      <Text style={[styles.pinWidgetLabel, { color: textColor }]}>{t('decksPinToWidget')}</Text>
-                      <Switch
-                        value={pinnedDeckId === editingDeck.id}
-                        onValueChange={() => handleTogglePinWidget(editingDeck.id)}
-                        trackColor={{ false: '#767577', true: accentColor }}
-                        thumbColor="#f4f3f4"
-                      />
-                    </View>
-                  )}
-
                   <Button
                     title={t('saveChanges')}
                     onPress={handleSaveEditDeck}
@@ -1289,17 +1263,6 @@ const styles = StyleSheet.create({
   },
   deleteFolderText: {
     color: '#ef4444',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  pinWidgetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 20,
-  },
-  pinWidgetLabel: {
-    flex: 1,
     fontSize: 15,
     fontWeight: '700',
   },

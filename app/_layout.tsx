@@ -7,7 +7,7 @@ import { ToastProvider, useToast } from '@/components/ui/Toast';
 import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { commitIncomingImport, DetectedIncomingFile, detectIncomingFile, discardIncomingFile, isFileUrl } from '@/utils/IncomingFile';
-import { buildPinnedDeckSession } from '@/utils/PinnedDeck';
+import { rearmStreakReminderOnLaunch } from '@/utils/Notifications';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Linking } from 'react-native';
@@ -36,27 +36,8 @@ function useIncomingFiles() {
 
   useEffect(() => {
     const handle = async (url: string | null) => {
-      // Home-screen widget tap: jump straight into a session for the
-      // currently pinned deck (see components/PinnedDeckWidget).
-      if (url?.startsWith('sprig://study')) {
-        const session = await buildPinnedDeckSession();
-        if (session) {
-          router.push({
-            pathname: '/swipe',
-            params: {
-              id: session.deckId,
-              uri: session.uri,
-              name: session.deckName,
-              mode: 'all',
-              cards: session.cardIndices.join(','),
-            },
-          });
-        } else {
-          router.replace('/decks');
-        }
-        return;
-      }
-
+      // Home-screen widget taps (`sprig://study?deckId=…`) are a real route —
+      // app/study.tsx — so expo-router handles them itself; nothing to do here.
       if (!isFileUrl(url)) return;
       router.replace('/decks');
       try {
@@ -112,10 +93,15 @@ function RootLayoutNav() {
   const { pending, handleCancel, handleConfirm } = useIncomingFiles();
   const backTitle = t('layoutBack');
 
+  useEffect(() => {
+    rearmStreakReminderOnLaunch().catch(() => { });
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="study" options={{ headerShown: false }} />
         <Stack.Screen name="swipe" options={{
           headerBackTitle: backTitle,
           headerTintColor: textColor,

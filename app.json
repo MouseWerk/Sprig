@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sprig",
     "slug": "sprig",
-    "version": "1.9.5",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "sprig",
@@ -74,10 +74,11 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.mousewerk.sprig",
-      "versionCode": 30,
+      "versionCode": 35,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.SYSTEM_ALERT_WINDOW"
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
       ],
       "intentFilters": [
         {
@@ -191,11 +192,12 @@
             {
               "name": "PinnedDeck",
               "label": "Sprig Deck",
-              "minWidth": "180dp",
+              "minWidth": "40dp",
               "minHeight": "40dp",
               "targetCellWidth": 3,
-              "targetCellHeight": 1,
-              "resizeMode": "horizontal",
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "widgetFeatures": "reconfigurable",
               "description": "Shows your pinned deck's due count — tap to study",
               "previewImage": "./assets/images/icon.png",
               "updatePeriodMillis": 1800000
@@ -204,7 +206,9 @@
         }
       ],
       "./plugins/withoutPushEntitlement",
-      "./plugins/withSigning"
+      "./plugins/withSigning",
+      "./plugins/withAndroidSigning",
+      "./plugins/withoutBootCompletedForegroundServices"
     ],
     "experiments": {
       "typedRoutes": true,

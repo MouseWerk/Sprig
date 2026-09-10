@@ -42,9 +42,13 @@ export function IncomingImportSheet({ detected, onCancel, onConfirm }: Props) {
 
     useEffect(() => {
         if (!detected) return;
+        let cancelled = false;
         setName(detected.suggestedName);
         setFolderId(null);
-        getFolders(folderKindFor(detected.kind)).then(setFolders).catch(() => setFolders([]));
+        getFolders(folderKindFor(detected.kind))
+            .then(list => { if (!cancelled) setFolders(list); })
+            .catch(() => { if (!cancelled) setFolders([]); });
+        return () => { cancelled = true; };
     }, [detected]);
 
     const IconComponent = detected?.kind === 'pdf' ? FileText : detected?.kind === 'audio' ? Music : Layers;

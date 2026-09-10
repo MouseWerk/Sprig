@@ -181,8 +181,11 @@ function mergeStats(current: UserStats | null, incoming: UserStats | null): User
 
 // Merge grove economy the same way as stats: numeric progress takes the max
 // so a restore can never take dew, seeds, or growth away from the player.
-// Species overrides and harvest cooldowns favor whichever side saw the deck
-// more recently, since those aren't naturally additive.
+// Harvest cooldowns are timestamped, so those genuinely take whichever side
+// saw the deck more recently. Species overrides, planters, and last-seen
+// stages have no per-entry timestamp to compare, so on a conflict they just
+// keep the current device's value (treated as the live, active choice) and
+// only fill in from the backup where the current device has none.
 function mergeGrove(current: GroveEconomy | null, incoming: GroveEconomy | null | undefined): GroveEconomy | null {
     if (!incoming) return current;
     if (!current) return incoming;

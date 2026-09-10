@@ -59,6 +59,11 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
     const rotateY = useSharedValue(0);
+    // Guards against a second fast swipe deciding an outcome on the same card
+    // instance while the first swipe-out animation is still mid-flight (the
+    // parent only remounts this component — resetting this flag — once the
+    // first onSwipeLeft/Right/Top callback has actually advanced its state).
+    const hasDecided = useSharedValue(false);
 
     const cardBg = useThemeColor({}, 'card');
     const mutedFg = useThemeColor({}, 'mutedForeground');
@@ -80,17 +85,22 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
     const panGesture = Gesture.Pan()
         .enabled(!highlightMode)
         .onUpdate((event) => {
+            if (hasDecided.value) return;
             translateX.value = event.translationX;
             translateY.value = event.translationY;
         })
         .onEnd((event) => {
+            if (hasDecided.value) return;
             if (event.translationY < -SWIPE_THRESHOLD_Y && Math.abs(event.translationX) < SWIPE_THRESHOLD) {
+                hasDecided.value = true;
                 translateY.value = withSpring(-SCREEN_HEIGHT, { velocity: event.velocityY }, () => {
                     runOnJS(Haptics.notificationAsync)(Haptics.NotificationFeedbackType.Warning as any);
                     runOnJS(onSwipeTop)();
                 });
             } else if (Math.abs(event.translationX) > SWIPE_THRESHOLD) {
+                hasDecided.value = true;
                 const direction = event.translationX > 0 ? 'right' : 'left';
+                translateY.value = withSpring(0);
                 translateX.value = withSpring(direction === 'right' ? SCREEN_WIDTH + 100 : -SCREEN_WIDTH - 100, { velocity: event.velocityX }, () => {
                     if (direction === 'right') {
                         runOnJS(Haptics.notificationAsync)(Haptics.NotificationFeedbackType.Success);
