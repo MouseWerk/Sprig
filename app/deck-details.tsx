@@ -56,6 +56,10 @@ export default function DeckDetailsScreen() {
     const [notebookVisible, setNotebookVisible] = useState(false);
     const [notebookEditing, setNotebookEditing] = useState(false);
     const [notesDraft, setNotesDraft] = useState('');
+    // Save confirmation lives inside the sheet rather than in a toast: the
+    // sheet is a native Modal, which is its own window, so a toast rendered by
+    // ToastProvider at the app root ends up *behind* it and is never seen.
+    const [notebookSaved, setNotebookSaved] = useState(false);
 
     const backgroundColor = useThemeColor({}, 'background');
     const cardColor = useThemeColor({}, 'card');
@@ -106,6 +110,7 @@ export default function DeckDetailsScreen() {
     const openNotebook = () => {
         setNotesDraft(deck?.notes || '');
         setNotebookEditing(!deck?.notes);
+        setNotebookSaved(false);
         setNotebookVisible(true);
     };
 
@@ -115,7 +120,7 @@ export default function DeckDetailsScreen() {
             await updateDeckNotes(id, notesDraft);
             setDeck(prev => prev ? { ...prev, notes: notesDraft } : prev);
             setNotebookEditing(false);
-            showToast({ message: t('deckDetailsNotebookSaved'), type: 'success' });
+            setNotebookSaved(true);
         } catch (e) {
             console.error('Error saving deck notes:', e);
             showToast({ message: t('error'), type: 'error' });
@@ -509,43 +514,12 @@ export default function DeckDetailsScreen() {
                                 <Text style={[styles.progressLabel, { color: progressColor, opacity: 0.8 }]}>Mastery</Text>
                             </View>
                             <View style={styles.progressStatsRight}>
-                                <View style={styles.deckTitleRow}>
-                                    <Text style={[styles.deckTitleLarge, { color: textColor }]} numberOfLines={2}>{deck.name}</Text>
-                                    <View style={styles.deckActions}>
-                                        <TouchableOpacity
-                                            style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
-                                            onPress={openNotebook}
-                                            accessibilityLabel={t('deckDetailsNotebook')}
-                                            accessibilityRole="button"
-                                        >
-                                            <NotebookPen size={15} color={accentColor} strokeWidth={3} />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
-                                            onPress={handleExportDeck}
-                                            accessibilityLabel="Export deck"
-                                            accessibilityRole="button"
-                                        >
-                                            <Share2 size={15} color={accentColor} strokeWidth={3} />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
-                                            onPress={handleImportCsv}
-                                            accessibilityLabel="Import cards from CSV"
-                                            accessibilityRole="button"
-                                        >
-                                            <FileUp size={15} color={accentColor} strokeWidth={3} />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
-                                            onPress={() => setAddCardModalVisible(true)}
-                                            accessibilityLabel="Add flashcard"
-                                            accessibilityRole="button"
-                                        >
-                                            <Plus size={15} color={accentColor} strokeWidth={3} />
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
+                                {/* Title gets the full column width. Sharing a row
+                                    with the action buttons left it so narrow that
+                                    a long first word broke mid-word ("Maestr /
+                                    o Test…"), so the actions sit on their own row
+                                    underneath. */}
+                                <Text style={[styles.deckTitleLarge, { color: textColor }]} numberOfLines={2}>{deck.name}</Text>
                                 {(() => {
                                     const learned = deck?.learnedIndices?.length || 0;
                                     const dueCount = Object.values(deck?.srsData || {}).filter(data =>
@@ -565,6 +539,40 @@ export default function DeckDetailsScreen() {
                                         </Text>
                                     );
                                 })()}
+                                <View style={styles.deckActions}>
+                                    <TouchableOpacity
+                                        style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
+                                        onPress={openNotebook}
+                                        accessibilityLabel={t('deckDetailsNotebook')}
+                                        accessibilityRole="button"
+                                    >
+                                        <NotebookPen size={15} color={accentColor} strokeWidth={3} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
+                                        onPress={handleExportDeck}
+                                        accessibilityLabel="Export deck"
+                                        accessibilityRole="button"
+                                    >
+                                        <Share2 size={15} color={accentColor} strokeWidth={3} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
+                                        onPress={handleImportCsv}
+                                        accessibilityLabel="Import cards from CSV"
+                                        accessibilityRole="button"
+                                    >
+                                        <FileUp size={15} color={accentColor} strokeWidth={3} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
+                                        onPress={() => setAddCardModalVisible(true)}
+                                        accessibilityLabel="Add flashcard"
+                                        accessibilityRole="button"
+                                    >
+                                        <Plus size={15} color={accentColor} strokeWidth={3} />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </View>
 
@@ -1007,21 +1015,38 @@ export default function DeckDetailsScreen() {
                     </TouchableOpacity>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 16 }}>
+                {notebookEditing ? (
+                    <Text style={[styles.notebookHint, { color: mutedForeground }]}>
+                        {t('deckDetailsNotebookHint')}
+                    </Text>
+                ) : notebookSaved ? (
+                    <View style={styles.notebookSavedRow}>
+                        <CheckCircle2 size={14} color="#22c55e" strokeWidth={3} />
+                        <Text style={[styles.notebookSavedText, { color: '#22c55e' }]}>
+                            {t('deckDetailsNotebookSaved')}
+                        </Text>
+                    </View>
+                ) : null}
+
+                <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 12 }}>
                     {notebookEditing ? (
                         <Input
                             value={notesDraft}
-                            onChangeText={setNotesDraft}
+                            onChangeText={text => { setNotesDraft(text); setNotebookSaved(false); }}
                             placeholder={t('deckDetailsNotebookPlaceholder')}
                             multiline
-                            inputStyle={{ minHeight: 260 }}
+                            autoFocus={!notesDraft}
+                            inputStyle={{ minHeight: 180 }}
                         />
                     ) : notesDraft.trim().length > 0 ? (
                         <MarkdownRenderer content={notesDraft} fontSize={16} />
                     ) : (
-                        <Text style={{ color: mutedForeground, fontSize: 14, textAlign: 'center', marginTop: 24 }}>
-                            {t('deckDetailsNotebookEmpty')}
-                        </Text>
+                        <View style={styles.notebookEmptyState}>
+                            <NotebookPen size={28} color={mutedForeground} strokeWidth={2} />
+                            <Text style={[styles.notebookEmptyText, { color: mutedForeground }]}>
+                                {t('deckDetailsNotebookEmpty')}
+                            </Text>
+                        </View>
                     )}
                 </ScrollView>
 
@@ -1164,20 +1189,14 @@ const styles = StyleSheet.create({
         flex: 1,
         marginLeft: 16,
     },
-    deckTitleRow: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        gap: 10,
-        marginBottom: 6,
-    },
     deckActions: {
         flexDirection: 'row',
         gap: 6,
         flexShrink: 0,
+        marginTop: 10,
     },
     deckTitleLarge: {
-        flex: 1,
+        marginBottom: 6,
         fontSize: 22,
         fontWeight: '800',
         letterSpacing: -0.5,
@@ -1367,6 +1386,33 @@ const styles = StyleSheet.create({
     notebookToggleText: {
         fontSize: 14,
         fontWeight: '700',
+    },
+    notebookHint: {
+        fontSize: 12,
+        fontWeight: '500',
+        marginTop: 10,
+        marginLeft: 4,
+    },
+    notebookSavedRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 10,
+        marginLeft: 4,
+    },
+    notebookSavedText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    notebookEmptyState: {
+        alignItems: 'center',
+        gap: 12,
+        paddingVertical: 40,
+    },
+    notebookEmptyText: {
+        fontSize: 14,
+        fontWeight: '500',
+        textAlign: 'center',
     },
     modalSubtitle: {
         fontSize: 12,

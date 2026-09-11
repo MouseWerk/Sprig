@@ -1,0 +1,48 @@
+# The two non-swipe study modes. Both need the six-card deck from flow 02 —
+# quiz in particular refuses to start with fewer than four cards.
+appId: com.mousewerk.sprig
+name: 06 Quiz and Type
+tags:
+  - core
+---
+- launchApp
+
+- tapOn: "Decks"
+- tapOn: "Maestro Test Deck"
+
+# --- Quiz: multiple choice ---
+- tapOn: "Quiz"
+- assertVisible:
+    text: ".*1 / .*"
+    optional: true
+- takeScreenshot: .maestro/screenshots/06-quiz-question
+
+# Answering is what unlocks the Next button; any option will do, right or wrong.
+- tapOn:
+    point: "50%, 55%"
+- extendedWaitUntil:
+    visible:
+      text: "Next Question|See Results"
+    timeout: 5000
+- takeScreenshot: .maestro/screenshots/06-quiz-answered
+
+- tapOn:
+    text: "Next Question|See Results"
+- takeScreenshot: .maestro/screenshots/06-quiz-next
+
+- back
+- back
+
+# --- Type: free-text answers ---
+- tapOn: "Maestro Test Deck"
+- tapOn: "Type"
+- takeScreenshot: .maestro/screenshots/06-type-prompt
+
+- tapOn:
+    point: "50%, 60%"
+- inputText: "Water"
+- hideKeyboard
+- tapOn: "Check"
+- takeScreenshot: .maestro/screenshots/06-type-checked
+
+- back

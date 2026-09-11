@@ -1,0 +1,24 @@
+# Maestro UI test suite for Sprig (Android).
+#
+# Playwright can't drive a React Native app — it automates web browsers. Maestro
+# is the mobile equivalent: it talks to the device over adb and drives the real
+# installed APK, so these flows exercise the same build that ships to Play.
+#
+# Run everything (alphabetical order, see "state" note below):
+#   npm run test:ui
+#
+# Run a single flow:
+#   maestro test .maestro/flows/04-study-session.yaml
+#
+# Watch a flow while editing it (re-runs on save):
+#   maestro test -c .maestro/flows/04-study-session.yaml
+#
+# STATE: only 00-onboarding clears app storage. Every later flow deliberately
+# keeps what the previous one produced — 02 creates the deck that 03/04/05 study
+# from. That mirrors a real user's device (data accumulates) and keeps the suite
+# fast. So run the whole folder, or re-run 00→02 before a single later flow.
+#
+# SCREENSHOTS land in .maestro/screenshots/ (gitignored) — one per meaningful
+# screen, so the run doubles as a visual review of every surface in the app.
+flows:
+  - "flows/*.yaml"

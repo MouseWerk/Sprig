@@ -1,0 +1,36 @@
+# Every tab opens, renders, and survives being revisited.
+# Also the cheapest regression net for "app starts at all after a change".
+appId: com.mousewerk.sprig
+name: 01 Tabs
+tags:
+  - smoke
+---
+- launchApp
+
+- tapOn: "Home"
+- assertVisible: "Home"
+- takeScreenshot: .maestro/screenshots/01-tab-home
+
+- tapOn: "Decks"
+- assertVisible: "Decks"
+- takeScreenshot: .maestro/screenshots/01-tab-decks
+
+- tapOn: "Library"
+- assertVisible: "Library"
+- takeScreenshot: .maestro/screenshots/01-tab-library
+
+- tapOn: "Audio"
+- assertVisible: "Audio"
+- takeScreenshot: .maestro/screenshots/01-tab-audio
+
+- tapOn: "Stats"
+- assertVisible: "Stats"
+- takeScreenshot: .maestro/screenshots/01-tab-stats
+
+- tapOn: "Settings"
+- assertVisible: "Settings"
+- takeScreenshot: .maestro/screenshots/01-tab-settings
+
+# Back to the start — catches tabs that only render correctly once.
+- tapOn: "Home"
+- assertVisible: "Home"

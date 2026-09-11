@@ -1,0 +1,37 @@
+# First launch: the six-slide onboarding, then landing on Home.
+# This is the only flow that wipes app storage — everything after it builds on
+# the state this leaves behind.
+appId: com.mousewerk.sprig
+name: 00 Onboarding
+tags:
+  - smoke
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+
+- assertVisible: "Welcome to Sprig"
+- assertVisible: "1 / 6"
+- takeScreenshot: .maestro/screenshots/00-onboarding-1-welcome
+
+# Walk every slide rather than skipping: each one renders its own animated
+# vignette, and a crash in any of them would otherwise go unnoticed.
+- repeat:
+    times: 5
+    commands:
+      - tapOn: "Next"
+      - takeScreenshot: .maestro/screenshots/00-onboarding-slide
+
+- assertVisible: "Get Started"
+- takeScreenshot: .maestro/screenshots/00-onboarding-6-last
+- tapOn: "Get Started"
+
+# Onboarding is done: the tab bar is up and Home is the landing tab.
+- assertVisible: "Decks"
+- assertVisible: "Stats"
+- takeScreenshot: .maestro/screenshots/00-home-first-run
+
+# It must not reappear on the next launch.
+- launchApp
+- assertNotVisible: "Welcome to Sprig"

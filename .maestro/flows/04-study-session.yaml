@@ -1,0 +1,77 @@
+# A full swipe session: flip a card, grade cards in all three directions, and
+# land on the summary with the reflection prompt.
+#
+# The swipe gestures are deliberately slower than Maestro's default: the card
+# only commits past a quarter-screen threshold, and a fast flick can be read as
+# a scroll by the gesture handler.
+appId: com.mousewerk.sprig
+name: 04 Study session
+tags:
+  - core
+---
+- launchApp
+
+- tapOn: "Decks"
+- tapOn: "Maestro Test Deck"
+- tapOn: "Study All"
+
+# Front of the card, then flip to the answer.
+- assertVisible: "Question"
+- takeScreenshot: .maestro/screenshots/04-card-front
+- tapOn:
+    text: "Tap to reveal answer"
+    optional: true
+- assertVisible: "Answer"
+- takeScreenshot: .maestro/screenshots/04-card-back
+
+# Right = known.
+- swipe:
+    start: "50%, 55%"
+    end: "92%, 55%"
+    duration: 600
+- extendedWaitUntil:
+    visible: "Question"
+    timeout: 5000
+
+# Left = not known.
+- swipe:
+    start: "50%, 55%"
+    end: "8%, 55%"
+    duration: 600
+- extendedWaitUntil:
+    visible: "Question"
+    timeout: 5000
+
+# Up = unsure.
+- swipe:
+    start: "50%, 60%"
+    end: "50%, 12%"
+    duration: 600
+- extendedWaitUntil:
+    visible: "Question"
+    timeout: 5000
+- takeScreenshot: .maestro/screenshots/04-mid-session
+
+# Clear the rest of the deck to reach the summary screen.
+- repeat:
+    times: 3
+    commands:
+      - swipe:
+          start: "50%, 55%"
+          end: "92%, 55%"
+          duration: 600
+      - waitForAnimationToEnd:
+          timeout: 3000
+
+# Session summary carries the stats and the optional reflection field.
+- assertVisible: "Session Complete!"
+- assertVisible: "What was hard today? (optional)"
+- takeScreenshot: .maestro/screenshots/04-session-complete
+
+- tapOn: "What was hard today? (optional)"
+- inputText: "Mixing up Jupiter and Saturn"
+- hideKeyboard
+- takeScreenshot: .maestro/screenshots/04-reflection-typed
+
+- tapOn: "Done"
+- assertVisible: "Maestro Test Deck"

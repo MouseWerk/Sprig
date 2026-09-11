@@ -1,0 +1,42 @@
+# The remaining surfaces: Home (with a studied deck behind it), the Grove, and
+# Settings including a language round-trip — the one setting that re-renders
+# every screen and so is the most likely to break something.
+appId: com.mousewerk.sprig
+name: 07 Home, Grove, Settings
+tags:
+  - core
+---
+- launchApp
+
+# --- Home ---
+- tapOn: "Home"
+- assertVisible: "Home"
+- takeScreenshot: .maestro/screenshots/07-home
+
+# --- Grove ---
+- scrollUntilVisible:
+    element: "The Grove"
+    direction: DOWN
+    timeout: 10000
+- tapOn: "The Grove"
+- takeScreenshot: .maestro/screenshots/07-grove
+- back
+
+# --- Settings ---
+- tapOn: "Settings"
+- assertVisible: "Settings"
+- takeScreenshot: .maestro/screenshots/07-settings
+
+# Switch to German, confirm the UI actually follows, then switch back so the
+# suite is repeatable.
+- tapOn: "Deutsch"
+- extendedWaitUntil:
+    visible: "Einstellungen"
+    timeout: 5000
+- takeScreenshot: .maestro/screenshots/07-settings-german
+
+- tapOn: "English"
+- extendedWaitUntil:
+    visible: "Settings"
+    timeout: 5000
+- takeScreenshot: .maestro/screenshots/07-settings-back-to-english

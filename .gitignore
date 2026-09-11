@@ -68,3 +68,6 @@ coverage/
 *.jks
 credentials.json
 play-service-account.json
+
+# Maestro UI test artifacts
+.maestro/screenshots/

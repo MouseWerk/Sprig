@@ -1,0 +1,52 @@
+# Creating a deck from pasted text, which is also the seed data every later
+# flow studies from. Six cards on purpose: quiz mode refuses to start under four.
+appId: com.mousewerk.sprig
+name: 02 Create deck
+tags:
+  - smoke
+---
+- launchApp
+
+- tapOn: "Decks"
+# The "+" in the header, not the empty-state button ("Create New Deck") — the
+# header one is there whether or not the grid already has decks, so this flow
+# still works on a device that isn't freshly wiped. Matching is case-sensitive,
+# so the two don't collide.
+- tapOn: "Create new deck"
+- assertVisible: "Create New Deck"
+- takeScreenshot: .maestro/screenshots/02-new-deck-sheet
+
+- tapOn: "e.g. History Facts"
+- inputText: "Maestro Test Deck"
+- hideKeyboard
+
+- tapOn: "Paste Cards as Text"
+
+# One card per line, "question, answer". Enter between lines because inputText
+# can't carry a newline through adb.
+- tapOn:
+    below: "Paste Cards as Text"
+- inputText: "What is H2O?, Water"
+- pressKey: Enter
+- inputText: "Capital of France?, Paris"
+- pressKey: Enter
+- inputText: "Largest planet?, Jupiter"
+- pressKey: Enter
+- inputText: "Speed of light?, 300000 km per second"
+- pressKey: Enter
+- inputText: "Author of Faust?, Goethe"
+- pressKey: Enter
+- inputText: "Square root of 81?, 9"
+- hideKeyboard
+- takeScreenshot: .maestro/screenshots/02-pasted-cards
+
+- tapOn: "Import Pasted Cards"
+
+# Back on the deck grid, the new deck is there with its six cards.
+- assertVisible: "Maestro Test Deck"
+- takeScreenshot: .maestro/screenshots/02-deck-created
+
+- tapOn: "Maestro Test Deck"
+- assertVisible:
+    text: ".*6 cards.*"
+- takeScreenshot: .maestro/screenshots/02-deck-details

@@ -50,8 +50,13 @@ export function BottomSheet({ visible, onClose, sheetStyle, children }: BottomSh
 
     return (
         <Modal visible={mounted} animationType="none" transparent onRequestClose={onClose}>
+            {/* Android resizes the window for the keyboard on its own, so a
+                "height" behavior here shrinks the overlay a second time — after
+                the keyboard closes the sheet is left floating above the bottom
+                edge with a strip of the screen behind it showing through. Only
+                iOS needs the manual padding. */}
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={{ flex: 1 }}
             >
                 <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>

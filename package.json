@@ -10,7 +10,8 @@
     "lint": "expo lint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "release:android": "node scripts/android-release.mjs"
+    "release:android": "node scripts/android-release.mjs",
+    "test:ui": "maestro test .maestro/flows"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

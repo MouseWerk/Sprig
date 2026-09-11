@@ -1,0 +1,27 @@
+# Stats after a session: the counters moved, and the reflection written in
+# flow 04 shows up in the Recent Reflections log.
+# Depends on 04 having run — see the state note in .maestro/config.yaml.
+appId: com.mousewerk.sprig
+name: 05 Stats and reflections
+tags:
+  - core
+---
+- launchApp
+
+- tapOn: "Stats"
+- assertVisible: "Stats"
+- takeScreenshot: .maestro/screenshots/05-stats-top
+
+- scrollUntilVisible:
+    element: "Recent Reflections"
+    direction: DOWN
+    timeout: 15000
+- assertVisible: "Mixing up Jupiter and Saturn"
+- takeScreenshot: .maestro/screenshots/05-reflections
+
+# Lifetime counters exist and the level card renders.
+- scrollUntilVisible:
+    element: "Lifetime"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: .maestro/screenshots/05-lifetime

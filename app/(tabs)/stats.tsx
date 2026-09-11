@@ -242,6 +242,10 @@ export default function StatsScreen() {
                         <View style={styles.group}>
                             {reflections.map(r => (
                                 <View key={r.id} style={[styles.item, { backgroundColor: cardColor }]}>
+                                    {/* Same leading marker as the toughest-card
+                                        rows above, so the two lists share one
+                                        left edge instead of stepping in and out. */}
+                                    <View style={[styles.reflectionDot, { backgroundColor: mutedForeground }]} />
                                     <View style={{ flex: 1 }}>
                                         <Text style={[styles.hardQuestion, { color: textColor }]} numberOfLines={2}>{r.note}</Text>
                                         <Text style={[styles.hardDeck, { color: mutedForeground }]} numberOfLines={1}>
@@ -375,6 +379,14 @@ const styles = StyleSheet.create({
         borderRadius: 5,
         marginRight: 14,
         marginLeft: 4,
+    },
+    reflectionDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        opacity: 0.5,
+        marginRight: 16,
+        marginLeft: 6,
     },
     hardQuestion: {
         fontSize: 14,
