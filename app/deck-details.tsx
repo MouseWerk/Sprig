@@ -3,7 +3,7 @@ import { TranslationKey } from '@/constants/translations';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
-import { ConfusionPair, Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getConfusionPairs, getDecks, importCsvToDeck, localDateKey, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckExamDate, updateDeckNotes, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
+import { ConfusionPair, Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getConfusionPairs, getDecks, importCsvToDeck, localDateKey, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckExamDate, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
@@ -21,7 +21,6 @@ import MarkdownRenderer from '../components/MarkdownRenderer';
 import { isImageToken } from '@/utils/CardImages';
 import { toDisplayText } from '@/utils/CardText';
 import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
 import { BottomSheet } from '../components/ui/BottomSheet';
 import { useConfirm } from '../components/ui/ConfirmDialog';
 
@@ -52,14 +51,6 @@ export default function DeckDetailsScreen() {
     const [cardSearch, setCardSearch] = useState('');
     const [filterMode, setFilterMode] = useState<'all' | 'learned' | 'unsure' | 'new'>('all');
     const [confusions, setConfusions] = useState<ConfusionPair[]>([]);
-
-    const [notebookVisible, setNotebookVisible] = useState(false);
-    const [notebookEditing, setNotebookEditing] = useState(false);
-    const [notesDraft, setNotesDraft] = useState('');
-    // Save confirmation lives inside the sheet rather than in a toast: the
-    // sheet is a native Modal, which is its own window, so a toast rendered by
-    // ToastProvider at the app root ends up *behind* it and is never seen.
-    const [notebookSaved, setNotebookSaved] = useState(false);
 
     const backgroundColor = useThemeColor({}, 'background');
     const cardColor = useThemeColor({}, 'card');
@@ -107,24 +98,12 @@ export default function DeckDetailsScreen() {
         }, [id])
     );
 
+    // The notebook is its own route (app/notebook.tsx), not a sheet — a
+    // full-height editor is the only way the caret stays visible above the
+    // keyboard while typing.
     const openNotebook = () => {
-        setNotesDraft(deck?.notes || '');
-        setNotebookEditing(!deck?.notes);
-        setNotebookSaved(false);
-        setNotebookVisible(true);
-    };
-
-    const handleSaveNotebook = async () => {
         if (!id) return;
-        try {
-            await updateDeckNotes(id, notesDraft);
-            setDeck(prev => prev ? { ...prev, notes: notesDraft } : prev);
-            setNotebookEditing(false);
-            setNotebookSaved(true);
-        } catch (e) {
-            console.error('Error saving deck notes:', e);
-            showToast({ message: t('error'), type: 'error' });
-        }
+        router.push({ pathname: '/notebook', params: { id, name: deck?.name || '' } });
     };
 
     const handleAddCard = async () => {
@@ -983,81 +962,6 @@ export default function DeckDetailsScreen() {
                         </ScrollView>
             </BottomSheet>
 
-            {/* Notebook */}
-            <BottomSheet
-                visible={notebookVisible}
-                onClose={() => setNotebookVisible(false)}
-                sheetStyle={[styles.modalContent, { backgroundColor, paddingBottom: Math.max(insets.bottom, 24) }]}
-            >
-                <View style={styles.modalHeader}>
-                    <Text style={[styles.modalTitle, { color: textColor }]}>{t('deckDetailsNotebook')}</Text>
-                    <TouchableOpacity onPress={() => setNotebookVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
-                        <X size={20} color={textColor} />
-                    </TouchableOpacity>
-                </View>
-
-                <View style={[styles.notebookToggleRow, { backgroundColor: secondaryBg }]}>
-                    <TouchableOpacity
-                        style={[styles.notebookToggleBtn, notebookEditing && { backgroundColor: accentColor }]}
-                        onPress={() => setNotebookEditing(true)}
-                    >
-                        <Text style={[styles.notebookToggleText, { color: notebookEditing ? primaryForeground : mutedForeground }]}>
-                            {t('deckDetailsNotebookEdit')}
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.notebookToggleBtn, !notebookEditing && { backgroundColor: accentColor }]}
-                        onPress={() => setNotebookEditing(false)}
-                    >
-                        <Text style={[styles.notebookToggleText, { color: !notebookEditing ? primaryForeground : mutedForeground }]}>
-                            {t('deckDetailsNotebookPreview')}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                {notebookEditing ? (
-                    <Text style={[styles.notebookHint, { color: mutedForeground }]}>
-                        {t('deckDetailsNotebookHint')}
-                    </Text>
-                ) : notebookSaved ? (
-                    <View style={styles.notebookSavedRow}>
-                        <CheckCircle2 size={14} color="#22c55e" strokeWidth={3} />
-                        <Text style={[styles.notebookSavedText, { color: '#22c55e' }]}>
-                            {t('deckDetailsNotebookSaved')}
-                        </Text>
-                    </View>
-                ) : null}
-
-                <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 12 }}>
-                    {notebookEditing ? (
-                        <Input
-                            value={notesDraft}
-                            onChangeText={text => { setNotesDraft(text); setNotebookSaved(false); }}
-                            placeholder={t('deckDetailsNotebookPlaceholder')}
-                            multiline
-                            autoFocus={!notesDraft}
-                            inputStyle={{ minHeight: 180 }}
-                        />
-                    ) : notesDraft.trim().length > 0 ? (
-                        <MarkdownRenderer content={notesDraft} fontSize={16} />
-                    ) : (
-                        <View style={styles.notebookEmptyState}>
-                            <NotebookPen size={28} color={mutedForeground} strokeWidth={2} />
-                            <Text style={[styles.notebookEmptyText, { color: mutedForeground }]}>
-                                {t('deckDetailsNotebookEmpty')}
-                            </Text>
-                        </View>
-                    )}
-                </ScrollView>
-
-                {notebookEditing && (
-                    <Button
-                        title={t('saveChanges')}
-                        onPress={handleSaveNotebook}
-                        style={{ marginTop: 16, height: 56, borderRadius: 16 }}
-                    />
-                )}
-            </BottomSheet>
         </View>
     );
 }

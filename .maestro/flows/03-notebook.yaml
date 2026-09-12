@@ -1,22 +1,32 @@
-# The per-deck Notebook: empty state, editing, markdown preview, persistence.
-# Screenshots here are the visual review surface — this screen was built without
-# ever being seen on a device.
+# The per-deck Notebook, which is its own route (app/notebook.tsx) rather than
+# a bottom sheet — as a sheet the keyboard covered the caret while typing.
+# Covers: empty state, editing, markdown preview, and persistence across
+# leaving the page.
 appId: com.mousewerk.sprig
 name: 03 Notebook
 tags:
   - ui
 ---
+# Cold start so the flow never inherits whatever screen a previous
+# flow was left on (state in storage is shared on purpose, navigation is not).
+- stopApp
 - launchApp
+# A cold start still has to boot the JS bundle before the tab bar exists;
+# on a loaded machine that is well past the default assertion timeout.
+- extendedWaitUntil:
+    visible: "Decks"
+    timeout: 60000
 
 - tapOn: "Decks"
 - tapOn: "Maestro Test Deck"
-
 - tapOn: "Notebook"
-- assertVisible: "Notebook"
+
+# A fresh deck has no notes, so the page opens straight in edit mode with the
+# keyboard already up.
+- assertVisible: "Add mnemonics, summaries, or reference notes for this deck…"
+- assertVisible: "Markdown works here — # heading, **bold**, - list"
 - takeScreenshot: .maestro/screenshots/03-notebook-empty
 
-# A fresh deck has no notes, so the sheet opens straight in edit mode.
-- assertVisible: "Add mnemonics, summaries, or reference notes for this deck…"
 - tapOn: "Add mnemonics, summaries, or reference notes for this deck…"
 - inputText: "# Chemistry"
 - pressKey: Enter
@@ -25,11 +35,20 @@ tags:
 - inputText: "- Jupiter is the largest planet"
 - pressKey: Enter
 - inputText: "- Goethe wrote Faust"
+
+# The text must still be on screen with the keyboard open — this is the
+# regression that moving off the bottom sheet fixed. A TextInput exposes its
+# whole value as one node, so this matches the full multi-line string;
+# (?s) lets "." span the newlines.
+- assertVisible: "(?s).*Goethe wrote Faust.*"
+- takeScreenshot: .maestro/screenshots/03-notebook-typing-with-keyboard
+
 - hideKeyboard
 - takeScreenshot: .maestro/screenshots/03-notebook-editing
 
 - tapOn: "Save Changes"
 - assertVisible: "Notes saved"
+- assertVisible: "Chemistry"
 - takeScreenshot: .maestro/screenshots/03-notebook-saved
 
 # Preview renders the markdown rather than the raw text.
@@ -37,9 +56,10 @@ tags:
 - assertVisible: "Chemistry"
 - takeScreenshot: .maestro/screenshots/03-notebook-preview
 
-# Notes survive closing and reopening the sheet.
-- tapOn: "Close"
+# Notes survive leaving the page and coming back.
+- back
+- assertVisible: "Maestro Test Deck"
 - tapOn: "Notebook"
 - assertVisible: "Chemistry"
 - takeScreenshot: .maestro/screenshots/03-notebook-reopened
-- tapOn: "Close"
+- back

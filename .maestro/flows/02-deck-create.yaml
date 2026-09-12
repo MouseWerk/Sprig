@@ -5,7 +5,15 @@ name: 02 Create deck
 tags:
   - smoke
 ---
+# Cold start so the flow never inherits whatever screen a previous
+# flow was left on (state in storage is shared on purpose, navigation is not).
+- stopApp
 - launchApp
+# A cold start still has to boot the JS bundle before the tab bar exists;
+# on a loaded machine that is well past the default assertion timeout.
+- extendedWaitUntil:
+    visible: "Decks"
+    timeout: 60000
 
 - tapOn: "Decks"
 # The "+" in the header, not the empty-state button ("Create New Deck") — the

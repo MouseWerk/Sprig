@@ -114,6 +114,12 @@ function RootLayoutNav() {
           headerStyle: { backgroundColor },
           headerTitleStyle: { fontWeight: '600' }
         }} />
+        <Stack.Screen name="notebook" options={{
+          headerBackTitle: backTitle,
+          headerTintColor: textColor,
+          headerStyle: { backgroundColor },
+          headerTitleStyle: { fontWeight: '600' }
+        }} />
         <Stack.Screen name="deck-details" options={{
           headerBackTitle: backTitle,
           headerTintColor: textColor,
