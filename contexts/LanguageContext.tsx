@@ -1,21 +1,7 @@
 import { Language, TranslationKey, translations } from '@/constants/translations';
+import { detectDefaultLanguage, LANGUAGE_STORAGE_KEY } from '@/utils/AppLanguage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-
-export const LANGUAGE_STORAGE_KEY = 'sprig_language';
-
-// Best-effort device-locale default for a first launch with no saved choice.
-// Pure JS (Hermes' built-in Intl), so this never needs a native module or
-// rebuild — if Intl is unavailable for any reason, English is the fallback.
-function detectDefaultLanguage(): Language {
-    try {
-        const locale = Intl.DateTimeFormat().resolvedOptions().locale || '';
-        if (locale.toLowerCase().startsWith('de')) return 'de';
-    } catch {
-        // ignore — fall through to English
-    }
-    return 'en';
-}
 
 interface LanguageContextType {
     language: Language;

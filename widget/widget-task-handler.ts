@@ -1,4 +1,5 @@
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
+import { getAppLanguage } from '../utils/AppLanguage';
 import { getCachedWidgetSnapshot, refreshCachedSnapshot, removeWidgetMapping } from '../utils/PinnedDeck';
 import { renderPinnedDeckWidget } from './PinnedDeckWidget';
 
@@ -20,7 +21,7 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps): Promise<
         case 'WIDGET_RESIZED': {
             let snapshot = await refreshCachedSnapshot(widgetId).catch(() => undefined);
             if (snapshot === undefined) snapshot = await getCachedWidgetSnapshot(widgetId);
-            props.renderWidget(renderPinnedDeckWidget(snapshot, width, height));
+            props.renderWidget(renderPinnedDeckWidget(snapshot, width, height, await getAppLanguage()));
             break;
         }
         case 'WIDGET_DELETED':

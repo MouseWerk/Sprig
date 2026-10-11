@@ -20,6 +20,7 @@ import { CardTextInput } from '../components/CardTextInput';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { isImageToken } from '@/utils/CardImages';
 import { toDisplayText } from '@/utils/CardText';
+import { plural } from '@/utils/AppLanguage';
 import { Button } from '../components/ui/Button';
 import { BottomSheet } from '../components/ui/BottomSheet';
 import { useConfirm } from '../components/ui/ConfirmDialog';
@@ -513,7 +514,7 @@ export default function DeckDetailsScreen() {
                                     const dueCount = countDueCards({ totalCards: cards.length, srsData: deck.srsData });
                                     return (
                                         <Text style={[styles.deckSubtitleSmall, { color: mutedForeground }]}>
-                                            {t('deckDetailsCardsCount').replace('{n}', String(cards.length))}
+                                            {plural(t, cards.length, 'cardsCountOne', 'deckDetailsCardsCount')}
                                             {'  ·  '}
                                             <Text style={{ color: cards.length > 0 && learned === cards.length ? '#22c55e' : mutedForeground }}>{t('deckDetailsLearnedCount').replace('{n}', String(learned))}</Text>
                                             {'  ·  '}

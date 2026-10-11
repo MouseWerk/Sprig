@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { FlexWidget, SvgWidget, TextWidget } from 'react-native-android-widget';
+import { Language, TranslationKey } from '../constants/translations';
+import { plural, translate } from '../utils/AppLanguage';
 import { WidgetSnapshot } from '../utils/PinnedDeck';
 import { getDeckIconSvg } from './deckIcons';
 
@@ -31,6 +33,9 @@ interface PinnedDeckWidgetProps {
     snapshot: WidgetSnapshot | null;
     width?: number;
     height?: number;
+    // The widget renders outside the app's LanguageProvider; callers pass
+    // the app language (utils/AppLanguage.getAppLanguage).
+    language?: Language;
 }
 
 // Below this, the full card (name row + cards/mastery row + progress bar)
@@ -39,7 +44,8 @@ interface PinnedDeckWidgetProps {
 const COMPACT_WIDTH_THRESHOLD = 140;
 const COMPACT_HEIGHT_THRESHOLD = 70;
 
-export function PinnedDeckWidget({ snapshot, width, height }: PinnedDeckWidgetProps) {
+export function PinnedDeckWidget({ snapshot, width, height, language = 'en' }: PinnedDeckWidgetProps) {
+    const t = (key: TranslationKey) => translate(language, key);
     const isCompact = (width !== undefined && width < COMPACT_WIDTH_THRESHOLD)
         || (height !== undefined && height < COMPACT_HEIGHT_THRESHOLD);
 
@@ -62,7 +68,7 @@ export function PinnedDeckWidget({ snapshot, width, height }: PinnedDeckWidgetPr
                     <TextWidget text="+" style={{ fontSize: 20, color: MUTED, fontWeight: '700' }} />
                 ) : (
                     <TextWidget
-                        text="Pin a deck in Sprig to see it here"
+                        text={t('widgetEmpty')}
                         style={{ fontSize: 13, color: MUTED, fontWeight: '600' }}
                     />
                 )}
@@ -109,7 +115,7 @@ export function PinnedDeckWidget({ snapshot, width, height }: PinnedDeckWidgetPr
         );
     }
 
-    const subtitle = snapshot.dueCount > 0 ? `${snapshot.dueCount} due` : 'All caught up';
+    const subtitle = snapshot.dueCount > 0 ? t('homeDueCount').replace('{n}', String(snapshot.dueCount)) : t('widgetAllCaughtUp');
 
     return (
         <FlexWidget
@@ -172,9 +178,9 @@ export function PinnedDeckWidget({ snapshot, width, height }: PinnedDeckWidgetPr
                     marginTop: 10,
                 }}
             >
-                <TextWidget text={`${snapshot.totalCards} cards`} style={{ fontSize: 11, fontWeight: '600', color: MUTED }} />
+                <TextWidget text={plural(t, snapshot.totalCards, 'cardsCountOne', 'deckDetailsCardsCount')} style={{ fontSize: 11, fontWeight: '600', color: MUTED }} />
                 <TextWidget
-                    text={`${snapshot.masteryPercent}% mastery`}
+                    text={t('widgetMastery').replace('{n}', String(snapshot.masteryPercent))}
                     style={{ fontSize: 11, fontWeight: '700', color: masteryColor }}
                 />
             </FlexWidget>
@@ -197,6 +203,6 @@ export function PinnedDeckWidget({ snapshot, width, height }: PinnedDeckWidgetPr
     );
 }
 
-export function renderPinnedDeckWidget(snapshot: WidgetSnapshot | null, width?: number, height?: number) {
-    return <PinnedDeckWidget snapshot={snapshot} width={width} height={height} />;
+export function renderPinnedDeckWidget(snapshot: WidgetSnapshot | null, width?: number, height?: number, language: Language = 'en') {
+    return <PinnedDeckWidget snapshot={snapshot} width={width} height={height} language={language} />;
 }

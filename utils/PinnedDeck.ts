@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAppLanguage } from './AppLanguage';
 import { countDueCards, Deck, dueCardIndices, getDecks } from './Storage';
 
 // Each Android home-screen widget instance can be pinned to a different deck
@@ -144,6 +145,7 @@ export async function refreshAllPinnedWidgets(): Promise<void> {
     try {
         const { requestWidgetUpdateById } = await import('react-native-android-widget');
         const { renderPinnedDeckWidget } = await import('../widget/PinnedDeckWidget');
+        const language = await getAppLanguage();
 
         for (const widgetIdStr of widgetIds) {
             const widgetId = Number(widgetIdStr);
@@ -151,7 +153,7 @@ export async function refreshAllPinnedWidgets(): Promise<void> {
             await requestWidgetUpdateById({
                 widgetName: 'PinnedDeck',
                 widgetId,
-                renderWidget: (info) => renderPinnedDeckWidget(snapshot, info.width, info.height),
+                renderWidget: (info) => renderPinnedDeckWidget(snapshot, info.width, info.height, language),
                 widgetNotFound: () => { removeWidgetMapping(widgetId).catch(() => { }); },
             });
         }
@@ -159,6 +161,28 @@ export async function refreshAllPinnedWidgets(): Promise<void> {
         // Android-only / no widget placed yet — usually fine to ignore, but
         // log so a real native-module failure doesn't disappear silently.
         if (__DEV__) console.warn('[PinnedDeck] refreshAllPinnedWidgets failed', err);
+    }
+}
+
+// Shows every placed widget as "pin a deck". Used before a full data wipe,
+// which clears the widget map along with everything else: afterwards
+// nothing could reach the widgets, and they kept showing the deleted deck.
+export async function blankAllPinnedWidgets(): Promise<void> {
+    const widgetIds = Object.keys(await getDeckMap());
+    if (widgetIds.length === 0) return;
+    try {
+        const { requestWidgetUpdateById } = await import('react-native-android-widget');
+        const { renderPinnedDeckWidget } = await import('../widget/PinnedDeckWidget');
+        const language = await getAppLanguage();
+        for (const widgetIdStr of widgetIds) {
+            await requestWidgetUpdateById({
+                widgetName: 'PinnedDeck',
+                widgetId: Number(widgetIdStr),
+                renderWidget: (info) => renderPinnedDeckWidget(null, info.width, info.height, language),
+            });
+        }
+    } catch (err) {
+        if (__DEV__) console.warn('[PinnedDeck] blankAllPinnedWidgets failed', err);
     }
 }
 

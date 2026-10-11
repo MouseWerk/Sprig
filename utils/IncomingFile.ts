@@ -1,4 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { Language } from '../constants/translations';
+import { translate } from './AppLanguage';
 import { importApkg } from './AnkiImport';
 import { importSprigDeck, looksLikeZipBase64Head } from './SprigDeck';
 import { createEmptyDeck, deleteDeck, importCsvToDeck, saveAudioFile, saveDeck } from './Storage';
@@ -62,7 +64,11 @@ function extFromUrl(url: string): string {
 // Copies the incoming file into cache and figures out roughly what kind of
 // file it is, without importing anything yet. Returns null when the URL was
 // already handled (cold start + event race).
-export async function detectIncomingFile(url: string): Promise<DetectedIncomingFile | null> {
+// Errors thrown by commitIncomingImport carry one of these codes as their
+// message; the caller shows the matching translated text.
+export type IncomingImportError = 'anki-new-format' | 'anki-empty' | 'anki-failed' | 'not-sprig' | 'no-cards';
+
+export async function detectIncomingFile(url: string, language: Language = 'en'): Promise<DetectedIncomingFile | null> {
     if (handled.has(url)) return null;
     handled.add(url);
 
@@ -72,24 +78,27 @@ export async function detectIncomingFile(url: string): Promise<DetectedIncomingF
 
         // Sniff the first bytes: "%PDF" -> base64 "JVBER...", ZIP -> "UEsDB..."
         const head = await FileSystem.readAsStringAsync(tmp, { encoding: 'base64', length: 8, position: 0 } as any);
+        const today = new Date().toLocaleDateString(language);
+        const fallback = (key: 'incomingDefaultPdfName' | 'incomingDefaultAudioName' | 'incomingDefaultDeckName') =>
+            translate(language, key).replace('{date}', today);
 
         if (head.startsWith('JVBER')) {
-            return { kind: 'pdf', tmpUri: tmp, sourceUrl: url, suggestedName: nameFromUrl(url, `Imported PDF ${new Date().toLocaleDateString()}`) };
+            return { kind: 'pdf', tmpUri: tmp, sourceUrl: url, suggestedName: nameFromUrl(url, fallback('incomingDefaultPdfName')) };
         }
 
         if (AUDIO_EXT_RE.test(extFromUrl(url))) {
-            return { kind: 'audio', tmpUri: tmp, sourceUrl: url, suggestedName: nameFromUrl(url, `Imported Audio ${new Date().toLocaleDateString()}`) };
+            return { kind: 'audio', tmpUri: tmp, sourceUrl: url, suggestedName: nameFromUrl(url, fallback('incomingDefaultAudioName')) };
         }
 
         if (looksLikeZipBase64Head(head)) {
             // Could be an Anki .apkg/.colpkg export or a shared .sprig deck — both
             // are ZIPs, resolved at commit time (Anki's collection DB is tried
             // first, falling back to the Sprig format).
-            return { kind: 'zip', tmpUri: tmp, sourceUrl: url, suggestedName: nameFromUrl(url, `Imported Deck ${new Date().toLocaleDateString()}`) };
+            return { kind: 'zip', tmpUri: tmp, sourceUrl: url, suggestedName: nameFromUrl(url, fallback('incomingDefaultDeckName')) };
         }
 
         // Treat anything else as CSV/text
-        return { kind: 'csv', tmpUri: tmp, sourceUrl: url, suggestedName: nameFromUrl(url, `Imported Deck ${new Date().toLocaleDateString()}`) };
+        return { kind: 'csv', tmpUri: tmp, sourceUrl: url, suggestedName: nameFromUrl(url, fallback('incomingDefaultDeckName')) };
     } catch (e) {
         // Copying or sniffing failed (unreadable URI, permission, out of space).
         // Release the URL so opening the same file again actually retries
@@ -124,11 +133,10 @@ export async function commitIncomingImport(
                 return { kind: 'anki', name, cards: res.cardCount };
             } catch (e: any) {
                 if (e?.message !== 'no-collection') {
-                    throw new Error(
-                        e?.message === 'new-format' ? 'This Anki export uses a newer format Sprig can\'t read yet — re-export with "Support older Anki versions" enabled'
-                            : e?.message === 'empty' ? 'No cards found in this Anki deck'
-                                : 'Could not import this Anki deck'
-                    );
+                    const code: IncomingImportError = e?.message === 'new-format' ? 'anki-new-format'
+                        : e?.message === 'empty' ? 'anki-empty'
+                            : 'anki-failed';
+                    throw new Error(code);
                 }
             }
 
@@ -137,9 +145,11 @@ export async function commitIncomingImport(
                 const res = await importSprigDeck(tmp, folderId, name);
                 return { kind: 'sprig', name: res.deck.name, cards: res.cardCount };
             } catch (e: any) {
-                throw new Error(e?.message === 'not-sprig'
-                    ? 'This file is not a Sprig deck'
-                    : (e?.message || 'Could not import this file'));
+                if (e?.message === 'not-sprig' || e?.message === 'empty') {
+                    const code: IncomingImportError = e.message === 'empty' ? 'no-cards' : 'not-sprig';
+                    throw new Error(code);
+                }
+                throw e;
             }
         }
 
@@ -153,7 +163,8 @@ export async function commitIncomingImport(
         const count = cards?.length ?? 0;
         if (count === 0) {
             await deleteDeck(deck.id);
-            throw new Error('No question/answer pairs found in the file');
+            const code: IncomingImportError = 'no-cards';
+            throw new Error(code);
         }
         return { kind: 'csv', name, cards: count };
     } finally {

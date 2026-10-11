@@ -7,6 +7,7 @@ import { replayOnboarding } from '@/components/Onboarding';
 import { SprigLogo } from '@/components/SprigLogo';
 import { createBackup, importBackup } from '@/utils/Backup';
 import { cancelAllNotifications, cancelStreakReminder, scheduleStreakReminder } from '@/utils/Notifications';
+import { blankAllPinnedWidgets } from '@/utils/PinnedDeck';
 import { CARD_TEXT_SCALE_OPTIONS, DAILY_GOAL_OPTIONS, FOCUS_MINUTES_OPTIONS, HomeSectionId, Preferences, REMINDER_HOUR_MAX, REMINDER_HOUR_MIN, STUDY_SESSION_LENGTH_OPTIONS, getPrefsSync, resetPrefsCache, setPref, subscribePrefs } from '@/utils/Preferences';
 import { clearCardCache, wipeAllData } from '@/utils/Storage';
 import { getWebServerCode, getWebServerLog, getWebServerUrl, isWebServerRunning, isWebServerSupported, startWebServer, stopWebServer } from '@/utils/WebServer';
@@ -219,6 +220,7 @@ export default function SettingsScreen() {
       // Cancel first: clearing AsyncStorage throws away the stored reminder
       // id, and without it nothing could ever stop the daily notification.
       await cancelAllNotifications();
+      await blankAllPinnedWidgets();
       await wipeAllData();
       await AsyncStorage.clear();
       resetPrefsCache();

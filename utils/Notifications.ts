@@ -1,11 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { LANGUAGE_STORAGE_KEY } from '../contexts/LanguageContext';
-import { Language, TranslationKey, translations } from '../constants/translations';
-import { buildGrovePlants } from './Grove';
+import { TranslationKey } from '../constants/translations';
+import { getAppLanguage, translate } from './AppLanguage';
 import { getPrefs } from './Preferences';
-import { getDecks } from './Storage';
 import { migrateKey } from './StorageMigration';
 
 // All calls are wrapped so a missing permission, an unsupported platform
@@ -18,17 +16,11 @@ let handlerConfigured = false;
 let permissionGranted: boolean | null = null;
 
 // Scheduled notifications fire outside any component tree, so there's no
-// LanguageProvider to pull `t()` from — read the same AsyncStorage key
-// LanguageContext saves the user's choice under instead.
+// LanguageProvider to pull `t()` from. getAppLanguage applies the same rule
+// as the app: the saved choice, else the device language — a German phone
+// whose user never touched the setting used to get English notifications.
 async function tNotif(key: TranslationKey): Promise<string> {
-    let lang: Language = 'en';
-    try {
-        const saved = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
-        if (saved === 'en' || saved === 'de') lang = saved;
-    } catch {
-        // ignore — English fallback
-    }
-    return translations[lang][key] ?? translations.en[key] ?? key;
+    return translate(await getAppLanguage(), key);
 }
 
 function configureHandler() {
@@ -65,7 +57,7 @@ export async function ensureNotificationPermissions(): Promise<boolean> {
         }
         if (Platform.OS === 'android') {
             await Notifications.setNotificationChannelAsync('default', {
-                name: 'Study reminders',
+                name: await tNotif('notifChannelName'),
                 importance: Notifications.AndroidImportance.DEFAULT,
             });
         }

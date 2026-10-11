@@ -2,6 +2,8 @@ import * as Icons from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { WidgetConfigurationScreenProps } from 'react-native-android-widget';
+import { Language, TranslationKey } from '../constants/translations';
+import { detectDefaultLanguage, getAppLanguage, plural, translate } from '../utils/AppLanguage';
 import { countDueCards, Deck, getDecks } from '../utils/Storage';
 import { setDeckIdForWidget } from '../utils/PinnedDeck';
 import { renderPinnedDeckWidget } from './PinnedDeckWidget';
@@ -21,8 +23,11 @@ const ACCENT = '#0f172a';
 export function WidgetConfigScreen({ widgetInfo, renderWidget, setResult }: WidgetConfigurationScreenProps) {
     const [decks, setDecks] = useState<Deck[] | null>(null);
     const [saving, setSaving] = useState(false);
+    const [language, setLanguage] = useState<Language>(detectDefaultLanguage);
+    const t = (key: TranslationKey) => translate(language, key);
 
     useEffect(() => {
+        getAppLanguage().then(setLanguage).catch(() => { });
         getDecks()
             .then(all => setDecks(all.filter(d => d.type === 'csv')))
             .catch(() => setDecks([]));
@@ -33,7 +38,7 @@ export function WidgetConfigScreen({ widgetInfo, renderWidget, setResult }: Widg
         setSaving(true);
         try {
             const snapshot = await setDeckIdForWidget(widgetInfo.widgetId, deck.id);
-            renderWidget(renderPinnedDeckWidget(snapshot, widgetInfo.width, widgetInfo.height));
+            renderWidget(renderPinnedDeckWidget(snapshot, widgetInfo.width, widgetInfo.height, language));
             setResult('ok');
         } catch {
             setSaving(false);
@@ -42,16 +47,16 @@ export function WidgetConfigScreen({ widgetInfo, renderWidget, setResult }: Widg
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Pin a deck</Text>
-            <Text style={styles.subtitle}>Choose which deck this widget shows</Text>
+            <Text style={styles.title} accessibilityRole="header">{t('widgetPinTitle')}</Text>
+            <Text style={styles.subtitle}>{t('widgetPinSubtitle')}</Text>
 
             {decks === null ? (
                 <ActivityIndicator style={styles.loading} color={ACCENT} />
             ) : decks.length === 0 ? (
                 <View style={styles.emptyState}>
-                    <Text style={styles.emptyText}>No decks yet — create one in Sprig first.</Text>
-                    <TouchableOpacity style={styles.cancelButton} onPress={() => setResult('cancel')}>
-                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                    <Text style={styles.emptyText}>{t('widgetNoDecks')}</Text>
+                    <TouchableOpacity style={styles.cancelButton} onPress={() => setResult('cancel')} accessibilityRole="button">
+                        <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
                     </TouchableOpacity>
                 </View>
             ) : (
@@ -68,17 +73,18 @@ export function WidgetConfigScreen({ widgetInfo, renderWidget, setResult }: Widg
                                 activeOpacity={0.7}
                                 disabled={saving}
                                 onPress={() => handlePick(item)}
+                                accessibilityRole="button"
                             >
                                 <View style={styles.deckIconBox}>
                                     <IconComponent size={20} color={TEXT} strokeWidth={2.5} />
                                 </View>
                                 <View style={styles.deckInfo}>
                                     <Text style={styles.deckName} numberOfLines={1}>{item.name}</Text>
-                                    <Text style={styles.deckMeta}>{item.totalCards || 0} cards</Text>
+                                    <Text style={styles.deckMeta}>{plural(t, item.totalCards || 0, 'cardsCountOne', 'deckDetailsCardsCount')}</Text>
                                 </View>
                                 {due > 0 && (
                                     <View style={styles.dueBadge}>
-                                        <Text style={styles.dueText}>{due} due</Text>
+                                        <Text style={styles.dueText}>{t('homeDueCount').replace('{n}', String(due))}</Text>
                                     </View>
                                 )}
                             </TouchableOpacity>

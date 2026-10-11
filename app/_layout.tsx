@@ -6,10 +6,12 @@ import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
 import { ToastProvider, useToast } from '@/components/ui/Toast';
 import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { commitIncomingImport, DetectedIncomingFile, detectIncomingFile, discardIncomingFile, isFileUrl } from '@/utils/IncomingFile';
+import { TranslationKey } from '@/constants/translations';
+import { commitIncomingImport, DetectedIncomingFile, detectIncomingFile, discardIncomingFile, IncomingImportError, isFileUrl } from '@/utils/IncomingFile';
+import { plural } from '@/utils/AppLanguage';
 import { rearmStreakReminderOnLaunch } from '@/utils/Notifications';
 import { Stack, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Linking } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -28,9 +30,21 @@ const ROUTE_FOR_KIND: Record<DetectedIncomingFile['kind'], '/explore' | '/audio'
   csv: '/decks',
 };
 
+const IMPORT_ERROR_KEYS: Record<IncomingImportError, TranslationKey> = {
+  'anki-new-format': 'decksAnkiNewFormat',
+  'anki-empty': 'decksAnkiEmpty',
+  'anki-failed': 'decksAnkiFailed',
+  'not-sprig': 'decksNotSprigFile',
+  'no-cards': 'deckDetailsNoImportPairs',
+};
+
 function useIncomingFiles() {
   const { showToast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  // The url listener is registered once; read the current language through
+  // a ref so a later language switch still names imports correctly.
+  const languageRef = useRef(language);
+  languageRef.current = language;
   const router = useRouter();
   const [pending, setPending] = useState<DetectedIncomingFile | null>(null);
 
@@ -41,7 +55,7 @@ function useIncomingFiles() {
       if (!isFileUrl(url)) return;
       router.replace('/decks');
       try {
-        const detected = await detectIncomingFile(url);
+        const detected = await detectIncomingFile(url, languageRef.current);
         if (!detected) return; // already handled
         router.replace(ROUTE_FOR_KIND[detected.kind]);
         setPending(detected);
@@ -74,12 +88,13 @@ function useIncomingFiles() {
           ? t('layoutPdfAdded').replace('{name}', result.name)
           : result.kind === 'audio'
             ? t('layoutAudioImported').replace('{name}', result.name)
-            : t('layoutDeckImported').replace('{name}', result.name).replace('{n}', String(result.cards)),
+            : t('layoutDeckImported').replace('{name}', result.name).replace('{cards}', plural(t, result.cards ?? 0, 'cardsCountOne', 'deckDetailsCardsCount')),
         type: 'success',
       });
-    } catch (e) {
+    } catch (e: any) {
       console.error('Incoming file import failed:', e);
-      showToast({ message: t('layoutImportFailed'), type: 'error' });
+      const key = IMPORT_ERROR_KEYS[e?.message as IncomingImportError] ?? 'layoutImportFailed';
+      showToast({ message: t(key), type: 'error' });
     }
   };
 

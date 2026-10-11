@@ -18,9 +18,10 @@ import { Input } from '../../components/ui/Input';
 import { useToast } from '../../components/ui/Toast';
 import * as FileSystem from 'expo-file-system/legacy';
 import { importApkg } from '../../utils/AnkiImport';
+import { plural } from '../../utils/AppLanguage';
 import { parseFlashcardsText } from '../../utils/CsvParser';
 import { importSprigDeck, isSprigFileName } from '../../utils/SprigDeck';
-import { countDueCards, createEmptyDeck, Deck, deleteDeck, deleteFolder, Folder, getDecks, getExamPlan, getFolders, importCsvToDeck, saveFolder, updateDeck, updateFolder } from '../../utils/Storage';
+import { countDueCards, createEmptyDeck, Deck, deleteDeck, getCachedData, deleteFolder, Folder, getDecks, getExamPlan, getFolders, importCsvToDeck, saveFolder, updateDeck, updateFolder } from '../../utils/Storage';
 
 export default function DecksScreen() {
   const router = useRouter();
@@ -120,7 +121,7 @@ export default function DecksScreen() {
       if (result.canceled || !result.assets || result.assets.length === 0) return;
 
       const asset = result.assets[0];
-      const fallbackName = asset.name?.replace(/\.[^/.]+$/, '') || 'Imported Deck';
+      const fallbackName = asset.name?.replace(/\.[^/.]+$/, '') || t('decksDefaultImportedName');
       const name = boxName.trim() || fallbackName;
 
       setImporting(true);
@@ -131,12 +132,20 @@ export default function DecksScreen() {
         setBoxName('');
         setSelectedIcon('Book');
         loadData();
-        showToast({ message: `"${res.deck.name}" imported · ${res.cardCount} cards`, type: 'success' });
+        showToast({ message: t('layoutDeckImported').replace('{name}', res.deck.name).replace('{cards}', plural(t, res.cardCount, 'cardsCountOne', 'deckDetailsCardsCount')), type: 'success' });
         return;
       }
 
       const newDeck = await createEmptyDeck(name, selectedIcon, currentFolderId);
       await importCsvToDeck(newDeck.id, asset.uri);
+      // A file without question/answer pairs (a PDF, a spreadsheet saved in
+      // another format) used to leave an empty deck behind under a
+      // "Deck created" message. Remove it and say what went wrong.
+      if (((await getCachedData<unknown[]>(newDeck.id))?.length ?? 0) === 0) {
+        await deleteDeck(newDeck.id);
+        showToast({ message: t('deckDetailsNoImportPairs'), type: 'warning' });
+        return;
+      }
 
       setImportModalVisible(false);
       setBoxName('');
@@ -169,7 +178,7 @@ export default function DecksScreen() {
         return;
       }
 
-      const fallbackName = asset.name.replace(/\.(apkg|colpkg)$/i, '') || 'Anki Deck';
+      const fallbackName = asset.name.replace(/\.(apkg|colpkg)$/i, '') || t('decksDefaultAnkiName');
       const name = boxName.trim() || fallbackName;
 
       setImporting(true);
@@ -180,8 +189,10 @@ export default function DecksScreen() {
       setBoxName('');
       setSelectedIcon('Book');
       loadData();
+      const summary = plural(t, res.cardCount, 'cardsCountOne', 'deckDetailsCardsCount')
+        + (res.imageCount > 0 ? ` · ${plural(t, res.imageCount, 'imagesCountOne', 'imagesCountMany')}` : '');
       showToast({
-        message: `"${name}" imported · ${res.cardCount} cards${res.imageCount > 0 ? ` · ${res.imageCount} images` : ''}`,
+        message: t('layoutDeckImported').replace('{name}', name).replace('{cards}', summary),
         type: 'success',
       });
     } catch (e: any) {
@@ -209,7 +220,7 @@ export default function DecksScreen() {
     }
     setImporting(true);
     try {
-      const name = boxName.trim() || 'Pasted Deck';
+      const name = boxName.trim() || t('decksDefaultPastedName');
       const tmp = `${FileSystem.cacheDirectory}pasted_${Date.now()}.csv`;
       await FileSystem.writeAsStringAsync(tmp, text);
       const newDeck = await createEmptyDeck(name, selectedIcon, currentFolderId);
@@ -222,7 +233,7 @@ export default function DecksScreen() {
       setPasteText('');
       setShowPaste(false);
       loadData();
-      showToast({ message: `"${name}" created · ${parsed.length} cards`, type: 'success' });
+      showToast({ message: t('decksCreatedWithCards').replace('{name}', name).replace('{cards}', plural(t, parsed.length, 'cardsCountOne', 'deckDetailsCardsCount')), type: 'success' });
     } catch (e) {
       console.error('Error importing pasted cards:', e);
       showToast({ message: t('error'), type: 'error' });
