@@ -58,16 +58,21 @@ function isQuotedCsv(records: string[]): boolean {
 // alternate lines, scrambling the deck when its cache is rebuilt.
 function joinQuotedRecords(lines: string[]): string[] {
   const records: string[] = [];
-  let open: string | null = null;
+  let open: string[] | null = null;
+  // Quote parity is tracked per line: recounting the growing record on every
+  // line made a single stray quote early in a big file quadratic.
+  let oddQuotes = false;
   for (const line of lines) {
-    open = open === null ? line : `${open}\n${line}`;
-    if ((open.match(/"/g)?.length ?? 0) % 2 === 0) {
-      records.push(open);
+    if (open === null) open = [];
+    open.push(line);
+    if ((line.match(/"/g)?.length ?? 0) % 2 === 1) oddQuotes = !oddQuotes;
+    if (!oddQuotes) {
+      records.push(open.join('\n'));
       open = null;
     }
   }
   // An unterminated quote is a stray character, not a multi-line cell
-  if (open !== null) records.push(...open.split('\n'));
+  if (open !== null) records.push(...open);
   return records;
 }
 

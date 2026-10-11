@@ -20,6 +20,7 @@ import { CardTextInput } from '../components/CardTextInput';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { isImageToken } from '@/utils/CardImages';
 import { toDisplayText } from '@/utils/CardText';
+import { filterDeckCards } from '@/utils/CardFilter';
 import { plural } from '@/utils/AppLanguage';
 import { Button } from '../components/ui/Button';
 import { BottomSheet } from '../components/ui/BottomSheet';
@@ -213,24 +214,14 @@ export default function DeckDetailsScreen() {
     };
 
     const cardQuery = cardSearch.trim().toLowerCase();
-    const visibleCards = React.useMemo(() => {
-        const cardsWithIndices = (cards || []).map((card, index) => ({ card, originalIndex: index }));
-        return cardsWithIndices.filter(({ card, originalIndex }) => {
-            if (cardQuery &&
-                !toDisplayText(card.question).toLowerCase().includes(cardQuery) &&
-                !toDisplayText(card.answer).toLowerCase().includes(cardQuery)) {
-                return false;
-            }
-            const isLearned = deck?.learnedIndices?.includes(originalIndex);
-            const isUnsure = deck?.unsureIndices?.includes(originalIndex);
-            switch (filterMode) {
-                case 'learned': return !!isLearned;
-                case 'unsure': return !!isUnsure;
-                case 'new': return !isLearned && !isUnsure;
-                default: return true;
-            }
-        });
-    }, [cards, cardQuery, filterMode, deck]);
+    const visibleCards = React.useMemo(
+        () => filterDeckCards(cards || [], deck?.learnedIndices, deck?.unsureIndices, cardQuery, filterMode),
+        [cards, cardQuery, filterMode, deck?.learnedIndices, deck?.unsureIndices]
+    );
+    // Per-row status lookups for the rendered window, without scanning the
+    // index arrays for every row
+    const learnedSet = React.useMemo(() => new Set(deck?.learnedIndices ?? []), [deck?.learnedIndices]);
+    const unsureSet = React.useMemo(() => new Set(deck?.unsureIndices ?? []), [deck?.unsureIndices]);
 
     const handleSetDirection = async (direction: StudyDirection) => {
         if (!id) return;
@@ -450,8 +441,8 @@ export default function DeckDetailsScreen() {
                 keyExtractor={(item) => item.originalIndex.toString()}
                 renderItem={({ item }) => {
                     const { card, originalIndex } = item;
-                    const isLearned = deck?.learnedIndices?.includes(originalIndex);
-                    const isUnsure = deck?.unsureIndices?.includes(originalIndex);
+                    const isLearned = learnedSet.has(originalIndex);
+                    const isUnsure = unsureSet.has(originalIndex);
 
                     // Status is carried by the icon (and the screen reader label);
                     // the card frame stays neutral — no colored strip or border.
