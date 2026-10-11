@@ -1,6 +1,7 @@
 import { useToast } from '@/components/ui/Toast';
 import { TranslationKey } from '@/constants/translations';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as Haptics from '@/utils/AppHaptics';
@@ -160,20 +161,27 @@ function VolumeBar({ value, color, trackColor, onChange }: VolumeBarProps) {
 // actually playing" signal, since a border tint alone is easy to miss.
 function PlayingIndicator({ color }: { color: string }) {
     const bars = useRef([0, 1, 2].map(() => new Animated.Value(0.35))).current;
+    const reducedMotion = useReducedMotion();
 
+    // scaleY on the native driver: animating height ran a JS-thread layout
+    // pass every frame for as long as a sound played
     useEffect(() => {
+        if (reducedMotion) {
+            bars.forEach((bar, i) => bar.setValue([0.6, 1, 0.75][i]));
+            return;
+        }
         const loops = bars.map((bar, i) =>
             Animated.loop(
                 Animated.sequence([
                     Animated.delay(i * 120),
-                    Animated.timing(bar, { toValue: 1, duration: 320, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
-                    Animated.timing(bar, { toValue: 0.35, duration: 320, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+                    Animated.timing(bar, { toValue: 1, duration: 320, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+                    Animated.timing(bar, { toValue: 0.35, duration: 320, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
                 ])
             )
         );
         loops.forEach(l => l.start());
         return () => loops.forEach(l => l.stop());
-    }, [bars]);
+    }, [bars, reducedMotion]);
 
     return (
         <View style={styles.eqRow}>
@@ -184,7 +192,9 @@ function PlayingIndicator({ color }: { color: string }) {
                         styles.eqBar,
                         {
                             backgroundColor: color,
-                            height: bar.interpolate({ inputRange: [0.35, 1], outputRange: [4, 12] }),
+                            height: 12,
+                            transformOrigin: 'bottom',
+                            transform: [{ scaleY: bar }],
                         },
                     ]}
                 />

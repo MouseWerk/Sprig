@@ -1,5 +1,6 @@
 import { TranslationKey } from '@/constants/translations';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from '@/utils/AppHaptics';
 import { RotateCcw } from 'lucide-react-native';
@@ -66,6 +67,7 @@ export function FocusPlant({ active }: FocusPlantProps) {
     activeRef.current = active;
 
     const popAnim = useRef(new Animated.Value(1)).current;
+    const reducedMotion = useReducedMotion();
     const swayAnim = useRef(new Animated.Value(0)).current;
 
     const textColor = useThemeColor({}, 'text');
@@ -161,7 +163,7 @@ export function FocusPlant({ active }: FocusPlantProps) {
 
     // Gentle idle sway while the plant is alive
     useEffect(() => {
-        if (dead) {
+        if (dead || reducedMotion) {
             swayAnim.stopAnimation();
             swayAnim.setValue(0);
             return;
@@ -174,7 +176,7 @@ export function FocusPlant({ active }: FocusPlantProps) {
         );
         loop.start();
         return () => loop.stop();
-    }, [dead, swayAnim]);
+    }, [dead, swayAnim, reducedMotion]);
 
     const replant = () => {
         setDead(false);

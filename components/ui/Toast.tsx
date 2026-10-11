@@ -1,4 +1,5 @@
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { AlertCircle, CheckCircle2, Info, X, XCircle } from 'lucide-react-native';
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
@@ -27,6 +28,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const opacity = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(-100)).current;
     const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Read through a ref: the show/hide callbacks are memoized
+    const reducedMotion = useReducedMotion();
+    const reducedMotionRef = useRef(reducedMotion);
+    reducedMotionRef.current = reducedMotion;
 
     const bgColor = useThemeColor({}, 'card');
     const textColor = useThemeColor({}, 'text');
@@ -51,15 +56,16 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             hideTimer.current = null;
         }
         actionToastRef.current = null;
+        const duration = reducedMotionRef.current ? 0 : 250;
         Animated.parallel([
             Animated.timing(opacity, {
                 toValue: 0,
-                duration: 250,
+                duration,
                 useNativeDriver: true,
             }),
             Animated.timing(translateY, {
                 toValue: -100,
-                duration: 250,
+                duration,
                 useNativeDriver: true,
             }),
         ]).start(({ finished }) => {
@@ -91,20 +97,25 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         actionToastRef.current = action ? shown : null;
         setToast(shown);
 
-        // Show
-        Animated.parallel([
-            Animated.timing(opacity, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-            Animated.spring(translateY, {
-                toValue: insets.top + 10,
-                tension: 40,
-                friction: 7,
-                useNativeDriver: true,
-            }),
-        ]).start();
+        // Show (in place, without sliding, when motion is reduced)
+        if (reducedMotionRef.current) {
+            opacity.setValue(1);
+            translateY.setValue(insets.top + 10);
+        } else {
+            Animated.parallel([
+                Animated.timing(opacity, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true,
+                }),
+                Animated.spring(translateY, {
+                    toValue: insets.top + 10,
+                    tension: 40,
+                    friction: 7,
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        }
 
         // Hide
         hideTimer.current = setTimeout(() => {

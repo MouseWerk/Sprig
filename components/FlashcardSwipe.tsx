@@ -1,4 +1,5 @@
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from '@/utils/AppHaptics';
 import { Check, HelpCircle, RotateCcw, X } from 'lucide-react-native';
@@ -67,6 +68,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
     const cardHeight = Math.min(SCREEN_HEIGHT * 0.6, 500);
 
     const [isFlipped, setIsFlipped] = useState(false);
+    const reducedMotion = useReducedMotion();
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
     const rotateY = useSharedValue(0);
@@ -89,7 +91,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
         setIsFlipped(nextState);
         onFlip?.(nextState);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        rotateY.value = withSpring(nextState ? 180 : 0, {
+        rotateY.value = reducedMotion ? (nextState ? 180 : 0) : withSpring(nextState ? 180 : 0, {
             damping: 20,
             stiffness: 90,
             mass: 1

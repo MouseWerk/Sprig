@@ -1,3 +1,4 @@
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, KeyboardAvoidingView, Modal, Platform, StyleProp, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 
@@ -25,8 +26,16 @@ export function BottomSheet({ visible, onClose, sheetStyle, children }: BottomSh
     const [mounted, setMounted] = useState(visible);
     const overlayOpacity = useRef(new Animated.Value(0)).current;
     const sheetTranslateY = useRef(new Animated.Value(CLOSED_TRANSLATE_Y)).current;
+    const reducedMotion = useReducedMotion();
 
     useEffect(() => {
+        if (reducedMotion) {
+            // Reduced motion: appear and disappear in place
+            overlayOpacity.setValue(visible ? 1 : 0);
+            sheetTranslateY.setValue(visible ? 0 : CLOSED_TRANSLATE_Y);
+            setMounted(visible);
+            return;
+        }
         if (visible) {
             setMounted(true);
             Animated.parallel([
@@ -44,7 +53,7 @@ export function BottomSheet({ visible, onClose, sheetStyle, children }: BottomSh
             });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [visible]);
+    }, [visible, reducedMotion]);
 
     if (!mounted) return null;
 

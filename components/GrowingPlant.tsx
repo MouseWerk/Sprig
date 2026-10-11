@@ -1,4 +1,5 @@
 import { TranslationKey } from '@/constants/translations';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import React, { useEffect, useRef } from 'react';
 import { Animated } from 'react-native';
 import Svg, { Circle, Ellipse, G, Path } from 'react-native-svg';
@@ -360,9 +361,10 @@ export interface GrowingPlantProps {
 
 export function GrowingPlant({ progress, size, color, soilColor, wilted = false, sway = false, species = 0, potStyle = 'classic' }: GrowingPlantProps) {
     const swayAnim = useRef(new Animated.Value(0)).current;
+    const reducedMotion = useReducedMotion();
 
     useEffect(() => {
-        if (!sway || wilted) {
+        if (!sway || wilted || reducedMotion) {
             swayAnim.stopAnimation();
             swayAnim.setValue(0);
             return;
@@ -375,7 +377,7 @@ export function GrowingPlant({ progress, size, color, soilColor, wilted = false,
         );
         loop.start();
         return () => loop.stop();
-    }, [sway, wilted, swayAnim]);
+    }, [sway, wilted, swayAnim, reducedMotion]);
 
     const rotate = swayAnim.interpolate({ inputRange: [-1, 1], outputRange: ['-2.5deg', '2.5deg'] });
 
