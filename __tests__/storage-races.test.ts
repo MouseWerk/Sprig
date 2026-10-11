@@ -1,7 +1,14 @@
+import { collectDew, harvestPlant, pendingDew, type GrovePlant } from '@/utils/Grove';
+import {
+    buyPlanter, getRecentReflections, getUserStats, loadGroveEconomy, revertUserStats,
+    saveReflection, updateUserStats,
+} from '@/utils/Storage';
+
 // Read-modify-write paths over the single-row kv records (stats, grove,
 // reflections) with an in-memory stand-in for the database. Every call
 // yields to the event loop, so overlapping calls really interleave the way
-// they do on a device: two reads first, then two writes.
+// they do on a device: two reads first, then two writes. (jest.mock below is
+// hoisted above the imports; the factory only reads mockDb when called.)
 const mockKv = new Map<string, string>();
 const mockFailReads = new Set<string>();
 const mockDb = {
@@ -29,12 +36,6 @@ const mockDb = {
     },
 };
 jest.mock('@/utils/Database', () => ({ getDb: async () => mockDb }));
-
-import { collectDew, harvestPlant, pendingDew, type GrovePlant } from '@/utils/Grove';
-import {
-    buyPlanter, getRecentReflections, getUserStats, loadGroveEconomy, revertUserStats,
-    saveReflection, updateUserStats,
-} from '@/utils/Storage';
 
 const stats = () => JSON.parse(mockKv.get('stats') ?? '{}');
 const grove = () => JSON.parse(mockKv.get('grove') ?? '{}');

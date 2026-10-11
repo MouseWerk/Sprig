@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // module is re-required rather than imported once at the top.
 const loadModule = () => {
     let mod!: typeof import('@/utils/Preferences');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- isolateModules needs a synchronous require
     jest.isolateModules(() => { mod = require('@/utils/Preferences'); });
     return mod;
 };

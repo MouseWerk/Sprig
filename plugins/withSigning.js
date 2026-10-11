@@ -11,18 +11,21 @@ const { withXcodeProject } = require('@expo/config-plugins');
 // rather than living in the source.
 module.exports = function withSigning(config) {
   const developmentTeam = process.env.EXPO_APPLE_TEAM_ID;
-  if (!developmentTeam) {
-    // Loud on purpose: prebuild would otherwise succeed and the failure would
-    // only surface much later, as an unsigned archive in Xcode.
-    console.warn(
-      '[withSigning] EXPO_APPLE_TEAM_ID is not set — the generated Xcode project ' +
-      'will have no signing team. Set it (see .env.example) and prebuild again, ' +
-      'or pick the team by hand in Xcode.'
-    );
-    return config;
-  }
 
+  // The mod only runs when the iOS project is generated. Warning here rather
+  // than up front keeps Android builds and JS exports (which evaluate every
+  // plugin, several times) free of a warning that doesn't concern them.
   return withXcodeProject(config, (config) => {
+    if (!developmentTeam) {
+      // Loud on purpose: prebuild would otherwise succeed and the failure would
+      // only surface much later, as an unsigned archive in Xcode.
+      console.warn(
+        '[withSigning] EXPO_APPLE_TEAM_ID is not set — the generated Xcode project ' +
+        'will have no signing team. Set it (see .env.example) and prebuild again, ' +
+        'or pick the team by hand in Xcode.'
+      );
+      return config;
+    }
     const project = config.modResults;
 
     const buildConfigs = project.pbxXCBuildConfigurationSection();
