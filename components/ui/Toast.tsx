@@ -37,11 +37,20 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const dangerColor = useThemeColor({}, 'danger');
     const warningColor = useThemeColor({}, 'warning');
 
+    // The toast on screen while it offers an action (Undo), and a plain
+    // message that arrived meanwhile. A quick follow-up message used to
+    // replace the toast and take its Undo away for good; it now waits until
+    // the action toast is gone. A newer action toast still replaces the old.
+    const actionToastRef = useRef<ToastOptions | null>(null);
+    const queuedRef = useRef<ToastOptions | null>(null);
+    const showRef = useRef<(options: ToastOptions) => void>(() => { });
+
     const hideToast = useCallback(() => {
         if (hideTimer.current) {
             clearTimeout(hideTimer.current);
             hideTimer.current = null;
         }
+        actionToastRef.current = null;
         Animated.parallel([
             Animated.timing(opacity, {
                 toValue: 0,
@@ -59,17 +68,28 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             // that invokes this callback with finished:false. Nulling the
             // toast in that case would erase the new toast that showToast()
             // just set, right after it set it.
-            if (finished) setToast(null);
+            if (!finished) return;
+            setToast(null);
+            const queued = queuedRef.current;
+            queuedRef.current = null;
+            if (queued) showRef.current(queued);
         });
     }, [opacity, translateY]);
 
-    const showToast = useCallback(({ message, type = 'success', duration = 3000, action }: ToastOptions) => {
+    const showToast = useCallback((options: ToastOptions) => {
+        const { message, type = 'success', duration = 3000, action } = options;
+        if (actionToastRef.current && !action) {
+            queuedRef.current = options;
+            return;
+        }
         // A newer toast replaces the old one along with its hide timer,
         // so an earlier timer can't dismiss this toast prematurely.
         if (hideTimer.current) {
             clearTimeout(hideTimer.current);
         }
-        setToast({ message, type, duration, action });
+        const shown = { message, type, duration, action };
+        actionToastRef.current = action ? shown : null;
+        setToast(shown);
 
         // Show
         Animated.parallel([
@@ -91,6 +111,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             hideToast();
         }, duration);
     }, [insets.top, opacity, translateY, hideToast]);
+    showRef.current = showToast;
 
     const getIcon = () => {
         const color = getStatusColor();

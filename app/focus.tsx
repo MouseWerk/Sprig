@@ -62,6 +62,14 @@ export default function FocusScreen() {
     const [soundsOn, setSoundsOn] = useState(false);
 
     const totalRef = useRef(getPrefsSync().defaultFocusMinutes * 60);
+    // When the running countdown reaches zero, on the monotonic clock. The
+    // countdown used to subtract one per interval tick, and timers are
+    // throttled or paused while the screen is off or the app is in the
+    // background (within the grace period), so a 25-minute session ran
+    // noticeably longer than 25 minutes.
+    const endAtRef = useRef(0);
+    const secondsLeftRef = useRef(secondsLeft);
+    secondsLeftRef.current = secondsLeft;
     const awayStartRef = useRef<number | null>(null);
     const warningIdRef = useRef<string | null>(null);
     const finishedRef = useRef(false);
@@ -85,11 +93,13 @@ export default function FocusScreen() {
         return () => { deactivateKeepAwake('focus-session'); };
     }, [phase]);
 
-    // Countdown ticker
+    // Countdown ticker. Entering running or break (start, resume, a new
+    // break) sets the deadline from what is left; each tick only reads it.
     useEffect(() => {
         if (phase !== 'running' && phase !== 'break') return;
+        endAtRef.current = performance.now() + secondsLeftRef.current * 1000;
         const t = setInterval(() => {
-            setSecondsLeft(s => Math.max(0, s - 1));
+            setSecondsLeft(Math.max(0, Math.ceil((endAtRef.current - performance.now()) / 1000)));
         }, 1000);
         return () => clearInterval(t);
     }, [phase]);

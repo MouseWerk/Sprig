@@ -109,6 +109,7 @@ export default function NotebookScreen() {
                     style={[styles.toggleBtn, editing && { backgroundColor: accentColor }]}
                     onPress={() => setEditing(true)}
                     accessibilityRole="button"
+                    accessibilityState={{ selected: editing }}
                 >
                     <Text style={[styles.toggleText, { color: editing ? primaryForeground : mutedForeground }]}>
                         {t('deckDetailsNotebookEdit')}
@@ -118,6 +119,7 @@ export default function NotebookScreen() {
                     style={[styles.toggleBtn, !editing && { backgroundColor: accentColor }]}
                     onPress={() => setEditing(false)}
                     accessibilityRole="button"
+                    accessibilityState={{ selected: !editing }}
                 >
                     <Text style={[styles.toggleText, { color: !editing ? primaryForeground : mutedForeground }]}>
                         {t('deckDetailsNotebookPreview')}
