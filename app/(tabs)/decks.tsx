@@ -387,7 +387,7 @@ export default function DecksScreen() {
               style={styles.deleteButtonContainer}
               onPress={() => handleEditDeck(item)}
               activeOpacity={0.5}
-              accessibilityLabel={`Options for ${item.name}`}
+              accessibilityLabel={t('a11yOptionsFor').replace('{name}', item.name)}
               accessibilityRole="button"
             >
               <MoreVertical size={16} color={mutedForeground} />
@@ -396,7 +396,7 @@ export default function DecksScreen() {
               style={styles.deleteButtonContainer}
               onPress={() => handleDelete(item.id, item.name)}
               activeOpacity={0.5}
-              accessibilityLabel={`Delete ${item.name}`}
+              accessibilityLabel={t('a11yDeleteItem').replace('{name}', item.name)}
               accessibilityRole="button"
             >
               <Trash2 size={16} color={mutedForeground} />
@@ -421,7 +421,7 @@ export default function DecksScreen() {
               <View style={[styles.dueBadge, { backgroundColor: plan.daysLeft <= 3 ? '#ef4444' : '#f59e0b', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
                 {plan.daysLeft > 0 && <CalendarDays size={11} color="#fff" strokeWidth={2.5} />}
                 <Text style={styles.dueText}>
-                  {plan.daysLeft === 0 ? t('decksExamToday') : `${plan.daysLeft}d`}
+                  {plan.daysLeft === 0 ? t('decksExamToday') : t('decksExamDaysLeft').replace('{n}', String(plan.daysLeft))}
                 </Text>
               </View>
             );
@@ -507,7 +507,7 @@ export default function DecksScreen() {
             style={[styles.addButton, { backgroundColor: secondaryBg }]}
             onPress={() => setNewFolderModalVisible(true)}
             activeOpacity={0.9}
-            accessibilityLabel="New folder"
+            accessibilityLabel={t('a11yNewFolder')}
             accessibilityRole="button"
           >
             <FolderIcon size={24} color={accentColor} strokeWidth={3} />
@@ -516,7 +516,7 @@ export default function DecksScreen() {
             style={[styles.addButton, { backgroundColor: accentColor }]}
             onPress={() => setImportModalVisible(true)}
             activeOpacity={0.9}
-            accessibilityLabel="Create new deck"
+            accessibilityLabel={t('a11yCreateNewDeck')}
             accessibilityRole="button"
           >
             <Plus size={24} color={primaryForeground} strokeWidth={3} />
@@ -536,7 +536,7 @@ export default function DecksScreen() {
           autoCorrect={false}
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8} accessibilityLabel="Clear search" accessibilityRole="button">
+          <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8} accessibilityLabel={t('a11yClearSearch')} accessibilityRole="button">
             <X size={18} color={mutedForeground} />
           </TouchableOpacity>
         )}
@@ -613,7 +613,7 @@ export default function DecksScreen() {
       >
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: textColor }]}>{t('newFolder')}</Text>
-                <TouchableOpacity onPress={() => setNewFolderModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+                <TouchableOpacity onPress={() => setNewFolderModalVisible(false)} accessibilityLabel={t('close')} accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>
@@ -642,7 +642,7 @@ export default function DecksScreen() {
                 </Text>
                 <TouchableOpacity onPress={() => {
                   setImportModalVisible(false);
-                }} accessibilityLabel="Close" accessibilityRole="button">
+                }} accessibilityLabel={t('close')} accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>
@@ -685,7 +685,7 @@ export default function DecksScreen() {
                     onPress={handleImportAnki}
                     activeOpacity={0.8}
                     disabled={importing}
-                    accessibilityLabel="Import Anki deck"
+                    accessibilityLabel={t('a11yImportAnkiDeck')}
                     accessibilityRole="button"
                   >
                     {importing ? (
@@ -715,7 +715,7 @@ export default function DecksScreen() {
                     style={[styles.importZone, { borderColor: accentColor, backgroundColor: secondaryBg }]}
                     onPress={() => setShowPaste(p => !p)}
                     activeOpacity={0.8}
-                    accessibilityLabel="Paste cards as text"
+                    accessibilityLabel={t('a11yPasteCardsAsText')}
                     accessibilityRole="button"
                   >
                     <ClipboardPaste size={22} color={accentColor} strokeWidth={2.5} />
@@ -737,7 +737,7 @@ export default function DecksScreen() {
                         placeholderTextColor={mutedForeground}
                         multiline
                         autoCorrect={false}
-                        accessibilityLabel="Pasted cards text"
+                        accessibilityLabel={t('a11yPastedCardsText')}
                       />
                       <Button
                         title={importing ? t('decksImportingEllipsis') : t('decksImportPastedCards')}
@@ -767,7 +767,7 @@ export default function DecksScreen() {
                 <Text style={[styles.modalTitle, { color: textColor }]}>
                   {t('decksEditDeckTitle')}
                 </Text>
-                <TouchableOpacity onPress={() => setEditDeckModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+                <TouchableOpacity onPress={() => setEditDeckModalVisible(false)} accessibilityLabel={t('close')} accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>
@@ -839,7 +839,7 @@ export default function DecksScreen() {
                 <Text style={[styles.modalTitle, { color: textColor }]}>
                   {t('renameFolderTitle')}
                 </Text>
-                <TouchableOpacity onPress={() => setEditingFolder(null)} accessibilityLabel="Close" accessibilityRole="button">
+                <TouchableOpacity onPress={() => setEditingFolder(null)} accessibilityLabel={t('close')} accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>

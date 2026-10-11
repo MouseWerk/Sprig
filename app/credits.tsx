@@ -52,7 +52,7 @@ export default function CreditsScreen() {
             style={[styles.card, { backgroundColor: cardColor }]}
             onPress={() => openUrl(entry.url)}
             activeOpacity={entry.url ? 0.7 : 1}
-            accessibilityLabel={`${entry.name}, ${entry.license} license`}
+            accessibilityLabel={t('a11yLicense').replace('{name}', entry.name).replace('{license}', entry.license)}
             accessibilityRole={entry.url ? 'link' : 'text'}
         >
             <View style={{ flex: 1 }}>

@@ -53,7 +53,7 @@ export function CardImagePicker({ text, onChangeText }: CardImagePickerProps) {
                     <TouchableOpacity
                         onPress={() => showImagePreview(resolveCardImageUri(file))}
                         activeOpacity={0.85}
-                        accessibilityLabel="Show enlarged image"
+                        accessibilityLabel={t('a11yShowEnlargedImage')}
                         accessibilityRole="imagebutton"
                     >
                         <Image
@@ -66,7 +66,7 @@ export function CardImagePicker({ text, onChangeText }: CardImagePickerProps) {
                         style={styles.removeBadge}
                         onPress={() => onChangeText(removeImageToken(text, file))}
                         hitSlop={6}
-                        accessibilityLabel="Remove image"
+                        accessibilityLabel={t('a11yRemoveImage')}
                         accessibilityRole="button"
                     >
                         <X size={11} color="#ffffff" strokeWidth={3} />
@@ -79,7 +79,7 @@ export function CardImagePicker({ text, onChangeText }: CardImagePickerProps) {
                 onPress={handleAdd}
                 disabled={busy}
                 activeOpacity={0.8}
-                accessibilityLabel="Add image"
+                accessibilityLabel={t('a11yAddImage')}
                 accessibilityRole="button"
             >
                 {busy ? (

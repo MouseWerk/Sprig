@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { localDateKey } from '@/utils/Storage';
 import React, { useMemo } from 'react';
@@ -24,6 +25,7 @@ function intensityColor(count: number, emptyColor: string): string {
 // GitHub-style activity calendar: columns are weeks (Monday first),
 // the rightmost column ends today.
 export const ReviewHeatmap: React.FC<ReviewHeatmapProps> = ({ data = {}, weeks = 17 }) => {
+    const { t } = useLanguage();
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const emptyColor = useThemeColor({}, 'secondary');
 
@@ -91,11 +93,11 @@ export const ReviewHeatmap: React.FC<ReviewHeatmapProps> = ({ data = {}, weeks =
                 ))}
             </View>
             <View style={styles.legendRow}>
-                <Text style={[styles.legendText, { color: mutedForeground }]}>Less</Text>
+                <Text style={[styles.legendText, { color: mutedForeground }]}>{t('heatmapLess')}</Text>
                 {[0, 1, 3, 10, 25].map(v => (
                     <View key={v} style={[styles.cell, { backgroundColor: intensityColor(v, emptyColor) }]} />
                 ))}
-                <Text style={[styles.legendText, { color: mutedForeground }]}>More</Text>
+                <Text style={[styles.legendText, { color: mutedForeground }]}>{t('heatmapMore')}</Text>
             </View>
         </View>
     );

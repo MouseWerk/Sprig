@@ -4,7 +4,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { ACHIEVEMENTS, unlockedCount } from '@/utils/Achievements';
 import { toDisplayText } from '@/utils/CardText';
-import { getLevelInfo } from '@/utils/Levels';
+import { getLevelInfo, rankLabelKey } from '@/utils/Levels';
 import { getDecks, getHardestCards, getRecentReflections, getUserStats, HardCard, liveStreak, localDateKey, ReflectionEntry, UserStats } from '@/utils/Storage';
 import { startTodaySession, TodayDeckEntry } from '@/utils/TodayPlan';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -206,7 +206,7 @@ export default function StatsScreen() {
                             <TouchableOpacity
                                 style={[styles.hardDrillBtn, { backgroundColor: accentColor }]}
                                 onPress={drillHardest}
-                                accessibilityLabel="Drill your toughest cards"
+                                accessibilityLabel={t('a11yDrillToughest')}
                                 accessibilityRole="button"
                             >
                                 <Brain size={13} color={backgroundColor} strokeWidth={2.5} />
@@ -251,7 +251,7 @@ export default function StatsScreen() {
 
                 <SectionHeader title={t('statsLifetime')} />
                 <View style={styles.group}>
-                    <StatRow icon={Zap} label={t('statsLevelLabel')} value={t('statsLvlRank').replace('{n}', String(level.level)).replace('{rank}', level.rank)} />
+                    <StatRow icon={Zap} label={t('statsLevelLabel')} value={t('statsLvlRank').replace('{n}', String(level.level)).replace('{rank}', t(rankLabelKey(level.rank)))} />
                     <StatRow icon={Zap} label={t('statsTotalXp')} value={`${(stats?.totalXp ?? 0).toLocaleString()} XP`} />
                     <StatRow icon={BookOpen} label={t('statsCardsReviewed')} value={`${stats?.totalCardsReviewed ?? 0}`} />
                     <StatRow icon={Clock} label={t('statsStudyTime')} value={formatStudyTime(stats?.totalStudyTime ?? 0)} />

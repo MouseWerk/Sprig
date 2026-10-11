@@ -3,6 +3,7 @@ import { X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 // Full-screen image preview. One host is mounted at the app root; any screen
 // (card renderer, editors) opens it via showImagePreview(uri) — no per-screen
@@ -15,6 +16,7 @@ export function showImagePreview(uri: string) {
 }
 
 export function ImageViewerHost() {
+    const { t } = useLanguage();
     const insets = useSafeAreaInsets();
     const [uri, setUri] = useState<string | null>(null);
 
@@ -27,7 +29,7 @@ export function ImageViewerHost() {
 
     return (
         <Modal visible={uri !== null} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
-            <TouchableWithoutFeedback onPress={close} accessibilityLabel="Close image preview" accessibilityRole="button">
+            <TouchableWithoutFeedback onPress={close} accessibilityLabel={t('a11yCloseImagePreview')} accessibilityRole="button">
                 <View style={styles.backdrop}>
                     {uri !== null && (
                         <Image
@@ -41,12 +43,12 @@ export function ImageViewerHost() {
                         style={[styles.closeBtn, { top: insets.top + 14 }]}
                         onPress={close}
                         hitSlop={10}
-                        accessibilityLabel="Close image preview"
+                        accessibilityLabel={t('a11yCloseImagePreview')}
                         accessibilityRole="button"
                     >
                         <X size={22} color="#ffffff" strokeWidth={2.5} />
                     </TouchableOpacity>
-                    <Text style={styles.hint}>Tap anywhere to close</Text>
+                    <Text style={styles.hint}>{t('imageViewerTapToClose')}</Text>
                 </View>
             </TouchableWithoutFeedback>
         </Modal>

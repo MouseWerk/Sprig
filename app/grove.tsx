@@ -214,7 +214,7 @@ export default function GroveScreen() {
             activeOpacity={0.85}
             onPress={() => setSelected(item)}
             accessibilityRole="button"
-            accessibilityLabel={`${item.deckName}, ${t(STAGE_LABEL_KEYS[item.stage])}${item.resting ? ', resting' : ''}${item.dueCards > 0 ? `, ${item.dueCards} cards due` : ''}`}
+            accessibilityLabel={[t('a11yPlantSummary').replace('{name}', item.deckName).replace('{stage}', t(STAGE_LABEL_KEYS[item.stage])), item.resting ? t('groveResting') : null, item.dueCards > 0 ? t('homeDueCount').replace('{n}', String(item.dueCards)) : null].filter(Boolean).join(', ')}
         >
             <View style={styles.badgeRow}>
                 {item.examPlan && item.examPlan.daysLeft >= 0 ? (
@@ -315,7 +315,7 @@ export default function GroveScreen() {
                                         style={[styles.collectButton, { backgroundColor: accentColor }]}
                                         onPress={handleCollect}
                                         activeOpacity={0.85}
-                                        accessibilityLabel={`Collect ${pending} dew`}
+                                        accessibilityLabel={t('a11yCollectDew').replace('{n}', String(pending))}
                                         accessibilityRole="button"
                                     >
                                         <Droplets size={15} color={primaryForeground} strokeWidth={2.5} />
@@ -350,7 +350,7 @@ export default function GroveScreen() {
                                 onPress={handleBuyFreeze}
                                 activeOpacity={0.85}
                                 disabled={freezes >= MAX_STREAK_FREEZES}
-                                accessibilityLabel={`Buy streak freeze for ${DEW_COST_FREEZE} dew`}
+                                accessibilityLabel={t('a11yBuyFreeze').replace('{n}', String(DEW_COST_FREEZE))}
                                 accessibilityRole="button"
                             >
                                 <View style={[styles.dewIcon, { backgroundColor: accentColor + '15' }]}>
@@ -375,7 +375,7 @@ export default function GroveScreen() {
                                 onPress={handleBuySunshine}
                                 activeOpacity={0.85}
                                 disabled={boostActive}
-                                accessibilityLabel={`Buy sunshine boost for ${DEW_COST_SUNSHINE} dew`}
+                                accessibilityLabel={t('a11yBuySunshine').replace('{n}', String(DEW_COST_SUNSHINE))}
                                 accessibilityRole="button"
                             >
                                 <View style={[styles.dewIcon, { backgroundColor: accentColor + '15' }]}>
@@ -407,7 +407,7 @@ export default function GroveScreen() {
                                         style={[styles.shopCard, { backgroundColor: secondaryBg, opacity: !owned && (econ?.dew ?? 0) < dec.price ? 0.55 : 1 }]}
                                         onPress={() => owned ? handleEquipDecoration(dec.id) : handleBuyDecoration(dec.id)}
                                         activeOpacity={0.85}
-                                        accessibilityLabel={owned ? `${equipped ? 'Remove' : 'Show'} ${decName}` : `Buy ${decName} for ${dec.price} dew`}
+                                        accessibilityLabel={owned ? t(equipped ? 'a11yHideItem' : 'a11yShowItem').replace('{name}', decName) : t('a11yBuyItem').replace('{name}', decName).replace('{n}', String(dec.price))}
                                         accessibilityRole="button"
                                     >
                                         <View style={[styles.dewIcon, { backgroundColor: accentColor + '15' }]}>
@@ -461,7 +461,7 @@ export default function GroveScreen() {
                     <>
                         <View style={styles.sheetHeader}>
                             <Text style={[styles.sheetTitle, { color: textColor }]} numberOfLines={1}>{selected.deckName}</Text>
-                            <TouchableOpacity onPress={() => setSelected(null)} accessibilityLabel="Close" accessibilityRole="button">
+                            <TouchableOpacity onPress={() => setSelected(null)} accessibilityLabel={t('close')} accessibilityRole="button">
                                 <X size={20} color={textColor} />
                             </TouchableOpacity>
                         </View>
@@ -527,7 +527,7 @@ export default function GroveScreen() {
                                             onPress={() => !active && handleBuyPlanter(pot)}
                                             disabled={active}
                                             activeOpacity={0.85}
-                                            accessibilityLabel={active ? `${potName}, current planter` : `Switch to ${potName}${price > 0 ? ` for ${price} dew` : ''}`}
+                                            accessibilityLabel={active ? t('a11yCurrentPlanter').replace('{name}', potName) : price > 0 ? t('a11yBuyItem').replace('{name}', potName).replace('{n}', String(price)) : t('a11ySwitchPlanter').replace('{name}', potName)}
                                             accessibilityRole="button"
                                         >
                                             <GrowingPlant progress={0.5} size={44} color={accentColor} soilColor={borderColor} potStyle={pot} />
@@ -554,7 +554,7 @@ export default function GroveScreen() {
                                     style={[styles.harvestRow, { backgroundColor: secondaryBg }]}
                                     onPress={handleHarvest}
                                     activeOpacity={0.85}
-                                    accessibilityLabel="Harvest a seed"
+                                    accessibilityLabel={t('a11yHarvestSeed')}
                                     accessibilityRole="button"
                                 >
                                     <Flower2 size={18} color={accentColor} strokeWidth={2.5} />
@@ -579,7 +579,7 @@ export default function GroveScreen() {
                                             style={[styles.seedChip, { backgroundColor: secondaryBg }]}
                                             onPress={() => handlePlantSeed(s)}
                                             activeOpacity={0.85}
-                                            accessibilityLabel={`Plant a ${t(SPECIES_NAME_KEYS[s])}`}
+                                            accessibilityLabel={t('a11yPlantSpecies').replace('{name}', t(SPECIES_NAME_KEYS[s]))}
                                             accessibilityRole="button"
                                         >
                                             <GrowingPlant progress={1} size={34} color={accentColor} soilColor={borderColor} species={s} />

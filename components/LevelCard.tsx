@@ -1,6 +1,6 @@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { getLevelInfo } from '@/utils/Levels';
+import { getLevelInfo, rankLabelKey } from '@/utils/Levels';
 import { getPrefsSync, subscribePrefs } from '@/utils/Preferences';
 import { localDateKey, UserStats } from '@/utils/Storage';
 import { Flame, Snowflake, Target, Zap } from 'lucide-react-native';
@@ -45,7 +45,7 @@ export function LevelCard({ stats, displayStreak }: LevelCardProps) {
                     textColor={textColor}
                 />
                 <View style={styles.levelInfo}>
-                    <Text style={[styles.rank, { color: textColor }]}>{info.rank}</Text>
+                    <Text style={[styles.rank, { color: textColor }]}>{t(rankLabelKey(info.rank))}</Text>
                     <View style={styles.xpRow}>
                         <Zap size={13} color={primaryColor} strokeWidth={2.5} fill={primaryColor} />
                         <Text style={[styles.xpText, { color: mutedForeground }]}>

@@ -1,3 +1,5 @@
+import type { TranslationKey } from '@/constants/translations';
+
 // XP + level progression. Pure math, no React — safe to use anywhere.
 
 // Default number of cards that fills the daily goal ring.
@@ -43,6 +45,21 @@ const RANKS: { min: number; name: string }[] = [
     { min: 50, name: 'Grandmaster' },
     { min: 75, name: 'Sage' },
 ];
+
+// Display text for a rank name from rankForLevel (the names double as ids)
+const RANK_LABEL_KEYS: Record<string, TranslationKey> = {
+    Novice: 'rankNovice',
+    Apprentice: 'rankApprentice',
+    Scholar: 'rankScholar',
+    Expert: 'rankExpert',
+    Master: 'rankMaster',
+    Grandmaster: 'rankGrandmaster',
+    Sage: 'rankSage',
+};
+
+export function rankLabelKey(rank: string): TranslationKey {
+    return RANK_LABEL_KEYS[rank] ?? 'rankNovice';
+}
 
 export function rankForLevel(level: number): string {
     let name = RANKS[0].name;

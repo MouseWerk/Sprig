@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Icons from 'lucide-react-native';
 import React from 'react';
@@ -16,6 +17,7 @@ interface IconPickerProps {
 }
 
 export const IconPicker: React.FC<IconPickerProps> = ({ selectedIcon, onSelect }) => {
+    const { t } = useLanguage();
     const primaryColor = useThemeColor({}, 'primary');
     const secondaryBg = useThemeColor({}, 'secondary');
     const mutedForeground = useThemeColor({}, 'mutedForeground');
@@ -36,7 +38,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({ selectedIcon, onSelect }
                                 styles.iconButton,
                                 { backgroundColor: isSelected ? primaryColor : secondaryBg }
                             ]}
-                            accessibilityLabel={`${name} icon`}
+                            accessibilityLabel={t('a11yIconOption').replace('{name}', name)}
                             accessibilityRole="radio"
                             accessibilityState={{ selected: isSelected }}
                         >

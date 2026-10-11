@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { CARD_TOKEN_RE, extractOcclusionPairs, IMAGE_TOKEN_RE, resolveCardImageUri } from '@/utils/CardImages';
 import { Image } from 'expo-image';
@@ -19,6 +20,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     fontSize = 18,
     color
 }) => {
+    const { t } = useLanguage();
     const themeTextColor = useThemeColor({}, 'text');
     const accentColor = useThemeColor({}, 'primary');
     const codeBg = useThemeColor({}, 'secondary');
@@ -147,7 +149,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                         key={`${file}-${i}`}
                         onPress={() => showImagePreview(uri)}
                         activeOpacity={0.85}
-                        accessibilityLabel="Show enlarged image"
+                        accessibilityLabel={t('a11yShowEnlargedImage')}
                         accessibilityRole="imagebutton"
                     >
                         <Image
@@ -166,7 +168,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                         key={`occl-${base}-${i}`}
                         onPress={() => showImagePreview(baseUri)}
                         activeOpacity={0.85}
-                        accessibilityLabel="Show enlarged image"
+                        accessibilityLabel={t('a11yShowEnlargedImage')}
                         accessibilityRole="imagebutton"
                         style={markdownStyles.occlusionWrap}
                     >

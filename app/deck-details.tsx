@@ -500,7 +500,7 @@ export default function DeckDetailsScreen() {
                         <View style={[styles.mainProgressCard, { backgroundColor: cardColor }]}>
                             <View style={[styles.progressCircleContainer, { backgroundColor: progressColor + '15', borderColor: progressColor + '30' }]}>
                                 <Text style={[styles.progressPercentage, { color: progressColor }]}>{Math.round(progress)}%</Text>
-                                <Text style={[styles.progressLabel, { color: progressColor, opacity: 0.8 }]}>Mastery</Text>
+                                <Text style={[styles.progressLabel, { color: progressColor, opacity: 0.8 }]}>{t('mastery')}</Text>
                             </View>
                             <View style={styles.progressStatsRight}>
                                 {/* Title gets the full column width. Sharing a row
@@ -538,7 +538,7 @@ export default function DeckDetailsScreen() {
                                     <TouchableOpacity
                                         style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
                                         onPress={handleExportDeck}
-                                        accessibilityLabel="Export deck"
+                                        accessibilityLabel={t('a11yExportDeck')}
                                         accessibilityRole="button"
                                     >
                                         <Share2 size={15} color={accentColor} strokeWidth={3} />
@@ -546,7 +546,7 @@ export default function DeckDetailsScreen() {
                                     <TouchableOpacity
                                         style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
                                         onPress={handleImportCsv}
-                                        accessibilityLabel="Import cards from CSV"
+                                        accessibilityLabel={t('a11yImportCardsCsv')}
                                         accessibilityRole="button"
                                     >
                                         <FileUp size={15} color={accentColor} strokeWidth={3} />
@@ -554,7 +554,7 @@ export default function DeckDetailsScreen() {
                                     <TouchableOpacity
                                         style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
                                         onPress={() => setAddCardModalVisible(true)}
-                                        accessibilityLabel="Add flashcard"
+                                        accessibilityLabel={t('a11yAddFlashcard')}
                                         accessibilityRole="button"
                                     >
                                         <Plus size={15} color={accentColor} strokeWidth={3} />
@@ -593,7 +593,7 @@ export default function DeckDetailsScreen() {
                                         router.push({ pathname: '/swipe', params: { id, uri: deck.uri, name: deck?.name, mode: 'all' } });
                                     }}
                                     activeOpacity={0.85}
-                                    accessibilityLabel="Study all cards"
+                                    accessibilityLabel={t('a11yStudyAllCards')}
                                     accessibilityRole="button"
                                 >
                                     <RotateCcw size={19} color={accentColor} strokeWidth={2.5} />
@@ -613,7 +613,7 @@ export default function DeckDetailsScreen() {
                                         router.push({ pathname: '/quiz', params: { id, uri: deck.uri, name: deck?.name } });
                                     }}
                                     activeOpacity={0.85}
-                                    accessibilityLabel="Quiz with multiple choice"
+                                    accessibilityLabel={t('a11yQuizMode')}
                                     accessibilityRole="button"
                                 >
                                     <ListChecks size={19} color={accentColor} strokeWidth={2.5} />
@@ -629,7 +629,7 @@ export default function DeckDetailsScreen() {
                                         router.push({ pathname: '/feed', params: { id, uri: deck.uri, name: deck?.name } });
                                     }}
                                     activeOpacity={0.85}
-                                    accessibilityLabel="Scroll and learn feed"
+                                    accessibilityLabel={t('a11yFeedMode')}
                                     accessibilityRole="button"
                                 >
                                     <GalleryVerticalEnd size={19} color={accentColor} strokeWidth={2.5} />
@@ -645,7 +645,7 @@ export default function DeckDetailsScreen() {
                                         router.push({ pathname: '/type', params: { id, uri: deck.uri, name: deck?.name } });
                                     }}
                                     activeOpacity={0.85}
-                                    accessibilityLabel="Type the answer mode"
+                                    accessibilityLabel={t('a11yTypeMode')}
                                     accessibilityRole="button"
                                 >
                                     <Keyboard size={19} color={accentColor} strokeWidth={2.5} />
@@ -699,7 +699,7 @@ export default function DeckDetailsScreen() {
                                                 <TouchableOpacity
                                                     style={[styles.filterChip, { backgroundColor: examSet ? accentColor : secondaryBg }]}
                                                     onPress={() => setShowExamPicker(true)}
-                                                    accessibilityLabel="Pick exam date"
+                                                    accessibilityLabel={t('a11yPickExamDate')}
                                                     accessibilityRole="button"
                                                 >
                                                     <CalendarDays size={13} color={examSet ? primaryForeground : mutedForeground} strokeWidth={2.5} />
@@ -745,7 +745,7 @@ export default function DeckDetailsScreen() {
                                             });
                                         }}
                                         activeOpacity={0.85}
-                                        accessibilityLabel="Drill the confused cards"
+                                        accessibilityLabel={t('a11yDrillConfused')}
                                         accessibilityRole="button"
                                     >
                                         <Zap size={13} color="#fff" strokeWidth={2.5} fill="#fff" />
@@ -789,7 +789,7 @@ export default function DeckDetailsScreen() {
                                 autoCorrect={false}
                             />
                             {cardSearch.length > 0 && (
-                                <TouchableOpacity onPress={() => setCardSearch('')} hitSlop={8} accessibilityLabel="Clear search" accessibilityRole="button">
+                                <TouchableOpacity onPress={() => setCardSearch('')} hitSlop={8} accessibilityLabel={t('a11yClearSearch')} accessibilityRole="button">
                                     <X size={16} color={mutedForeground} />
                                 </TouchableOpacity>
                             )}
@@ -844,7 +844,7 @@ export default function DeckDetailsScreen() {
             >
                         <View style={styles.modalHeader}>
                             <Text style={[styles.modalTitle, { color: textColor }]}>{t('deckDetailsAddFlashcard')}</Text>
-                            <TouchableOpacity onPress={() => setAddCardModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+                            <TouchableOpacity onPress={() => setAddCardModalVisible(false)} accessibilityLabel={t('close')} accessibilityRole="button">
                                 <X size={20} color={textColor} />
                             </TouchableOpacity>
                         </View>
@@ -890,7 +890,7 @@ export default function DeckDetailsScreen() {
                                 <Text style={[styles.modalTitle, { color: textColor }]}>{t('deckDetailsEditFlashcard')}</Text>
                                 <Text style={[styles.modalSubtitle, { color: mutedForeground }]}>{t('deckDetailsLongPressHint')}</Text>
                             </View>
-                            <TouchableOpacity onPress={() => setEditModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+                            <TouchableOpacity onPress={() => setEditModalVisible(false)} accessibilityLabel={t('close')} accessibilityRole="button">
                                 <X size={24} color={textColor} />
                             </TouchableOpacity>
                         </View>
@@ -914,7 +914,7 @@ export default function DeckDetailsScreen() {
                             <TouchableOpacity
                                 style={[styles.deleteBtn, { backgroundColor: '#ef444420' }]}
                                 onPress={() => editingIndex !== null && handleDeleteCard(editingIndex)}
-                                accessibilityLabel="Delete flashcard"
+                                accessibilityLabel={t('a11yDeleteFlashcard')}
                                 accessibilityRole="button"
                             >
                                 <Trash2 size={18} color="#ef4444" />

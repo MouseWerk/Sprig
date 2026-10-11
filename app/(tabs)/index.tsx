@@ -113,7 +113,7 @@ export default function HomeScreen() {
           style={[styles.rowCard, { backgroundColor: secondaryBg }]}
           onPress={handleStartToday}
           activeOpacity={0.85}
-          accessibilityLabel={`Start today's session with ${todayPlan.totalCards} cards`}
+          accessibilityLabel={t('a11yStartToday').replace('{n}', String(todayPlan.totalCards))}
           accessibilityRole="button"
         >
           <View style={[styles.rowIcon, { backgroundColor: accentColor + '15' }]}>
@@ -146,7 +146,7 @@ export default function HomeScreen() {
                 style={styles.groveHeader}
                 onPress={() => router.push('/grove')}
                 activeOpacity={0.8}
-                accessibilityLabel="Open the Grove"
+                accessibilityLabel={t('a11yOpenGrove')}
                 accessibilityRole="button"
               >
                 <View style={{ flex: 1 }}>
@@ -171,7 +171,7 @@ export default function HomeScreen() {
               style={[styles.rowCard, { backgroundColor: accentColor }]}
               onPress={() => router.push('/focus')}
               activeOpacity={0.9}
-              accessibilityLabel="Start a focus session"
+              accessibilityLabel={t('a11yStartFocusSession')}
               accessibilityRole="button"
             >
               <View style={[styles.rowIcon, { backgroundColor: primaryForeground }]}>
@@ -193,7 +193,7 @@ export default function HomeScreen() {
               style={[styles.rowCard, { backgroundColor: secondaryBg }]}
               onPress={() => router.push('/decks')}
               activeOpacity={0.85}
-              accessibilityLabel="Open your decks"
+              accessibilityLabel={t('a11yOpenDecks')}
               accessibilityRole="button"
             >
               <View style={[styles.rowIcon, { backgroundColor: accentColor + '15' }]}>

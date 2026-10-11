@@ -7,6 +7,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from '@/utils/AppHaptics';
 import { useNavigation } from '@react-navigation/native';
 import { FOCUS_MINUTES_OPTIONS, getPrefsSync, setPref } from '@/utils/Preferences';
+import { rankLabelKey } from '@/utils/Levels';
 import { recordFocusSession } from '@/utils/Storage';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Stack } from 'expo-router';
@@ -170,7 +171,7 @@ export default function FocusScreen() {
                 let delay = 400;
                 showToast({ message: t('focusComplete').replace('{xp}', String(result.xpGained)), type: 'success' });
                 if (result.leveledUp) {
-                    setTimeout(() => showToast({ message: t('focusLevelUp').replace('{level}', String(result.newLevel)).replace('{rank}', result.newRank), type: 'success' }), delay);
+                    setTimeout(() => showToast({ message: t('focusLevelUp').replace('{level}', String(result.newLevel)).replace('{rank}', t(rankLabelKey(result.newRank))), type: 'success' }), delay);
                     delay += 600;
                 }
                 result.newAchievements.forEach(a => {
@@ -290,7 +291,7 @@ export default function FocusScreen() {
                             <TouchableOpacity
                                 style={[styles.circleBtn, { backgroundColor: secondaryBg }]}
                                 onPress={giveUp}
-                                accessibilityLabel="Give up session"
+                                accessibilityLabel={t('a11yGiveUpSession')}
                                 accessibilityRole="button"
                             >
                                 <X size={24} color={textColor} />
@@ -298,7 +299,7 @@ export default function FocusScreen() {
                             <TouchableOpacity
                                 style={[styles.circleBtn, styles.bigBtn, { backgroundColor: primaryColor }]}
                                 onPress={togglePause}
-                                accessibilityLabel={phase === 'running' ? 'Pause session' : 'Resume session'}
+                                accessibilityLabel={t(phase === 'running' ? 'a11yPauseSession' : 'a11yResumeSession')}
                                 accessibilityRole="button"
                             >
                                 {phase === 'running'
@@ -308,7 +309,7 @@ export default function FocusScreen() {
                             <TouchableOpacity
                                 style={[styles.circleBtn, { backgroundColor: soundsOn ? primaryColor : secondaryBg }]}
                                 onPress={() => setMixerVisible(true)}
-                                accessibilityLabel="Open ambient sound mixer"
+                                accessibilityLabel={t('a11yOpenSoundMixer')}
                                 accessibilityRole="button"
                             >
                                 <Music size={22} color={soundsOn ? primaryForeground : textColor} />

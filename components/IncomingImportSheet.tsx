@@ -66,7 +66,7 @@ export function IncomingImportSheet({ detected, onCancel, onConfirm }: Props) {
                     </View>
                     <Text style={[styles.title, { color: textColor }]}>{t('layoutIncomingTitle')}</Text>
                 </View>
-                <TouchableOpacity onPress={onCancel} accessibilityLabel="Cancel" accessibilityRole="button">
+                <TouchableOpacity onPress={onCancel} accessibilityLabel={t('cancel')} accessibilityRole="button">
                     <X size={20} color={textColor} />
                 </TouchableOpacity>
             </View>

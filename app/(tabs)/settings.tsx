@@ -387,7 +387,7 @@ export default function SettingsScreen() {
                   key={n}
                   style={[styles.prefChip, { backgroundColor: prefs.dailyGoal === n ? accentColor : secondaryBg }]}
                   onPress={() => setPref('dailyGoal', n)}
-                  accessibilityLabel={`Daily goal ${n} cards`}
+                  accessibilityLabel={t('a11yDailyGoalOption').replace('{n}', String(n))}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: prefs.dailyGoal === n }}
                 >
@@ -407,7 +407,7 @@ export default function SettingsScreen() {
                   key={n}
                   style={[styles.prefChip, { backgroundColor: prefs.defaultFocusMinutes === n ? accentColor : secondaryBg }]}
                   onPress={() => setPref('defaultFocusMinutes', n)}
-                  accessibilityLabel={`Default focus length ${n} minutes`}
+                  accessibilityLabel={t('a11yFocusLengthOption').replace('{n}', String(n))}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: prefs.defaultFocusMinutes === n }}
                 >
@@ -427,7 +427,7 @@ export default function SettingsScreen() {
                   key={n}
                   style={[styles.prefChip, { backgroundColor: prefs.studySessionLength === n ? accentColor : secondaryBg }]}
                   onPress={() => setPref('studySessionLength', n)}
-                  accessibilityLabel={`Quiz and Type session length ${n} cards`}
+                  accessibilityLabel={t('a11ySessionLengthOption').replace('{n}', String(n))}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: prefs.studySessionLength === n }}
                 >
@@ -453,7 +453,7 @@ export default function SettingsScreen() {
                   style={[styles.prefChip, { backgroundColor: secondaryBg }]}
                   onPress={() => shiftReminderHour(-1)}
                   disabled={prefs.reminderHour <= REMINDER_HOUR_MIN}
-                  accessibilityLabel="Reminder one hour earlier"
+                  accessibilityLabel={t('a11yReminderEarlier')}
                   accessibilityRole="button"
                 >
                   <Text style={[styles.prefChipText, { color: prefs.reminderHour <= REMINDER_HOUR_MIN ? mutedForeground + '66' : mutedForeground }]}>−</Text>
@@ -467,7 +467,7 @@ export default function SettingsScreen() {
                   style={[styles.prefChip, { backgroundColor: secondaryBg }]}
                   onPress={() => shiftReminderHour(1)}
                   disabled={prefs.reminderHour >= REMINDER_HOUR_MAX}
-                  accessibilityLabel="Reminder one hour later"
+                  accessibilityLabel={t('a11yReminderLater')}
                   accessibilityRole="button"
                 >
                   <Text style={[styles.prefChipText, { color: prefs.reminderHour >= REMINDER_HOUR_MAX ? mutedForeground + '66' : mutedForeground }]}>+</Text>
@@ -492,7 +492,7 @@ export default function SettingsScreen() {
                   key={scale}
                   style={[styles.prefChip, { backgroundColor: prefs.cardTextScale === scale ? accentColor : secondaryBg }]}
                   onPress={() => setPref('cardTextScale', scale)}
-                  accessibilityLabel={`Card text size ${t(CARD_TEXT_SCALE_LABEL_KEYS[scale])}`}
+                  accessibilityLabel={t('a11yCardTextSizeOption').replace('{name}', t(CARD_TEXT_SCALE_LABEL_KEYS[scale]))}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: prefs.cardTextScale === scale }}
                 >
@@ -523,7 +523,7 @@ export default function SettingsScreen() {
                     style={[styles.prefChip, { backgroundColor: secondaryBg }]}
                     onPress={() => moveHomeSection(id, -1)}
                     disabled={idx === 0}
-                    accessibilityLabel={`Move ${t(meta.labelKey)} up`}
+                    accessibilityLabel={t('a11yMoveUp').replace('{name}', t(meta.labelKey))}
                     accessibilityRole="button"
                   >
                     <ChevronUp size={16} color={idx === 0 ? mutedForeground + '66' : mutedForeground} />
@@ -532,7 +532,7 @@ export default function SettingsScreen() {
                     style={[styles.prefChip, { backgroundColor: secondaryBg }]}
                     onPress={() => moveHomeSection(id, 1)}
                     disabled={idx === prefs.homeSectionOrder.length - 1}
-                    accessibilityLabel={`Move ${t(meta.labelKey)} down`}
+                    accessibilityLabel={t('a11yMoveDown').replace('{name}', t(meta.labelKey))}
                     accessibilityRole="button"
                   >
                     <ChevronDown size={16} color={idx === prefs.homeSectionOrder.length - 1 ? mutedForeground + '66' : mutedForeground} />
@@ -540,7 +540,7 @@ export default function SettingsScreen() {
                   <TouchableOpacity
                     style={[styles.prefChip, { backgroundColor: hidden ? secondaryBg : accentColor }]}
                     onPress={() => toggleHomeSectionHidden(id)}
-                    accessibilityLabel={hidden ? `Show ${t(meta.labelKey)} on Home` : `Hide ${t(meta.labelKey)} on Home`}
+                    accessibilityLabel={t(hidden ? 'a11yShowOnHome' : 'a11yHideOnHome').replace('{name}', t(meta.labelKey))}
                     accessibilityRole="button"
                   >
                     {hidden ? <EyeOff size={16} color={mutedForeground} /> : <Eye size={16} color={backgroundColor} />}

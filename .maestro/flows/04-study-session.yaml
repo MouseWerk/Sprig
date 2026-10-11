@@ -27,7 +27,7 @@ tags:
 - assertVisible: "Question"
 - takeScreenshot: .maestro/screenshots/04-card-front
 - tapOn:
-    text: "Tap to reveal answer"
+    text: "Tap to reveal the answer"
     optional: true
 - assertVisible: "Answer"
 - takeScreenshot: .maestro/screenshots/04-card-back

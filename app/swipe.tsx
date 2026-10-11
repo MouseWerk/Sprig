@@ -16,7 +16,7 @@ import { detectStageUps, STAGE_LABEL_KEYS, StageUp } from '../utils/Grove';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast';
 import { FlashcardData, parseFlashcardsCsv } from '../utils/CsvParser';
-import { xpForGrade } from '../utils/Levels';
+import { rankLabelKey, xpForGrade } from '../utils/Levels';
 import { scheduleStreakReminder } from '../utils/Notifications';
 import { refreshAllPinnedWidgets } from '../utils/PinnedDeck';
 import { applySwipeResult, calculateSM2, getCachedData, isCardDue, getDecks, restoreCardSRS, revertUserStats, saveReflection, setCachedData, SRSCardData, updateCardInDeck, updateDeckProgress, updateUserStats } from '../utils/Storage';
@@ -380,7 +380,7 @@ export default function SwipeScreen() {
                 if (result.leveledUp) {
                     setTimeout(() => {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        showToast({ message: t('focusLevelUp').replace('{level}', String(result.newLevel)).replace('{rank}', result.newRank), type: 'success' });
+                        showToast({ message: t('focusLevelUp').replace('{level}', String(result.newLevel)).replace('{rank}', t(rankLabelKey(result.newRank))), type: 'success' });
                     }, delay);
                     delay += 600;
                 }
@@ -618,7 +618,7 @@ export default function SwipeScreen() {
                             {sessionDew > 0 && (
                                 <View style={[styles.xpBadge, { backgroundColor: primaryColor + '18' }]}>
                                     <Droplet size={18} color={primaryColor} strokeWidth={2.5} />
-                                    <Text style={[styles.xpBadgeText, { color: primaryColor }]}>+{sessionDew} dew</Text>
+                                    <Text style={[styles.xpBadgeText, { color: primaryColor }]}>{t('swipeDewEarned').replace('{n}', String(sessionDew))}</Text>
                                 </View>
                             )}
                             {sessionBoosted && (
@@ -722,7 +722,7 @@ export default function SwipeScreen() {
                                     styles.iconBtn,
                                     focusMode && { backgroundColor: primaryColor + '20' }
                                 ]}
-                                accessibilityLabel={focusMode ? 'Disable focus mode' : 'Enable focus mode'}
+                                accessibilityLabel={t(focusMode ? 'a11yFocusModeOff' : 'a11yFocusModeOn')}
                                 accessibilityRole="button"
                             >
                                 <Sprout size={20} color={focusMode ? primaryColor : textColor} strokeWidth={focusMode ? 2.5 : 2} />
@@ -731,7 +731,7 @@ export default function SwipeScreen() {
                                 onPress={speakCurrentCard}
                                 style={styles.iconBtn}
                                 disabled={!currentCard}
-                                accessibilityLabel="Read card aloud"
+                                accessibilityLabel={t('a11yReadCardAloud')}
                                 accessibilityRole="button"
                             >
                                 <Volume2 size={20} color={currentCard ? textColor : mutedForeground} strokeWidth={2} />
@@ -740,7 +740,7 @@ export default function SwipeScreen() {
                                 onPress={handleUndo}
                                 style={styles.iconBtn}
                                 disabled={undoStack.length === 0}
-                                accessibilityLabel="Undo last swipe"
+                                accessibilityLabel={t('a11yUndoLastSwipe')}
                                 accessibilityRole="button"
                             >
                                 <Undo2 size={20} color={undoStack.length > 0 ? textColor : mutedForeground} strokeWidth={2} />
@@ -751,7 +751,7 @@ export default function SwipeScreen() {
                                     styles.iconBtn,
                                     isHighlightMode && { backgroundColor: primaryColor + '20' }
                                 ]}
-                                accessibilityLabel={isHighlightMode ? 'Exit highlight mode' : 'Enter highlight mode'}
+                                accessibilityLabel={t(isHighlightMode ? 'a11yHighlightModeOff' : 'a11yHighlightModeOn')}
                                 accessibilityRole="button"
                             >
                                 <Edit3 size={20} color={isHighlightMode ? primaryColor : textColor} strokeWidth={isHighlightMode ? 3 : 2} />
@@ -781,6 +781,7 @@ export default function SwipeScreen() {
                         answer={displayAnswer}
                         frontLabel={currentCard.reversed ? t('swipeAnswer') : t('swipeQuestion')}
                         backLabel={currentCard.reversed ? t('swipeQuestion') : t('swipeAnswer')}
+                        reversed={currentCard.reversed}
                         onSwipeLeft={() => handleSwipe(0)}
                         onSwipeRight={() => handleSwipe(5)}
                         onSwipeTop={() => handleSwipe(3)}

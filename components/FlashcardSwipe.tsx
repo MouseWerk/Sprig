@@ -3,7 +3,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from '@/utils/AppHaptics';
 import { Check, HelpCircle, RotateCcw, X } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { AccessibilityActionEvent, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
     Extrapolation,
@@ -13,6 +13,7 @@ import Animated, {
     useSharedValue,
     withSpring
 } from 'react-native-reanimated';
+import { toDisplayText } from '@/utils/CardText';
 import { HighlightableText } from './HighlightableText';
 import MarkdownRenderer from './MarkdownRenderer';
 import { Card, CardContent } from './ui/Card';
@@ -31,7 +32,14 @@ interface FlashcardSwipeProps {
     // while displaying the answer.
     frontLabel?: string;
     backLabel?: string;
+    reversed?: boolean; // answer side shown first, so the back holds the question
     fontScale?: number; // user's card-text-size preference; 1 = default
+}
+
+// What a screen reader announces for one side: the prose without image
+// tokens, highlight markers or markdown symbols.
+function spokenText(raw: string): string {
+    return toDisplayText(raw).replace(/[*_`#>$]/g, '').replace(/\s+/g, ' ').trim();
 }
 
 export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
@@ -43,11 +51,14 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
     highlightMode = false,
     onHighlightChange,
     onFlip,
-    frontLabel = 'Question',
-    backLabel = 'Answer',
+    frontLabel,
+    backLabel,
+    reversed = false,
     fontScale = 1
 }) => {
     const { t } = useLanguage();
+    const frontTitle = frontLabel ?? t('swipeQuestion');
+    const backTitle = backLabel ?? t('swipeAnswer');
     const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
     const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
     const SWIPE_THRESHOLD_Y = SCREEN_HEIGHT * 0.15;
@@ -188,7 +199,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
             >
                 <Card style={[styles.card, { backgroundColor: cardBg }]}>
                     <CardContent style={styles.content}>
-                        <Text style={[styles.label, { color: mutedFg }]} pointerEvents="none">{frontLabel}</Text>
+                        <Text style={[styles.label, { color: mutedFg }]} pointerEvents="none">{frontTitle}</Text>
                         <ScrollView centerContent showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
                             {highlightMode ? (
                                 <HighlightableText text={question} fontSize={24 * fontScale} onChange={(t) => onHighlightChange?.(true, t)} />
@@ -198,7 +209,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
                         </ScrollView>
                         <View style={styles.footerHint} pointerEvents="none">
                             <Text style={[styles.hint, { color: mutedFg }]}>
-                                {highlightMode ? 'Tap words to highlight' : `Tap to reveal ${backLabel.toLowerCase()}`}
+                                {highlightMode ? t('flashcardTapWordsToHighlight') : t(reversed ? 'flashcardTapToRevealQuestion' : 'flashcardTapToRevealAnswer')}
                             </Text>
                         </View>
                         {highlightMode && (
@@ -221,7 +232,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
             >
                 <Card style={[styles.card, { backgroundColor: secondaryBg }]}>
                     <CardContent style={styles.content}>
-                        <Text style={[styles.label, { color: mutedFg }]} pointerEvents="none">{backLabel}</Text>
+                        <Text style={[styles.label, { color: mutedFg }]} pointerEvents="none">{backTitle}</Text>
                         <ScrollView centerContent showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
                             {highlightMode ? (
                                 <HighlightableText text={answer} fontSize={22 * fontScale} onChange={(t) => onHighlightChange?.(false, t)} />
@@ -231,7 +242,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
                         </ScrollView>
                         <View style={styles.footerHint} pointerEvents="none">
                             <Text style={[styles.hint, { color: mutedFg }]}>
-                                {highlightMode ? 'Tap words to highlight' : 'Swipe to mark as known/unknown'}
+                                {highlightMode ? t('flashcardTapWordsToHighlight') : t('flashcardSwipeToGrade')}
                             </Text>
                         </View>
                         {highlightMode && (
@@ -249,8 +260,37 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
         </Animated.View>
     );
 
+    // Screen readers can't swipe: the card is one element that reads the
+    // visible side and offers flip and the three grades as actions. Not in
+    // highlight mode, where the single words must stay reachable.
+    const gradeFromAction = (grade: () => void) => {
+        if (hasDecided.value) return;
+        hasDecided.value = true;
+        grade();
+    };
+    const a11yProps = highlightMode ? {} : {
+        accessible: true,
+        accessibilityRole: 'button' as const,
+        accessibilityLabel: `${isFlipped ? backTitle : frontTitle}: ${spokenText(isFlipped ? answer : question)}`,
+        accessibilityHint: t('flashcardA11yHint'),
+        accessibilityActions: [
+            { name: 'activate', label: t('flashcardA11yFlip') },
+            { name: 'good', label: t('swipeGood') },
+            { name: 'hard', label: t('swipeHard') },
+            { name: 'again', label: t('swipeAgain') },
+        ],
+        onAccessibilityAction: (e: AccessibilityActionEvent) => {
+            switch (e.nativeEvent.actionName) {
+                case 'activate': toggleFlip(); break;
+                case 'good': gradeFromAction(onSwipeRight); break;
+                case 'hard': gradeFromAction(onSwipeTop); break;
+                case 'again': gradeFromAction(onSwipeLeft); break;
+            }
+        },
+    };
+
     return (
-        <View style={[styles.cardContainer, { width: cardWidth, height: cardHeight }]}>
+        <View style={[styles.cardContainer, { width: cardWidth, height: cardHeight }]} {...a11yProps}>
             {highlightMode ? (
                 cardInner
             ) : (

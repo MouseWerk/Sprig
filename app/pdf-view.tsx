@@ -25,6 +25,7 @@ interface PageSliderProps {
 // mixer's VolumeBar). Dragging previews the target page; the PDF only jumps
 // once on release, since re-rendering a page per move tick is too heavy.
 function PageSlider({ page, total, color, trackColor, labelColor, onCommit }: PageSliderProps) {
+    const { t } = useLanguage();
     const containerRef = useRef<RNView>(null);
     const widthRef = useRef(1);
     const originXRef = useRef(0);
@@ -85,8 +86,16 @@ function PageSlider({ page, total, color, trackColor, labelColor, onCommit }: Pa
             style={styles.sliderHit}
             onLayout={measure}
             accessibilityRole="adjustable"
-            accessibilityLabel="Page position"
+            accessibilityLabel={t('a11yPagePosition')}
             accessibilityValue={{ min: 1, max: total, now: shownPage }}
+            // An "adjustable" element has to answer the screen reader's
+            // increment/decrement gestures, or it can't be moved at all
+            accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+            onAccessibilityAction={(e) => {
+                const step = e.nativeEvent.actionName === 'increment' ? 1 : -1;
+                const next = Math.max(1, Math.min(total, page + step));
+                if (next !== page) onCommit(next);
+            }}
             {...pan.panHandlers}
         >
             {dragPage !== null && (
@@ -205,7 +214,7 @@ const PDFViewScreen = () => {
                 headerTintColor: textColor,
                 headerShadowVisible: false,
                 headerRight: () => (
-                    <TouchableOpacity onPress={openInExternal} style={{ marginRight: 8 }} accessibilityLabel="Share document" accessibilityRole="button">
+                    <TouchableOpacity onPress={openInExternal} style={{ marginRight: 8 }} accessibilityLabel={t('a11yShareDocument')} accessibilityRole="button">
                         <Share2 size={22} color={textColor} strokeWidth={2.5} />
                     </TouchableOpacity>
                 )
@@ -276,7 +285,7 @@ const PDFViewScreen = () => {
                         onPress={() => goToPage(currentPage - 1)}
                         disabled={currentPage <= 1}
                         style={[styles.navBtn, currentPage <= 1 && { opacity: 0.3 }]}
-                        accessibilityLabel="Previous page"
+                        accessibilityLabel={t('a11yPreviousPage')}
                         accessibilityRole="button"
                     >
                         <ChevronLeft size={28} color={textColor} strokeWidth={2.5} />
@@ -298,7 +307,7 @@ const PDFViewScreen = () => {
                         onPress={() => goToPage(currentPage + 1)}
                         disabled={currentPage >= totalPages}
                         style={[styles.navBtn, currentPage >= totalPages && { opacity: 0.3 }]}
-                        accessibilityLabel="Next page"
+                        accessibilityLabel={t('a11yNextPage')}
                         accessibilityRole="button"
                     >
                         <ChevronRight size={28} color={textColor} strokeWidth={2.5} />
@@ -323,7 +332,7 @@ const PDFViewScreen = () => {
                         <View style={[styles.modalCard, { backgroundColor }]}>
                             <View style={styles.modalHeader}>
                                 <Text style={[styles.modalTitle, { color: textColor }]}>{t('pdfJumpToPage')}</Text>
-                                <TouchableOpacity onPress={() => setJumpVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+                                <TouchableOpacity onPress={() => setJumpVisible(false)} accessibilityLabel={t('close')} accessibilityRole="button">
                                     <X size={20} color={textColor} />
                                 </TouchableOpacity>
                             </View>

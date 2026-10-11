@@ -274,7 +274,7 @@ export default function TypeScreen() {
                     onSubmitEditing={handleCheck}
                     blurOnSubmit
                     returnKeyType="done"
-                    accessibilityLabel="Answer input"
+                    accessibilityLabel={t('a11yAnswerInput')}
                 />
 
                 {banner && (
@@ -294,7 +294,7 @@ export default function TypeScreen() {
                 )}
 
                 {verdict === 'wrong' && !overridden && (
-                    <TouchableOpacity onPress={handleOverride} style={styles.overrideLink} accessibilityRole="button" accessibilityLabel="Count my answer as correct">
+                    <TouchableOpacity onPress={handleOverride} style={styles.overrideLink} accessibilityRole="button" accessibilityLabel={t('a11yCountAsCorrect')}>
                         <Text style={[styles.overrideText, { color: mutedForeground }]}>{t('typeMyAnswerWasRight')}</Text>
                     </TouchableOpacity>
                 )}

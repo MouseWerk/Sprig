@@ -12,7 +12,10 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider = ({ children }: { children: ReactNode }) => {
-    const [language, setLanguageState] = useState<Language>('en');
+    // Start from the device language rather than English: the stored choice
+    // arrives a moment later, and until then every screen (and any toast
+    // fired on the first render) spoke English on a German phone.
+    const [language, setLanguageState] = useState<Language>(detectDefaultLanguage);
 
     useEffect(() => {
         AsyncStorage.getItem(LANGUAGE_STORAGE_KEY).then(saved => {

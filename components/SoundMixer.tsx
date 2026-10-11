@@ -92,6 +92,7 @@ interface VolumeBarProps {
 // whatever view currently sits under the finger, which can drift mid-drag
 // once the touch moves off its starting element — that produces jitter.
 function VolumeBar({ value, color, trackColor, onChange }: VolumeBarProps) {
+    const { t } = useLanguage();
     const containerRef = useRef<RNView>(null);
     const widthRef = useRef(1);
     const originXRef = useRef(0);
@@ -136,8 +137,16 @@ function VolumeBar({ value, color, trackColor, onChange }: VolumeBarProps) {
             style={styles.volumeHit}
             onLayout={measure}
             accessibilityRole="adjustable"
-            accessibilityLabel="Volume"
+            accessibilityLabel={t('a11yVolume')}
             accessibilityValue={{ min: 0, max: 100, now: Math.round(display * 100) }}
+            // Screen reader increment/decrement moves the volume in 10 % steps
+            accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+            onAccessibilityAction={(e) => {
+                const step = e.nativeEvent.actionName === 'increment' ? 0.1 : -0.1;
+                const next = Math.max(0, Math.min(1, Math.round((display + step) * 10) / 10));
+                setDisplay(next);
+                onChangeRef.current(next);
+            }}
             {...pan.panHandlers}
         >
             <View style={[styles.volumeTrack, { backgroundColor: trackColor }]}>
@@ -318,7 +327,7 @@ export function SoundMixer({ visible, onClose }: SoundMixerProps) {
                                 {activeCount > 0 ? `${activeCount} playing` : 'Blend ambient sounds to focus'}
                             </Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} hitSlop={10} accessibilityLabel="Close sound mixer" accessibilityRole="button">
+                        <TouchableOpacity onPress={onClose} hitSlop={10} accessibilityLabel={t('a11yCloseSoundMixer')} accessibilityRole="button">
                             <X size={22} color={textColor} />
                         </TouchableOpacity>
                     </View>
@@ -341,7 +350,7 @@ export function SoundMixer({ visible, onClose }: SoundMixerProps) {
                                         onPress={() => toggleSound(def)}
                                         activeOpacity={0.7}
                                         disabled={isLoading}
-                                        accessibilityLabel={`${entry.playing ? 'Stop' : 'Play'} ${t(def.nameKey)} sound`}
+                                        accessibilityLabel={t(entry.playing ? 'a11yStopSound' : 'a11yPlaySound').replace('{name}', t(def.nameKey))}
                                         accessibilityRole="button"
                                     >
                                         <View style={[
@@ -376,7 +385,7 @@ export function SoundMixer({ visible, onClose }: SoundMixerProps) {
                         onPress={handleStopAll}
                         disabled={activeCount === 0}
                         activeOpacity={0.85}
-                        accessibilityLabel="Stop all ambient sounds"
+                        accessibilityLabel={t('a11yStopAllSounds')}
                         accessibilityRole="button"
                     >
                         <Square size={16} color={activeCount > 0 ? primaryForeground : mutedForeground} fill={activeCount > 0 ? primaryForeground : 'none'} strokeWidth={2.5} />

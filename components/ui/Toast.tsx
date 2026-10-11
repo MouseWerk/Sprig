@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { AlertCircle, CheckCircle2, Info, X, XCircle } from 'lucide-react-native';
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
@@ -20,6 +21,7 @@ interface ToastContextType {
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { t } = useLanguage();
     const [toast, setToast] = useState<ToastOptions | null>(null);
     const insets = useSafeAreaInsets();
     const opacity = useRef(new Animated.Value(0)).current;
@@ -139,7 +141,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                                 <Text style={[styles.actionText, { color: getStatusColor() }]}>{toast.action.label}</Text>
                             </TouchableOpacity>
                         )}
-                        <TouchableOpacity onPress={hideToast} style={styles.closeBtn} accessibilityLabel="Dismiss notification" accessibilityRole="button">
+                        <TouchableOpacity onPress={hideToast} style={styles.closeBtn} accessibilityLabel={t('a11yDismissNotification')} accessibilityRole="button">
                             <X size={16} color={mutedForeground} />
                         </TouchableOpacity>
                     </View>

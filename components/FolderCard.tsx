@@ -38,7 +38,7 @@ export function FolderCard({ name, onOpen, onMenu, layout = 'grid' }: FolderCard
                     style={styles.rowContent}
                     onPress={onOpen}
                     activeOpacity={0.8}
-                    accessibilityLabel={`Open folder ${name}`}
+                    accessibilityLabel={t('a11yOpenFolder').replace('{name}', name)}
                     accessibilityRole="button"
                 >
                     {iconTile}
@@ -53,7 +53,7 @@ export function FolderCard({ name, onOpen, onMenu, layout = 'grid' }: FolderCard
                         style={styles.rowDelete}
                         onPress={onMenu}
                         activeOpacity={0.5}
-                        accessibilityLabel={`Options for folder ${name}`}
+                        accessibilityLabel={t('a11yFolderOptions').replace('{name}', name)}
                         accessibilityRole="button"
                     >
                         <MoreVertical size={18} color={mutedForeground} />
@@ -68,7 +68,7 @@ export function FolderCard({ name, onOpen, onMenu, layout = 'grid' }: FolderCard
             style={[styles.gridCard, { backgroundColor: secondaryBg }]}
             onPress={onOpen}
             activeOpacity={0.8}
-            accessibilityLabel={`Open folder ${name}`}
+            accessibilityLabel={t('a11yOpenFolder').replace('{name}', name)}
             accessibilityRole="button"
         >
             <View style={styles.gridHeader}>
@@ -78,7 +78,7 @@ export function FolderCard({ name, onOpen, onMenu, layout = 'grid' }: FolderCard
                         style={styles.gridDelete}
                         onPress={onMenu}
                         activeOpacity={0.5}
-                        accessibilityLabel={`Options for folder ${name}`}
+                        accessibilityLabel={t('a11yFolderOptions').replace('{name}', name)}
                         accessibilityRole="button"
                     >
                         <MoreVertical size={18} color={mutedForeground} />

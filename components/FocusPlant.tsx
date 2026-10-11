@@ -1,3 +1,5 @@
+import { TranslationKey } from '@/constants/translations';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import * as Haptics from '@/utils/AppHaptics';
 import { RotateCcw } from 'lucide-react-native';
@@ -14,15 +16,15 @@ const BLOOM_SECONDS = 360;
 
 interface Stage {
     min: number;      // focus seconds needed to reach this stage
-    label: string;
+    labelKey: TranslationKey;
 }
 
 const STAGES: Stage[] = [
-    { min: 0, label: 'Seedling' },
-    { min: 45, label: 'Sprouting' },
-    { min: 120, label: 'Growing' },
-    { min: 240, label: 'Flourishing' },
-    { min: BLOOM_SECONDS, label: 'In bloom' },
+    { min: 0, labelKey: 'focusPlantSeedling' },
+    { min: 45, labelKey: 'focusPlantSprouting' },
+    { min: 120, labelKey: 'focusPlantGrowing' },
+    { min: 240, labelKey: 'focusPlantFlourishing' },
+    { min: BLOOM_SECONDS, labelKey: 'focusPlantInBloom' },
 ];
 
 function stageIndexFor(seconds: number): number {
@@ -48,6 +50,7 @@ interface FocusPlantProps {
 // focused in the app; if you leave the app for more than GRACE_MS and
 // come back, it withers and has to be replanted.
 export function FocusPlant({ active }: FocusPlantProps) {
+    const { t } = useLanguage();
     const [focusSeconds, setFocusSeconds] = useState(0);
     const [dead, setDead] = useState(false);
 
@@ -210,7 +213,7 @@ export function FocusPlant({ active }: FocusPlantProps) {
                     </View>
                 </View>
                 <View style={styles.info}>
-                    <Text style={[styles.title, { color: '#ef4444' }]}>Your plant withered</Text>
+                    <Text style={[styles.title, { color: '#ef4444' }]}>{t('focusPlantWithered')}</Text>
                     <Text style={[styles.subtitle, { color: mutedForeground }]} numberOfLines={1}>
                         You left for more than 10s. Stay in the app to keep it alive.
                     </Text>
@@ -221,7 +224,7 @@ export function FocusPlant({ active }: FocusPlantProps) {
                     activeOpacity={0.85}
                 >
                     <RotateCcw size={16} color={primaryForeground} strokeWidth={2.5} />
-                    <Text style={[styles.replantText, { color: primaryForeground }]}>Replant</Text>
+                    <Text style={[styles.replantText, { color: primaryForeground }]}>{t('focusPlantReplant')}</Text>
                 </TouchableOpacity>
             </View>
         );
@@ -239,7 +242,7 @@ export function FocusPlant({ active }: FocusPlantProps) {
             </View>
 
             <View style={styles.info}>
-                <Text style={[styles.title, { color: textColor }]}>{stage.label}</Text>
+                <Text style={[styles.title, { color: textColor }]}>{t(stage.labelKey)}</Text>
                 <View style={[styles.progressTrack, { backgroundColor: primaryColor + '20' }]}>
                     <View style={[styles.progressFill, { width: `${Math.round(stageProgress * 100)}%`, backgroundColor: primaryColor }]} />
                 </View>
@@ -247,7 +250,7 @@ export function FocusPlant({ active }: FocusPlantProps) {
 
             <View style={styles.timerWrap}>
                 <Text style={[styles.timer, { color: textColor }]}>{formatTime(focusSeconds)}</Text>
-                <Text style={[styles.timerLabel, { color: mutedForeground }]}>focus</Text>
+                <Text style={[styles.timerLabel, { color: mutedForeground }]}>{t('focusPlantTimerLabel')}</Text>
             </View>
         </View>
     );

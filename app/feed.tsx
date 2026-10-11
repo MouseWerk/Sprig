@@ -162,16 +162,16 @@ export default function FeedScreen() {
         headerShadowVisible: false,
         headerRight: () => (
             <View style={{ flexDirection: 'row', gap: 18 }}>
-                <TouchableOpacity onPress={toggleFocusMode} hitSlop={10} accessibilityLabel={focusMode ? 'Disable focus mode' : 'Enable focus mode'} accessibilityRole="button">
+                <TouchableOpacity onPress={toggleFocusMode} hitSlop={10} accessibilityLabel={t(focusMode ? 'a11yFocusModeOff' : 'a11yFocusModeOn')} accessibilityRole="button">
                     <Sprout size={22} color={focusMode ? primaryColor : textColor} strokeWidth={focusMode ? 2.5 : 2} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={toggleHighlightMode} hitSlop={10} accessibilityLabel={isHighlightMode ? 'Exit highlight mode' : 'Enter highlight mode'} accessibilityRole="button">
+                <TouchableOpacity onPress={toggleHighlightMode} hitSlop={10} accessibilityLabel={t(isHighlightMode ? 'a11yHighlightModeOff' : 'a11yHighlightModeOn')} accessibilityRole="button">
                     <Edit3 size={22} color={isHighlightMode ? primaryColor : textColor} strokeWidth={isHighlightMode ? 3 : 2} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={toggleHideAnswers} hitSlop={10} accessibilityLabel={hideAnswers ? 'Show answers' : 'Hide answers'} accessibilityRole="button">
+                <TouchableOpacity onPress={toggleHideAnswers} hitSlop={10} accessibilityLabel={t(hideAnswers ? 'a11yShowAnswers' : 'a11yHideAnswers')} accessibilityRole="button">
                     {hideAnswers ? <EyeOff size={22} color={textColor} /> : <Eye size={22} color={textColor} />}
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleShuffle} hitSlop={10} accessibilityLabel="Shuffle cards" accessibilityRole="button">
+                <TouchableOpacity onPress={handleShuffle} hitSlop={10} accessibilityLabel={t('a11yShuffleCards')} accessibilityRole="button">
                     <Shuffle size={22} color={textColor} />
                 </TouchableOpacity>
             </View>

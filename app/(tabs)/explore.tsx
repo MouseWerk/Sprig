@@ -374,7 +374,7 @@ export default function LibraryScreen() {
             <TouchableOpacity
               style={styles.deleteButton}
               onPress={() => openDocMenu(item)}
-              accessibilityLabel={`Options for ${item.name}`}
+              accessibilityLabel={t('a11yOptionsFor').replace('{name}', item.name)}
               accessibilityRole="button"
             >
               <MoreVertical size={18} color={mutedForeground} />
@@ -382,7 +382,7 @@ export default function LibraryScreen() {
             <TouchableOpacity
               style={styles.deleteButton}
               onPress={() => handleDelete(item.id, item.name)}
-              accessibilityLabel={`Delete ${item.name}`}
+              accessibilityLabel={t('a11yDeleteItem').replace('{name}', item.name)}
               accessibilityRole="button"
             >
               <Trash2 size={18} color="#ef4444" />
@@ -451,7 +451,7 @@ export default function LibraryScreen() {
             style={[styles.addButton, { backgroundColor: secondaryBg }]}
             onPress={() => setNewFolderModalVisible(true)}
             activeOpacity={0.9}
-            accessibilityLabel="New folder"
+            accessibilityLabel={t('a11yNewFolder')}
             accessibilityRole="button"
           >
             <FolderIcon size={24} color={accentColor} strokeWidth={3} />
@@ -459,7 +459,7 @@ export default function LibraryScreen() {
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: accentColor }]}
             onPress={() => setImportModalVisible(true)}
-            accessibilityLabel="Add PDF document"
+            accessibilityLabel={t('a11yAddPdfDocument')}
             accessibilityRole="button"
             activeOpacity={0.9}
           >
@@ -521,7 +521,7 @@ export default function LibraryScreen() {
               style={[styles.continueCard, { backgroundColor: accentColor + '12', borderColor: accentColor + '30' }]}
               activeOpacity={0.8}
               onPress={() => router.push({ pathname: '/pdf-view', params: { id: continueDoc!.id, uri: continueDoc!.uri, name: continueDoc!.name } })}
-              accessibilityLabel={`Continue reading ${continueDoc.name}`}
+              accessibilityLabel={t('a11yContinueReading').replace('{name}', continueDoc.name)}
               accessibilityRole="button"
             >
               <View style={[styles.continueIcon, { backgroundColor: accentColor + '18' }]}>
@@ -566,7 +566,7 @@ export default function LibraryScreen() {
       >
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: textColor }]}>{t('sortBy')}</Text>
-              <TouchableOpacity onPress={() => setSortModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+              <TouchableOpacity onPress={() => setSortModalVisible(false)} accessibilityLabel={t('close')} accessibilityRole="button">
                 <X size={20} color={textColor} />
               </TouchableOpacity>
             </View>
@@ -597,7 +597,7 @@ export default function LibraryScreen() {
       >
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: textColor }]}>{t('newFolder')}</Text>
-                <TouchableOpacity onPress={() => setNewFolderModalVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+                <TouchableOpacity onPress={() => setNewFolderModalVisible(false)} accessibilityLabel={t('close')} accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>
@@ -630,7 +630,7 @@ export default function LibraryScreen() {
                 <TouchableOpacity onPress={() => {
                   setImportModalVisible(false);
                   setPickedFile(null);
-                }} accessibilityLabel="Close" accessibilityRole="button">
+                }} accessibilityLabel={t('close')} accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>
@@ -654,7 +654,7 @@ export default function LibraryScreen() {
                       label={t('exploreGiveItAName')}
                       value={docName}
                       onChangeText={setDocName}
-                      placeholder="e.g. Science Book"
+                      placeholder={t('exploreDocNamePlaceholder')}
                     />
 
                     <Text style={[styles.sectionLabel, { color: textColor }]}>{t('exploreSelectAnIcon')}</Text>
@@ -688,7 +688,7 @@ export default function LibraryScreen() {
       >
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: textColor }]}>{t('exploreEditDocument')}</Text>
-                <TouchableOpacity onPress={() => setEditDoc(null)} accessibilityLabel="Close" accessibilityRole="button">
+                <TouchableOpacity onPress={() => setEditDoc(null)} accessibilityLabel={t('close')} accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>
@@ -699,7 +699,7 @@ export default function LibraryScreen() {
                     label={t('exploreDocumentName')}
                     value={editDocName}
                     onChangeText={setEditDocName}
-                    placeholder="e.g. Science Book"
+                    placeholder={t('exploreDocNamePlaceholder')}
                   />
 
                   <Text style={[styles.sectionLabel, { color: textColor, marginTop: 16 }]}>{t('moveToFolder')}</Text>
@@ -767,7 +767,7 @@ export default function LibraryScreen() {
                 <Text style={[styles.modalTitle, { color: textColor }]}>
                   {t('renameFolderTitle')}
                 </Text>
-                <TouchableOpacity onPress={() => setEditingFolder(null)} accessibilityLabel="Close" accessibilityRole="button">
+                <TouchableOpacity onPress={() => setEditingFolder(null)} accessibilityLabel={t('close')} accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>
@@ -807,7 +807,7 @@ export default function LibraryScreen() {
                 <Text style={[styles.modalTitle, { color: textColor }]}>
                   {t(selectedIds.size === 1 ? 'exploreMoveCountOne' : 'exploreMoveCountMany').replace('{n}', String(selectedIds.size))}
                 </Text>
-                <TouchableOpacity onPress={() => setMoveSheetVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+                <TouchableOpacity onPress={() => setMoveSheetVisible(false)} accessibilityLabel={t('close')} accessibilityRole="button">
                   <X size={20} color={textColor} />
                 </TouchableOpacity>
               </View>
@@ -843,7 +843,7 @@ export default function LibraryScreen() {
               style={styles.selectBarBtn}
               onPress={() => setMoveSheetVisible(true)}
               disabled={selectedIds.size === 0}
-              accessibilityLabel="Move selected documents"
+              accessibilityLabel={t('a11yMoveSelectedDocuments')}
               accessibilityRole="button"
             >
               <FolderInput size={20} color={primaryForeground} strokeWidth={2.5} />
@@ -853,7 +853,7 @@ export default function LibraryScreen() {
               style={styles.selectBarBtn}
               onPress={handleDeleteSelected}
               disabled={selectedIds.size === 0}
-              accessibilityLabel="Delete selected documents"
+              accessibilityLabel={t('a11yDeleteSelectedDocuments')}
               accessibilityRole="button"
             >
               <Trash2 size={20} color={primaryForeground} strokeWidth={2.5} />
@@ -862,7 +862,7 @@ export default function LibraryScreen() {
             <TouchableOpacity
               style={styles.selectBarBtn}
               onPress={exitSelectMode}
-              accessibilityLabel="Cancel selection"
+              accessibilityLabel={t('a11yCancelSelection')}
               accessibilityRole="button"
             >
               <X size={20} color={primaryForeground} strokeWidth={2.5} />

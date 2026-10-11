@@ -133,7 +133,7 @@ export function GroveStrip({ plants, onPressPlant, large = false, decorations = 
                                 onPress={() => onPressPlant?.(plant)}
                                 disabled={!onPressPlant}
                                 accessibilityRole="button"
-                                accessibilityLabel={`${plant.deckName}${plant.resting ? ', resting' : ''}${plant.dueCards > 0 ? `, ${plant.dueCards} cards due` : ''}`}
+                                accessibilityLabel={[plant.deckName, plant.resting ? t('groveResting') : null, plant.dueCards > 0 ? t('homeDueCount').replace('{n}', String(plant.dueCards)) : null].filter(Boolean).join(', ')}
                             >
                                 <GrowingPlant
                                     progress={plant.growth}

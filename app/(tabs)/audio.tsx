@@ -460,7 +460,7 @@ export default function AudioPlayerScreen() {
                                 style={styles.deleteButtonContainer}
                                 onPress={() => openAudioMenu(item)}
                                 activeOpacity={0.5}
-                                accessibilityLabel={`Options for ${item.name}`}
+                                accessibilityLabel={t('a11yOptionsFor').replace('{name}', item.name)}
                                 accessibilityRole="button"
                             >
                                 <MoreVertical size={16} color={mutedForeground} />
@@ -469,7 +469,7 @@ export default function AudioPlayerScreen() {
                                 style={styles.deleteButtonContainer}
                                 onPress={() => handleDelete(item.id)}
                                 activeOpacity={0.5}
-                                accessibilityLabel={`Delete ${item.name}`}
+                                accessibilityLabel={t('a11yDeleteItem').replace('{name}', item.name)}
                                 accessibilityRole="button"
                             >
                                 <Trash2 size={16} color={mutedForeground} />
@@ -512,7 +512,7 @@ export default function AudioPlayerScreen() {
                         style={[styles.addButton, { backgroundColor: secondaryBg }]}
                         onPress={() => setNewFolderSheetVisible(true)}
                         activeOpacity={0.9}
-                        accessibilityLabel="New folder"
+                        accessibilityLabel={t('a11yNewFolder')}
                         accessibilityRole="button"
                     >
                         <FolderIcon size={24} color={accentColor} strokeWidth={3} />
@@ -521,7 +521,7 @@ export default function AudioPlayerScreen() {
                         style={[styles.addButton, { backgroundColor: secondaryBg }]}
                         onPress={() => setMixerVisible(true)}
                         activeOpacity={0.9}
-                        accessibilityLabel="Open ambient sound mixer"
+                        accessibilityLabel={t('a11yOpenSoundMixer')}
                         accessibilityRole="button"
                     >
                         <SlidersHorizontal size={24} color={accentColor} strokeWidth={3} />
@@ -530,7 +530,7 @@ export default function AudioPlayerScreen() {
                         style={[styles.addButton, { backgroundColor: accentColor }]}
                         onPress={handlePickAudio}
                         activeOpacity={0.9}
-                        accessibilityLabel="Add audio file"
+                        accessibilityLabel={t('a11yAddAudioFile')}
                         accessibilityRole="button"
                     >
                         <Plus size={24} color={accentForeground} strokeWidth={3} />
@@ -592,7 +592,7 @@ export default function AudioPlayerScreen() {
                                 <TouchableOpacity
                                     onPress={stopPlayback}
                                     hitSlop={8}
-                                    accessibilityLabel="Close player"
+                                    accessibilityLabel={t('a11yClosePlayer')}
                                     accessibilityRole="button"
                                 >
                                     <X size={18} color={mutedForeground} strokeWidth={2.5} />
@@ -613,7 +613,7 @@ export default function AudioPlayerScreen() {
                                     seekingRef.current = false;
                                     seekTo(v);
                                 }}
-                                accessibilityLabel="Seek position"
+                                accessibilityLabel={t('a11ySeekPosition')}
                             />
 
                             <View style={styles.playerMain}>
@@ -625,7 +625,7 @@ export default function AudioPlayerScreen() {
                                         onPress={cyclePlaybackRate}
                                         style={[styles.rateChip, { backgroundColor: playbackRate !== 1 ? accentColor : secondaryBg }]}
                                         activeOpacity={0.8}
-                                        accessibilityLabel={`Playback speed ${playbackRate}x`}
+                                        accessibilityLabel={t('a11yPlaybackSpeed').replace('{n}', String(playbackRate))}
                                         accessibilityRole="button"
                                     >
                                         <Text style={[styles.rateChipText, { color: playbackRate !== 1 ? accentForeground : textColor }]}>
@@ -635,7 +635,7 @@ export default function AudioPlayerScreen() {
                                     <TouchableOpacity
                                         onPress={() => skipBy(-15)}
                                         hitSlop={6}
-                                        accessibilityLabel="Back 15 seconds"
+                                        accessibilityLabel={t('a11yBack15')}
                                         accessibilityRole="button"
                                     >
                                         <Rewind size={26} color={textColor} strokeWidth={2.25} />
@@ -644,7 +644,7 @@ export default function AudioPlayerScreen() {
                                         onPress={togglePlayback}
                                         style={[styles.floatingPlayBtn, { backgroundColor: accentColor }]}
                                         activeOpacity={0.8}
-                                        accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
+                                        accessibilityLabel={t(isPlaying ? 'a11yPause' : 'a11yPlay')}
                                         accessibilityRole="button"
                                     >
                                         {isPlaying ? (
@@ -656,7 +656,7 @@ export default function AudioPlayerScreen() {
                                     <TouchableOpacity
                                         onPress={() => skipBy(15)}
                                         hitSlop={6}
-                                        accessibilityLabel="Forward 15 seconds"
+                                        accessibilityLabel={t('a11yForward15')}
                                         accessibilityRole="button"
                                     >
                                         <FastForward size={26} color={textColor} strokeWidth={2.25} />
@@ -679,7 +679,7 @@ export default function AudioPlayerScreen() {
             >
                 <View style={styles.modalHeader}>
                     <Text style={[styles.modalTitle, { color: textColor }]}>{t('audioEditTitle')}</Text>
-                    <TouchableOpacity onPress={() => setEditAudio(null)} accessibilityLabel="Close" accessibilityRole="button">
+                    <TouchableOpacity onPress={() => setEditAudio(null)} accessibilityLabel={t('close')} accessibilityRole="button">
                         <X size={20} color={textColor} />
                     </TouchableOpacity>
                 </View>
@@ -754,7 +754,7 @@ export default function AudioPlayerScreen() {
                     <Text style={[styles.modalTitle, { color: textColor }]}>
                         {t('renameFolderTitle')}
                     </Text>
-                    <TouchableOpacity onPress={() => setEditingFolder(null)} accessibilityLabel="Close" accessibilityRole="button">
+                    <TouchableOpacity onPress={() => setEditingFolder(null)} accessibilityLabel={t('close')} accessibilityRole="button">
                         <X size={20} color={textColor} />
                     </TouchableOpacity>
                 </View>
@@ -794,7 +794,7 @@ export default function AudioPlayerScreen() {
                     <Text style={[styles.modalTitle, { color: textColor }]}>
                         {t(selectedIds.size === 1 ? 'audioMoveCountOne' : 'audioMoveCountMany').replace('{n}', String(selectedIds.size))}
                     </Text>
-                    <TouchableOpacity onPress={() => setMoveSheetVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+                    <TouchableOpacity onPress={() => setMoveSheetVisible(false)} accessibilityLabel={t('close')} accessibilityRole="button">
                         <X size={20} color={textColor} />
                     </TouchableOpacity>
                 </View>
@@ -827,7 +827,7 @@ export default function AudioPlayerScreen() {
             >
                 <View style={styles.modalHeader}>
                     <Text style={[styles.modalTitle, { color: textColor }]}>{t('newFolder')}</Text>
-                    <TouchableOpacity onPress={() => setNewFolderSheetVisible(false)} accessibilityLabel="Close" accessibilityRole="button">
+                    <TouchableOpacity onPress={() => setNewFolderSheetVisible(false)} accessibilityLabel={t('close')} accessibilityRole="button">
                         <X size={20} color={textColor} />
                     </TouchableOpacity>
                 </View>
@@ -855,7 +855,7 @@ export default function AudioPlayerScreen() {
                             style={styles.selectBarBtn}
                             onPress={() => setMoveSheetVisible(true)}
                             disabled={selectedIds.size === 0}
-                            accessibilityLabel="Move selected files"
+                            accessibilityLabel={t('a11yMoveSelectedFiles')}
                             accessibilityRole="button"
                         >
                             <FolderInput size={20} color={accentForeground} strokeWidth={2.5} />
@@ -865,7 +865,7 @@ export default function AudioPlayerScreen() {
                             style={styles.selectBarBtn}
                             onPress={handleDeleteSelected}
                             disabled={selectedIds.size === 0}
-                            accessibilityLabel="Delete selected files"
+                            accessibilityLabel={t('a11yDeleteSelectedFiles')}
                             accessibilityRole="button"
                         >
                             <Trash2 size={20} color={accentForeground} strokeWidth={2.5} />
@@ -874,7 +874,7 @@ export default function AudioPlayerScreen() {
                         <TouchableOpacity
                             style={styles.selectBarBtn}
                             onPress={exitSelectMode}
-                            accessibilityLabel="Cancel selection"
+                            accessibilityLabel={t('a11yCancelSelection')}
                             accessibilityRole="button"
                         >
                             <X size={20} color={accentForeground} strokeWidth={2.5} />
