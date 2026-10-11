@@ -4,7 +4,7 @@
 
 import { BASE_SPECIES_COUNT, PLANT_SPECIES_COUNT, PotStyle } from '@/components/GrowingPlant';
 import { TranslationKey } from '@/constants/translations';
-import { Deck, ExamPlan, getDecks, getExamPlan, getGroveEconomy, getUserStats, GroveEconomy, isReviewDue, liveStreak, saveGroveEconomy, serialized } from './Storage';
+import { Deck, ExamPlan, getDecks, getExamPlan, getUserStats, GroveEconomy, isReviewDue, liveStreak, loadGroveEconomy, saveGroveEconomy, serialized } from './Storage';
 
 // A card counts as mature once its SM-2 interval reaches 21 days (Anki convention).
 export const MATURE_INTERVAL_DAYS = 21;
@@ -179,13 +179,21 @@ export async function collectDew(plants: GrovePlant[]): Promise<CollectResult> {
     // overlaps a purchase read can silently undo the purchase's spend (or
     // vice versa) when the later write lands with a stale dew balance.
     return serialized(async () => {
-        const [econ, stats] = await Promise.all([getGroveEconomy(), getUserStats()]);
+        const [econ, stats] = await Promise.all([loadGroveEconomy(), getUserStats()]);
         const streak = liveStreak(stats);
-        const collected = pendingDew(plants, econ, streak);
+        const now = Date.now();
+        if (econ.lastCollectedAt > now) {
+            // The clock was set back (or the timestamp came from a device
+            // that was ahead): without this, nothing would accrue again until
+            // real time caught up with the stored moment.
+            econ.lastCollectedAt = now;
+            await saveGroveEconomy(econ);
+        }
+        const collected = pendingDew(plants, econ, streak, now);
         if (collected > 0) {
             // Fractions under one dew stay on the clock only when nothing was
             // collected; on a real collect the clock simply resets.
-            econ.lastCollectedAt = Date.now();
+            econ.lastCollectedAt = now;
             econ.dew += collected;
             await saveGroveEconomy(econ);
         }
@@ -216,22 +224,29 @@ export function harvestCooldownDays(plant: GrovePlant, econ: GroveEconomy, nowMs
     return Math.max(0, Math.ceil((readyAt - nowMs) / 86400000));
 }
 
+// Serialized like every other grove read-modify-write (see collectDew): a
+// double tap on "Harvest" used to read the same cooldown twice and grant
+// two seeds.
 export async function harvestPlant(plant: GrovePlant): Promise<{ ok: boolean; seeds: number }> {
-    const econ = await getGroveEconomy();
-    if (!canHarvest(plant, econ)) return { ok: false, seeds: econ.seeds };
-    econ.harvests[plant.deckId] = Date.now();
-    econ.seeds += 1;
-    await saveGroveEconomy(econ);
-    return { ok: true, seeds: econ.seeds };
+    return serialized(async () => {
+        const econ = await loadGroveEconomy();
+        if (!canHarvest(plant, econ)) return { ok: false, seeds: econ.seeds };
+        econ.harvests[plant.deckId] = Date.now();
+        econ.seeds += 1;
+        await saveGroveEconomy(econ);
+        return { ok: true, seeds: econ.seeds };
+    });
 }
 
 export async function plantSeed(deckId: string, species: number): Promise<{ ok: boolean; seeds: number }> {
-    const econ = await getGroveEconomy();
-    if (econ.seeds <= 0 || !RARE_SPECIES.includes(species)) return { ok: false, seeds: econ.seeds };
-    econ.seeds -= 1;
-    econ.speciesOverrides[deckId] = species;
-    await saveGroveEconomy(econ);
-    return { ok: true, seeds: econ.seeds };
+    return serialized(async () => {
+        const econ = await loadGroveEconomy();
+        if (econ.seeds <= 0 || !RARE_SPECIES.includes(species)) return { ok: false, seeds: econ.seeds };
+        econ.seeds -= 1;
+        econ.speciesOverrides[deckId] = species;
+        await saveGroveEconomy(econ);
+        return { ok: true, seeds: econ.seeds };
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -250,8 +265,15 @@ export interface StageUp {
     growth: number;
 }
 
+// Serialized: it writes the whole economy back, and runs right as a study
+// session ends — the same moment the last review's dew is being written.
+// Unserialized, the stale copy it read could overwrite that dew.
 export async function detectStageUps(): Promise<StageUp[]> {
-    const [decks, econ] = await Promise.all([getDecks(), getGroveEconomy()]);
+    return serialized(detectStageUpsUnserialized);
+}
+
+async function detectStageUpsUnserialized(): Promise<StageUp[]> {
+    const [decks, econ] = await Promise.all([getDecks(), loadGroveEconomy()]);
     const plants = buildGrovePlants(decks, econ.speciesOverrides, econ.planters);
 
     const firstRun = Object.keys(econ.lastStages).length === 0;

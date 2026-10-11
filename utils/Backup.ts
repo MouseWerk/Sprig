@@ -8,17 +8,18 @@ import {
     getAudioFiles,
     getDecks,
     getFolders,
-    getGroveEconomy,
     getPdfProgressMap,
-    getUserStats,
     GroveEconomy,
     importAudioRecord,
     importDeckRecord,
     importFolderRecord,
+    loadGroveEconomy,
+    loadUserStats,
     mergePdfProgress,
     safeAudioFileName,
     saveGroveEconomy,
     saveUserStats,
+    serialized,
     UserStats,
 } from './Storage';
 
@@ -87,8 +88,8 @@ export async function createBackup(): Promise<string> {
         getFolders(),
         getAudioFiles(),
         getPdfProgressMap(),
-        getUserStats(),
-        getGroveEconomy(),
+        loadUserStats(),
+        loadGroveEconomy(),
     ]);
 
     const files: BackupPayload['files'] = { decks: {}, audio: {}, images: {} };
@@ -296,19 +297,21 @@ export async function importBackup(uri: string): Promise<ImportSummary> {
     // PDF progress (imported fills gaps, existing wins)
     await mergePdfProgress(backup.data.pdfProgress || {});
 
-    // Stats (merge, never lose progress)
-    const merged = mergeStats(await getUserStats(), backup.data.stats);
-    if (merged) {
-        await saveUserStats(merged);
-        summary.statsMerged = true;
-    }
-
-    // Grove economy (merge, never lose dew/seeds/growth)
-    const mergedGrove = mergeGrove(await getGroveEconomy(), backup.data.grove);
-    if (mergedGrove) {
-        await saveGroveEconomy(mergedGrove);
-        summary.groveMerged = true;
-    }
+    // Stats and grove economy: merged so a restore never takes progress
+    // away. Strict reads (a failed read throws instead of looking like a
+    // fresh install) and serialized against reviews writing the same rows.
+    await serialized(async () => {
+        const merged = mergeStats(await loadUserStats(), backup.data.stats);
+        if (merged) {
+            await saveUserStats(merged);
+            summary.statsMerged = true;
+        }
+        const mergedGrove = mergeGrove(await loadGroveEconomy(), backup.data.grove);
+        if (mergedGrove) {
+            await saveGroveEconomy(mergedGrove);
+            summary.groveMerged = true;
+        }
+    });
 
     // Preferences (only set ones the user hasn't already chosen). Older
     // backups use the pre-rename key names — map those onto the current ones.

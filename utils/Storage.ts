@@ -147,36 +147,8 @@ export interface GroveEconomy {
     equippedDecorations: string[];            // owned decorations currently shown, any number at once
 }
 
-export async function getGroveEconomy(): Promise<GroveEconomy> {
-    try {
-        const db = await getDb();
-        const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM kv WHERE key = ?', 'grove');
-        if (row) {
-            const parsed = JSON.parse(row.value);
-            return {
-                dew: parsed.dew || 0,
-                lastCollectedAt: parsed.lastCollectedAt || Date.now(),
-                burstDate: parsed.burstDate || '',
-                burstDewToday: parsed.burstDewToday || 0,
-                boostUntil: parsed.boostUntil || 0,
-                seeds: parsed.seeds || 0,
-                harvests: parsed.harvests || {},
-                speciesOverrides: parsed.speciesOverrides || {},
-                lastStages: parsed.lastStages || {},
-                planters: parsed.planters || {},
-                ownedDecorations: parsed.ownedDecorations || [],
-                // Migrates the old single-slot field (a decoration id or null)
-                // into the new array so existing users keep their shelf.
-                equippedDecorations: Array.isArray(parsed.equippedDecorations)
-                    ? parsed.equippedDecorations
-                    : (parsed.equippedDecoration ? [parsed.equippedDecoration] : []),
-            };
-        }
-    } catch (e) {
-        console.error('Error getting grove economy', e);
-    }
-    // First run: persist immediately so the accrual clock survives restarts
-    const fresh: GroveEconomy = {
+function freshGroveEconomy(): GroveEconomy {
+    return {
         dew: 0,
         lastCollectedAt: Date.now(),
         burstDate: localDateKey(),
@@ -190,8 +162,49 @@ export async function getGroveEconomy(): Promise<GroveEconomy> {
         ownedDecorations: [],
         equippedDecorations: [],
     };
-    await saveGroveEconomy(fresh).catch(() => { });
-    return fresh;
+}
+
+// Strict read for read-modify-write paths: throws when the database can't be
+// read, so a transient failure can never be "saved" back as a fresh, empty
+// economy on top of the player's real balance. The first run (no row yet)
+// is persisted right away so the accrual clock survives restarts.
+export async function loadGroveEconomy(): Promise<GroveEconomy> {
+    const db = await getDb();
+    const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM kv WHERE key = ?', 'grove');
+    if (!row) {
+        const fresh = freshGroveEconomy();
+        await saveGroveEconomy(fresh).catch(() => { });
+        return fresh;
+    }
+    const parsed = JSON.parse(row.value);
+    return {
+        dew: parsed.dew || 0,
+        lastCollectedAt: parsed.lastCollectedAt || Date.now(),
+        burstDate: parsed.burstDate || '',
+        burstDewToday: parsed.burstDewToday || 0,
+        boostUntil: parsed.boostUntil || 0,
+        seeds: parsed.seeds || 0,
+        harvests: parsed.harvests || {},
+        speciesOverrides: parsed.speciesOverrides || {},
+        lastStages: parsed.lastStages || {},
+        planters: parsed.planters || {},
+        ownedDecorations: parsed.ownedDecorations || [],
+        // Migrates the old single-slot field (a decoration id or null)
+        // into the new array so existing users keep their shelf.
+        equippedDecorations: Array.isArray(parsed.equippedDecorations)
+            ? parsed.equippedDecorations
+            : (parsed.equippedDecoration ? [parsed.equippedDecoration] : []),
+    };
+}
+
+// For display: never throws, falls back to an empty economy (not saved).
+export async function getGroveEconomy(): Promise<GroveEconomy> {
+    try {
+        return await loadGroveEconomy();
+    } catch (e) {
+        console.error('Error getting grove economy', e);
+        return freshGroveEconomy();
+    }
 }
 
 export async function saveGroveEconomy(econ: GroveEconomy): Promise<void> {
@@ -210,7 +223,7 @@ export type PurchaseFailure = 'dew' | 'max' | 'active';
 // once but granted twice.
 export async function buyStreakFreezeWithDew(): Promise<{ ok: boolean; reason?: PurchaseFailure; dew: number; streakFreezes: number }> {
     return serialized(async () => {
-        const [econ, stats] = await Promise.all([getGroveEconomy(), getUserStats()]);
+        const [econ, stats] = await Promise.all([loadGroveEconomy(), loadUserStats()]);
         const owned = stats.streakFreezes || 0;
         if (owned >= MAX_STREAK_FREEZES) return { ok: false, reason: 'max' as const, dew: econ.dew, streakFreezes: owned };
         if (econ.dew < DEW_COST_FREEZE) return { ok: false, reason: 'dew' as const, dew: econ.dew, streakFreezes: owned };
@@ -223,7 +236,7 @@ export async function buyStreakFreezeWithDew(): Promise<{ ok: boolean; reason?: 
 
 export async function buySunshineBoost(): Promise<{ ok: boolean; reason?: PurchaseFailure; dew: number; boostUntil: number }> {
     return serialized(async () => {
-        const econ = await getGroveEconomy();
+        const econ = await loadGroveEconomy();
         const now = Date.now();
         if (now < econ.boostUntil) return { ok: false, reason: 'active' as const, dew: econ.dew, boostUntil: econ.boostUntil };
         if (econ.dew < DEW_COST_SUNSHINE) return { ok: false, reason: 'dew' as const, dew: econ.dew, boostUntil: econ.boostUntil };
@@ -240,7 +253,10 @@ export async function buySunshineBoost(): Promise<{ ok: boolean; reason?: Purcha
 // price; each deck's pot is its own purchase.
 export async function buyPlanter(deckId: string, potId: string): Promise<{ ok: boolean; reason?: PurchaseFailure; dew: number; planters: Record<string, string> }> {
     return serialized(async () => {
-        const econ = await getGroveEconomy();
+        const econ = await loadGroveEconomy();
+        // Already this deck's pot: a second tap that landed before the
+        // sheet re-rendered must not charge for the same planter again.
+        if (econ.planters[deckId] === potId) return { ok: true, dew: econ.dew, planters: econ.planters };
         const price = POT_PRICES[potId] || 0;
         if (econ.dew < price) return { ok: false, reason: 'dew' as const, dew: econ.dew, planters: econ.planters };
         econ.dew -= price;
@@ -252,7 +268,7 @@ export async function buyPlanter(deckId: string, potId: string): Promise<{ ok: b
 
 export async function buyDecoration(decorationId: string): Promise<{ ok: boolean; reason?: PurchaseFailure; dew: number; ownedDecorations: string[] }> {
     return serialized(async () => {
-        const econ = await getGroveEconomy();
+        const econ = await loadGroveEconomy();
         if (econ.ownedDecorations.includes(decorationId)) return { ok: false, reason: 'max' as const, dew: econ.dew, ownedDecorations: econ.ownedDecorations };
         const price = DECORATION_CATALOG.find(d => d.id === decorationId)?.price || 0;
         if (econ.dew < price) return { ok: false, reason: 'dew' as const, dew: econ.dew, ownedDecorations: econ.ownedDecorations };
@@ -268,7 +284,7 @@ export async function buyDecoration(decorationId: string): Promise<{ ok: boolean
 // dew was already spent to unlock it. Any number can be shown at once.
 export async function equipDecoration(decorationId: string): Promise<GroveEconomy> {
     return serialized(async () => {
-        const econ = await getGroveEconomy();
+        const econ = await loadGroveEconomy();
         if (econ.ownedDecorations.includes(decorationId)) {
             econ.equippedDecorations = econ.equippedDecorations.includes(decorationId)
                 ? econ.equippedDecorations.filter(id => id !== decorationId)
@@ -750,16 +766,7 @@ export async function clearCardCache(): Promise<void> {
 
 // User Stats Functions
 
-export async function getUserStats(): Promise<UserStats> {
-    try {
-        const db = await getDb();
-        const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM kv WHERE key = ?', 'stats');
-        if (row) {
-            return JSON.parse(row.value);
-        }
-    } catch (e) {
-        console.error('Error getting stats', e);
-    }
+function emptyUserStats(): UserStats {
     return {
         totalCardsReviewed: 0,
         totalStudyTime: 0,
@@ -772,6 +779,25 @@ export async function getUserStats(): Promise<UserStats> {
         focusSessions: 0,
         quizzesCompleted: 0,
     };
+}
+
+// Strict read for read-modify-write paths (see loadGroveEconomy): a failed
+// read throws instead of handing back zeros that the caller would then save
+// over years of streak, XP and review history.
+export async function loadUserStats(): Promise<UserStats> {
+    const db = await getDb();
+    const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM kv WHERE key = ?', 'stats');
+    return row ? { ...emptyUserStats(), ...JSON.parse(row.value) } : emptyUserStats();
+}
+
+// For display: never throws.
+export async function getUserStats(): Promise<UserStats> {
+    try {
+        return await loadUserStats();
+    } catch (e) {
+        console.error('Error getting stats', e);
+        return emptyUserStats();
+    }
 }
 
 export async function saveUserStats(stats: UserStats): Promise<void> {
@@ -787,7 +813,13 @@ export async function saveUserStats(stats: UserStats): Promise<void> {
 // milestones, and re-locking an achievement mid-session would be worse than
 // the small over-count.
 export async function revertUserStats(cardsReviewed: number, seconds: number, xpGained: number): Promise<void> {
-    const stats = await getUserStats();
+    // Serialized like updateUserStats: an undo racing a review's write would
+    // otherwise drop one of the two changes.
+    return serialized(() => revertUserStatsUnserialized(cardsReviewed, seconds, xpGained));
+}
+
+async function revertUserStatsUnserialized(cardsReviewed: number, seconds: number, xpGained: number): Promise<void> {
+    const stats = await loadUserStats();
     const today = localDateKey();
 
     stats.totalCardsReviewed = Math.max(0, (stats.totalCardsReviewed || 0) - Math.max(0, cardsReviewed));
@@ -829,7 +861,7 @@ async function updateUserStatsUnserialized(
     bonusXp: number = 0,
     activity?: { focusSession?: boolean; quizCompleted?: boolean }
 ): Promise<StatsUpdateResult> {
-    const stats = await getUserStats();
+    const stats = await loadUserStats();
     const today = localDateKey();
     const lastStudy = stats.lastStudyDate.split('T')[0];
 
@@ -839,11 +871,13 @@ async function updateUserStatsUnserialized(
 
     // Grove economy: an active sunshine boost doubles XP, and card reviews
     // drip dew into the balance (capped per day so grinding can't farm it)
-    const groveEcon = await getGroveEconomy();
-    const boostActive = Date.now() < groveEcon.boostUntil;
+    // The grove is optional here: if it can't be read, the review still
+    // counts, just without dew or a boost (and nothing is written to it).
+    const groveEcon = await loadGroveEconomy().catch(() => null);
+    const boostActive = !!groveEcon && Date.now() < groveEcon.boostUntil;
     const xpGained = boostActive ? baseXp * 2 : baseXp;
     let dewEarned = 0;
-    if (cardsReviewed > 0) {
+    if (groveEcon && cardsReviewed > 0) {
         if (groveEcon.burstDate !== today) {
             groveEcon.burstDate = today;
             groveEcon.burstDewToday = 0;
@@ -985,6 +1019,12 @@ const REFLECTIONS_KV_KEY = 'reflections';
 const MAX_REFLECTIONS = 200;
 
 export async function saveReflection(entry: Omit<ReflectionEntry, 'id' | 'createdAt'>): Promise<void> {
+    // Read-modify-write of one kv row: serialized so two quick saves (the
+    // field's blur and the screen's unmount flush) can't drop one another.
+    return serialized(() => saveReflectionUnserialized(entry));
+}
+
+async function saveReflectionUnserialized(entry: Omit<ReflectionEntry, 'id' | 'createdAt'>): Promise<void> {
     const db = await getDb();
     const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM kv WHERE key = ?', REFLECTIONS_KV_KEY);
     const list: ReflectionEntry[] = row ? JSON.parse(row.value) : [];
@@ -1503,7 +1543,10 @@ export function safeAudioFileName(name: string): string {
 }
 
 export async function saveAudioFile(sourceUri: string, name: string, folderId: string | null = null): Promise<AudioFile> {
-    const id = Date.now().toString();
+    // Not Date.now(): two files saved in the same millisecond (several WiFi
+    // uploads finishing together) got the same id, and INSERT OR REPLACE
+    // then silently swapped the first file's entry for the second.
+    const id = generateId();
     const localUri = `${FileSystem.documentDirectory}audio/${id}_${safeAudioFileName(name)}`;
 
     const dirInfo = await FileSystem.getInfoAsync(`${FileSystem.documentDirectory}audio/`);
@@ -1570,7 +1613,7 @@ export async function importFolderRecord(folder: Folder): Promise<void> {
 export async function importAudioRecord(audio: AudioFile): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-        'INSERT OR REPLACE INTO audio_files (id, name, uri, duration) VALUES (?, ?, ?, ?)',
-        audio.id, audio.name, audio.uri, audio.duration ?? null
+        'INSERT OR REPLACE INTO audio_files (id, name, uri, duration, folder_id, position) VALUES (?, ?, ?, ?, ?, ?)',
+        audio.id, audio.name, audio.uri, audio.duration ?? null, audio.folderId ?? null, audio.position ?? null
     );
 }
