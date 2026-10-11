@@ -6,15 +6,22 @@
 // Anki field HTML -> plain text (+ image references)
 // ---------------------------------------------------------------------------
 
-function decodeEntities(s: string): string {
-    return s
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)))
-        .replace(/&amp;/g, '&');
+// Code point from a numeric entity, or the entity itself when it names
+// nothing printable (fromCodePoint throws past U+10FFFF).
+function codePointEntity(match: string, code: number): string {
+    return Number.isInteger(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
+}
+
+// One pass, so "&amp;lt;" becomes the text "&lt;" instead of "<".
+export function decodeEntities(s: string): string {
+    const named: Record<string, string> = { nbsp: ' ', lt: '<', gt: '>', quot: '"', apos: "'", amp: '&' };
+    return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, body: string) => {
+        if (body[0] === '#') {
+            const hex = body[1] === 'x' || body[1] === 'X';
+            return codePointEntity(match, parseInt(body.slice(hex ? 2 : 1), hex ? 16 : 10));
+        }
+        return named[body.toLowerCase()] ?? match;
+    });
 }
 
 // Placeholder marking where an image sat in the text. The bracket sentinel
@@ -45,6 +52,7 @@ export function cleanAnkiHtml(html: string): { text: string; images: string[] } 
     s = s
         .replace(/\r/g, '')
         .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n[ \t]+/g, '\n')
         .replace(/\n{3,}/g, '\n\n')
         .replace(/[ \t]{2,}/g, ' ')
         .trim();

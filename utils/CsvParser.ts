@@ -1,5 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { Buffer } from 'buffer';
 import Papa from 'papaparse';
+import { decodeEntities } from './AnkiParse';
 
 export interface FlashcardData {
   question: string;
@@ -26,16 +28,12 @@ const SEPARATOR_NAMES: Record<string, string> = {
 };
 
 function decodeHtml(text: string): string {
-  return text
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(div|p|li)>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;/g, "'")
+  return decodeEntities(
+    text
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(div|p|li)>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+  )
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -43,6 +41,35 @@ function decodeHtml(text: string): string {
 // Delimiters that split "question DELIM answer" on a single line rather than
 // acting as CSV cell separators (e.g. "Capital of France -> Paris").
 const ARROW_DELIMITERS = ['->', '=>', '→'];
+
+// Rows that are fully quoted ("...","...") — the shape of app- and
+// Anki-written CSV. [\s\S] because a record may span several lines.
+const QUOTED_ROW_RE = /^\s*"[\s\S]*"\s*$/;
+
+function isQuotedCsv(records: string[]): boolean {
+  return records.length > 0 && records.filter(r => QUOTED_ROW_RE.test(r)).length / records.length >= 0.6;
+}
+
+// Logical records of a quoted CSV: a line that leaves a double-quoted field
+// open continues on the next line (RFC 4180 multi-line cells). Sprig's own
+// deck files look like this whenever an answer spans lines — every attached
+// image sits on its own line — so judging the format line by line would see
+// a continuation line without a delimiter and fall back to pairing up
+// alternate lines, scrambling the deck when its cache is rebuilt.
+function joinQuotedRecords(lines: string[]): string[] {
+  const records: string[] = [];
+  let open: string | null = null;
+  for (const line of lines) {
+    open = open === null ? line : `${open}\n${line}`;
+    if ((open.match(/"/g)?.length ?? 0) % 2 === 0) {
+      records.push(open);
+      open = null;
+    }
+  }
+  // An unterminated quote is a stray character, not a multi-line cell
+  if (open !== null) records.push(...open.split('\n'));
+  return records;
+}
 
 // Choose the most plausible delimiter by how consistently it appears across
 // lines. Prose often contains commas, so tab/semicolon/pipe get priority.
@@ -55,7 +82,7 @@ function detectDelimiter(lines: string[]): string | undefined {
   const hitRatio = (candidate: string) =>
     sample.filter(l => l.includes(candidate)).length / sample.length;
 
-  const quotedCsv = sample.filter(l => /^\s*".*"\s*$/.test(l)).length / sample.length >= 0.6;
+  const quotedCsv = isQuotedCsv(sample);
   const candidates = quotedCsv
     ? ['\t', ';', '|', ',', ...ARROW_DELIMITERS]
     : ['\t', ';', '|', ...ARROW_DELIMITERS, ','];
@@ -126,12 +153,16 @@ export function parseFlashcardsText(raw: string): FlashcardData[] {
     }
     bodyStart++;
   }
-  const bodyLines = lines.slice(bodyStart).filter(l => l.trim().length > 0);
+  const rawBodyLines = lines.slice(bodyStart);
+  const bodyLines = rawBodyLines.filter(l => l.trim().length > 0);
   if (bodyLines.length === 0) return [];
-  text = bodyLines.join('\n');
+  // Blank lines are dropped for line-based detection only: inside a quoted
+  // cell they are content (a paragraph break) and must reach the CSV parser.
+  text = rawBodyLines.join('\n');
 
   if (!delimiter) {
-    delimiter = detectDelimiter(bodyLines);
+    const records = joinQuotedRecords(rawBodyLines).filter(r => r.trim().length > 0);
+    delimiter = detectDelimiter(isQuotedCsv(records) ? records : bodyLines);
   }
 
   // Arrow-style files ("question -> answer" per line) are split manually on
@@ -210,9 +241,50 @@ export function parseFlashcardsText(raw: string): FlashcardData[] {
   return alternating;
 }
 
+// Windows-1252 code points for bytes 0x80-0x9F (the only range where it
+// differs from Latin-1); undefined slots map straight through.
+const CP1252_HIGH = [
+  0x20ac, 0x81, 0x201a, 0x192, 0x201e, 0x2026, 0x2020, 0x2021, 0x2c6, 0x2030, 0x160, 0x2039, 0x152, 0x8d, 0x17d, 0x8f,
+  0x90, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014, 0x2dc, 0x2122, 0x161, 0x203a, 0x153, 0x9d, 0x17e, 0x178,
+];
+
+// Decodes an imported text file. Spreadsheet apps on Windows (Excel's
+// "CSV" in German locales above all) save in Windows-1252, and some tools
+// write UTF-16 with a BOM; reading every file as UTF-8 turned their umlauts
+// into replacement characters. UTF-8 is still tried first and wins whenever
+// the bytes are valid UTF-8.
+export function decodeTextBytes(bytes: Uint8Array): string {
+  const buf = Buffer.from(bytes);
+  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
+    return buf.toString('utf16le', 2);
+  }
+  if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
+    const swapped = Buffer.from(buf.subarray(2));
+    for (let i = 0; i + 1 < swapped.length; i += 2) {
+      const b = swapped[i];
+      swapped[i] = swapped[i + 1];
+      swapped[i + 1] = b;
+    }
+    return swapped.toString('utf16le');
+  }
+  const utf8 = buf.toString('utf8');
+  // U+FFFD only appears when decoding failed, unless the file really
+  // contains one (EF BF BD)
+  if (!utf8.includes('\ufffd') || buf.indexOf(Buffer.from([0xef, 0xbf, 0xbd])) >= 0) {
+    return utf8;
+  }
+  let out = '';
+  for (let i = 0; i < buf.length; i++) {
+    const b = buf[i];
+    out += String.fromCharCode(b >= 0x80 && b <= 0x9f ? CP1252_HIGH[b - 0x80] : b);
+  }
+  return out;
+}
+
 export async function parseFlashcardsCsv(fileUri: string): Promise<FlashcardData[]> {
   try {
-    const raw = await FileSystem.readAsStringAsync(fileUri);
+    const base64 = await FileSystem.readAsStringAsync(fileUri, { encoding: FileSystem.EncodingType.Base64 });
+    const raw = decodeTextBytes(Buffer.from(base64, 'base64'));
     return parseFlashcardsText(raw);
   } catch (error) {
     console.error('Error parsing flashcards file:', error);
