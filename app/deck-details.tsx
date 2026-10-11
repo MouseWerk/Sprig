@@ -493,8 +493,8 @@ export default function DeckDetailsScreen() {
                     <View style={styles.headerDashboard}>
                         <View style={[styles.mainProgressCard, { backgroundColor: cardColor }]}>
                             <View style={[styles.progressCircleContainer, { backgroundColor: secondaryBg }]}>
-                                <Text style={[styles.progressPercentage, { color: progressColor }]}>{Math.round(progress)}%</Text>
-                                <Text style={[styles.progressLabel, { color: mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit>{t('mastery')}</Text>
+                                <Text style={[styles.progressPercentage, { color: progressColor }]} maxFontSizeMultiplier={1.3}>{Math.round(progress)}%</Text>
+                                <Text style={[styles.progressLabel, { color: mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.3}>{t('mastery')}</Text>
                             </View>
                             <View style={styles.progressStatsRight}>
                                 {/* Title gets the full column width. Sharing a row

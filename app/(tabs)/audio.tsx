@@ -156,10 +156,21 @@ export default function AudioPlayerScreen() {
         });
     }, []);
 
+    // Saves the loaded track's current position and mirrors it into the list
+    const rememberPosition = () => {
+        const audio = currentAudioRef.current;
+        const player = playerRef.current;
+        if (!audio || !player) return;
+        let at = 0;
+        try { at = player.currentTime || 0; } catch { return; }
+        setAudioPosition(audio.id, at);
+        setAudios(prev => prev.map(a => (a.id === audio.id ? { ...a, position: at } : a)));
+    };
+
     // Stop playback entirely, release the player, hide the mini player.
     const stopPlayback = () => {
         switchSeqRef.current++;
-        if (currentAudio && position > 0) setAudioPosition(currentAudio.id, position);
+        rememberPosition();
         releasePlayer();
         setCurrentAudio(null);
         setIsPlaying(false);
@@ -201,6 +212,10 @@ export default function AudioPlayerScreen() {
 
         const seq = ++switchSeqRef.current;
         try {
+            // Remember where the previous track stopped, in the database and
+            // in the list: coming back to it used to resume from the position
+            // the list was loaded with (up to the whole listen earlier).
+            rememberPosition();
             releasePlayer();
 
             const resume = item.position && item.position > 5 ? item.position : 0;

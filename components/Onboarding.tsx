@@ -341,7 +341,16 @@ export function Onboarding() {
                     <Text style={[styles.stepLabel, { color: mutedForeground }]}>
                         {index + 1} / {SLIDES.length}
                     </Text>
-                    <TouchableOpacity accessibilityRole="button" onPress={finish} hitSlop={12} style={{ opacity: isLast ? 0 : 1 }} disabled={isLast}>
+                    <TouchableOpacity
+                        accessibilityRole="button"
+                        onPress={finish}
+                        hitSlop={12}
+                        style={{ opacity: isLast ? 0 : 1 }}
+                        disabled={isLast}
+                        // Hidden on the last slide: keep screen readers off it too
+                        accessibilityElementsHidden={isLast}
+                        importantForAccessibility={isLast ? 'no-hide-descendants' : 'auto'}
+                    >
                         <Text style={[styles.skip, { color: mutedForeground }]}>{t('onboardSkip')}</Text>
                     </TouchableOpacity>
                 </View>

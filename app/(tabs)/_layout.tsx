@@ -3,6 +3,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { Tabs } from 'expo-router';
 import { BarChart3, Home, Layers, Library, Music, Settings } from 'lucide-react-native';
 import React from 'react';
+import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
@@ -11,7 +12,11 @@ export default function TabLayout() {
   const backgroundColor = useThemeColor({}, 'background');
   const borderColor = useThemeColor({}, 'border');
   const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   const { t } = useLanguage();
+  // The labels grow with the system font size; a fixed bar height clipped
+  // them at large text settings. 14 is the label line at 100 %.
+  const labelHeight = Math.ceil(14 * Math.min(fontScale, 2));
 
   return (
     <Tabs
@@ -23,7 +28,7 @@ export default function TabLayout() {
           borderTopColor: borderColor,
           elevation: 0,
           shadowOpacity: 0,
-          height: 64 + insets.bottom, // Increased height and added safe area
+          height: 50 + labelHeight + insets.bottom,
           paddingBottom: insets.bottom + 8, // Proper bottom padding for modern devices
           paddingTop: 12,
           paddingHorizontal: 8,
