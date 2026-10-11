@@ -1,12 +1,14 @@
 <en-US>
-- Fixed the Android home-screen widget being invisible and redesigned it: deck icon, live due count, mastery progress, and a tap that reliably opens your session
-- Widgets can be pinned to different decks, as many as you like, and shrink to a compact icon-only size
-- Added a per-deck Notebook, and an optional post-session reflection with a log in Stats
-- Fixed bugs where editing/deleting a card, fast swiping, or collecting Grove dew could corrupt or double-count progress
+- Cards are due by calendar day: last evening's cards are due this morning, and the interval hints are now exact
+- Fixed decks with multi-line answers or images getting scrambled after clearing the cache or a restore
+- Excel CSV files (Windows encoding) import with correct umlauts
+- Fixed lost or double-counted progress on fast taps, undo and Grove purchases
+- Safer, translated WiFi upload; better screen reader support, contrast and large text
 </en-US>
 <de-DE>
-- Android-Widget war unsichtbar — behoben und neu gestaltet: Symbol, stets aktuelle fällige Karten, Fortschritt, und Antippen startet die Sitzung zuverlässig
-- Widgets lassen sich an verschiedene Decks anheften, beliebig viele, und bis auf Symbolgröße verkleinern
-- Neues Notizbuch pro Deck, plus optionale Reflexion nach der Lernsitzung mit Verlauf in den Statistiken
-- Fehler behoben: Karten bearbeiten/löschen, schnelles Wischen und Tau sammeln konnten den Fortschritt verfälschen
+- Karten sind nach Kalendertag fällig: Was du gestern Abend gelernt hast, ist heute früh dran; Intervall-Hinweise stimmen jetzt
+- Decks mit mehrzeiligen Antworten oder Bildern geraten nach „Cache leeren“ oder Wiederherstellen nicht mehr durcheinander
+- CSV aus Excel (Windows-Kodierung) mit korrekten Umlauten
+- Kein verlorener oder doppelter Fortschritt mehr bei schnellem Tippen, Rückgängig und Garten-Käufen
+- Sicherer, übersetzter WLAN-Upload; besserer Screenreader, Kontrast und große Schrift
 </de-DE>

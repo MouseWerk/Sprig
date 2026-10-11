@@ -25,6 +25,10 @@ tags:
 
 # Front of the card, then flip to the answer.
 - assertVisible: "Question"
+# The interval hints come from the SM-2 step the swipe applies: a new card
+# returns tomorrow whichever way it is graded (they used to claim "4d").
+- assertVisible: "1d"
+- assertNotVisible: "4d"
 - takeScreenshot: .maestro/screenshots/04-card-front
 - tapOn:
     text: "Tap to reveal the answer"
