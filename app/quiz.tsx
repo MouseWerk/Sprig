@@ -120,8 +120,20 @@ export default function QuizScreen() {
     const questions = useMemo(() => (cards ? buildQuestions(cards, studySessionLength) : []), [cards, studySessionLength]);
     const current = questions[index];
 
+    // Both refs are re-armed by the effect below once the next question is
+    // on screen. Resetting them inside the tap handlers let a fast double
+    // tap through before the re-render: two options answered (two reviews
+    // counted), or the index advanced twice, skipping a question.
+    const answeredRef = useRef(false);
+    const advancingRef = useRef(false);
+    useEffect(() => {
+        answeredRef.current = false;
+        advancingRef.current = false;
+    }, [index, questions]);
+
     const handleSelect = (option: QuizOption) => {
-        if (selected) return; // already answered
+        if (selected || answeredRef.current) return; // already answered
+        answeredRef.current = true;
         setSelected(option.text);
         const correct = option.text === current.correct;
         if (correct) {
@@ -139,7 +151,6 @@ export default function QuizScreen() {
         updateUserStats(1, delta, correct ? 5 : 0).catch(() => { });
     };
 
-    const advancingRef = useRef(false);
     const handleNext = () => {
         // A fast double-tap can fire before the re-render that hides this
         // button (once `answered` flips false) reaches the screen, which
@@ -153,7 +164,6 @@ export default function QuizScreen() {
         } else {
             setIndex(i => i + 1);
             setSelected(null);
-            advancingRef.current = false;
         }
     };
 
@@ -162,6 +172,7 @@ export default function QuizScreen() {
         setSelected(null);
         setScore(0);
         setDone(false);
+        answeredRef.current = false;
         advancingRef.current = false;
         lastTickRef.current = Date.now();
         // Re-shuffle by nudging cards reference

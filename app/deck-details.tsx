@@ -106,8 +106,12 @@ export default function DeckDetailsScreen() {
         router.push({ pathname: '/notebook', params: { id, name: deck?.name || '' } });
     };
 
+    // Add/save fire once per tap: a double tap used to add the card twice
+    const savingCardRef = React.useRef(false);
+
     const handleAddCard = async () => {
-        if (!newQuestion.trim() || !newAnswer.trim() || !id) return;
+        if (!newQuestion.trim() || !newAnswer.trim() || !id || savingCardRef.current) return;
+        savingCardRef.current = true;
         try {
             await addCardToDeck(id, newQuestion, newAnswer);
             setNewQuestion('');
@@ -125,6 +129,8 @@ export default function DeckDetailsScreen() {
         } catch (e) {
             console.error('Error adding card:', e);
             showToast({ message: t('deckDetailsAddCardFailed'), type: 'error' });
+        } finally {
+            savingCardRef.current = false;
         }
     };
 
@@ -162,7 +168,8 @@ export default function DeckDetailsScreen() {
     };
 
     const handleUpdateCard = async () => {
-        if (!editQuestion.trim() || !editAnswer.trim() || editingIndex === null || !id) return;
+        if (!editQuestion.trim() || !editAnswer.trim() || editingIndex === null || !id || savingCardRef.current) return;
+        savingCardRef.current = true;
         try {
             await updateCardInDeck(id, editingIndex, { question: editQuestion, answer: editAnswer });
             setEditModalVisible(false);
@@ -174,6 +181,8 @@ export default function DeckDetailsScreen() {
         } catch (e) {
             console.error('Error updating card:', e);
             showToast({ message: t('deckDetailsUpdateCardFailed'), type: 'error' });
+        } finally {
+            savingCardRef.current = false;
         }
     };
 

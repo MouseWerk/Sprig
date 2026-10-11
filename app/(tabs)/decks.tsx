@@ -87,8 +87,12 @@ export default function DecksScreen() {
     }, [loadData])
   );
 
+  // A double tap on "Create" used to create the deck (or folder) twice
+  const creatingRef = useRef(false);
+
   const handleCreateDeck = async () => {
-    if (!boxName.trim()) return;
+    if (!boxName.trim() || creatingRef.current) return;
+    creatingRef.current = true;
 
     try {
       await createEmptyDeck(boxName, selectedIcon, currentFolderId);
@@ -100,6 +104,8 @@ export default function DecksScreen() {
     } catch (e) {
       console.error('Error creating deck:', e);
       showToast({ message: t('error'), type: 'error' });
+    } finally {
+      creatingRef.current = false;
     }
   };
 
@@ -226,7 +232,8 @@ export default function DecksScreen() {
   };
 
   const handleCreateFolder = async () => {
-    if (!newFolderName.trim()) return;
+    if (!newFolderName.trim() || creatingRef.current) return;
+    creatingRef.current = true;
     try {
       await saveFolder(newFolderName, currentFolderId, 'deck');
       setNewFolderName('');
@@ -236,6 +243,8 @@ export default function DecksScreen() {
     } catch (e) {
       console.error('Error creating folder:', e);
       showToast({ message: t('error'), type: 'error' });
+    } finally {
+      creatingRef.current = false;
     }
   };
 

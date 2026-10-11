@@ -83,16 +83,23 @@ export default function TypeScreen() {
     const total = cards?.length ?? 0;
     const current = cards?.[index];
 
-    // SRS state from before the current card was graded, so "I was right" can
-    // undo the wrong grade instead of stacking a second one on top of it.
-    const preGradeSrsRef = useRef<SRSCardData | null | undefined>(undefined);
+    // The pending grade write, resolving to the card's SRS state from before
+    // it, so "I was right" can undo the wrong grade instead of stacking a
+    // second one on top. Kept as the promise, not its result: a quick tap on
+    // "I was right" used to arrive before the write finished, restore
+    // "nothing" (deleting the card's whole review history) and then race the
+    // still-running wrong grade.
+    const gradeWriteRef = useRef<Promise<SRSCardData | null> | null>(null);
+    // Check/Next fire from both the keyboard's submit and the button; a
+    // second call before the re-render must not grade or advance twice.
+    const checkedRef = useRef(false);
+    const advancingRef = useRef(false);
 
     const applyResult = (grade: number) => {
         if (!id || !current) return;
-        preGradeSrsRef.current = undefined;
-        updateCardSRS(id, current.originalIndex, grade)
-            .then(previous => { preGradeSrsRef.current = previous; })
-            .catch(() => { });
+        const write = updateCardSRS(id, current.originalIndex, grade);
+        gradeWriteRef.current = write;
+        write.catch(() => { });
         const now = Date.now();
         const delta = Math.min(Math.round((now - lastTickRef.current) / 1000), 60);
         lastTickRef.current = now;
@@ -100,7 +107,8 @@ export default function TypeScreen() {
     };
 
     const handleCheck = () => {
-        if (!current || verdict) return;
+        if (!current || verdict || checkedRef.current) return;
+        checkedRef.current = true;
         // Compare against the prose only — attached images can't be typed
         const v = checkAnswer(typed, stripImageTokens(current.answer));
         setVerdict(v);
@@ -125,15 +133,27 @@ export default function TypeScreen() {
             // Roll the wrong grade back first. Grading again on top of it would
             // leave the ease factor carrying the full "Again" penalty and the
             // interval reset to one day — the opposite of what the button says.
+            const wrongGrade = gradeWriteRef.current;
             (async () => {
-                await restoreCardSRS(id, cardIndex, preGradeSrsRef.current ?? undefined);
+                if (!wrongGrade) return;
+                const previous = await wrongGrade;
+                await restoreCardSRS(id, cardIndex, previous ?? undefined);
                 await updateCardSRS(id, cardIndex, 4);
             })().catch(() => { });
         }
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
 
+    // Re-armed once the next card is actually on screen, not in the tap
+    // handler itself (that would let a double tap through before the render)
+    useEffect(() => {
+        checkedRef.current = false;
+        advancingRef.current = false;
+    }, [index]);
+
     const handleNext = () => {
+        if (advancingRef.current) return;
+        advancingRef.current = true;
         if (index + 1 >= total) {
             setDone(true);
         } else {
@@ -153,6 +173,8 @@ export default function TypeScreen() {
         setOverridden(false);
         setScore(0);
         setDone(false);
+        checkedRef.current = false;
+        advancingRef.current = false;
         lastTickRef.current = Date.now();
     };
 

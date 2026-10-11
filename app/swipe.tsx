@@ -125,7 +125,21 @@ export default function SwipeScreen() {
     // that back out (a sunshine boost doubles the XP, so it isn't derivable).
     const pendingStatsRef = useRef<Promise<void>>(Promise.resolve());
     const swipeSeqRef = useRef(0);
+    // Mirrors undoStack, but updated in the same tick as the change: an undo
+    // tapped before the re-render must see the swipe it is undoing (and a
+    // second undo must not see the entry the first one just took back).
     const undoStackRef = useRef<UndoEntry[]>([]);
+    const setUndoEntries = (entries: UndoEntry[]) => {
+        undoStackRef.current = entries;
+        setUndoStack(entries);
+    };
+    // One grade per card shown: a second swipe or accessibility action that
+    // lands before the re-render would otherwise grade the same card twice
+    // and skip the next one. The epoch moves on undo/restart, when the same
+    // position legitimately gets graded again.
+    const gradedKeyRef = useRef<string | null>(null);
+    const gradeEpochRef = useRef(0);
+    const undoingRef = useRef(false);
     const filteredCardsRef = useRef<FlashcardWithIndex[]>([]);
     const statsBySwipeRef = useRef<Map<number, { seconds: number; xpGained: number }>>(new Map());
 
@@ -214,7 +228,6 @@ export default function SwipeScreen() {
             ? shuffledCards.filter(c => isCardDue(srsData[c.originalIndex], sessionStartRef.current))
             : shuffledCards;
 
-    undoStackRef.current = undoStack;
     filteredCardsRef.current = filteredCards;
 
     const currentCard = filteredCards[currentIndex];
@@ -269,12 +282,15 @@ export default function SwipeScreen() {
     };
 
     const handleSwipe = (grade: number) => {
-        if (!currentCard || !id) return;
+        if (!currentCard || !id || undoingRef.current) return;
+        const gradedKey = `${gradeEpochRef.current}:${studyMode}:${currentIndex}`;
+        if (gradedKeyRef.current === gradedKey) return;
+        gradedKeyRef.current = gradedKey;
         const originalIndex = currentCard.originalIndex;
         const swipeId = ++swipeSeqRef.current;
 
         // Snapshot state for undo before mutating anything
-        setUndoStack(stack => [...stack, {
+        setUndoEntries([...undoStackRef.current, {
             swipeId,
             originalIndex,
             grade,
@@ -381,8 +397,21 @@ export default function SwipeScreen() {
 
     const handleUndo = async () => {
         const stack = undoStackRef.current;
-        if (stack.length === 0 || !id) return;
+        if (stack.length === 0 || !id || undoingRef.current) return;
+        undoingRef.current = true;
+        try {
+            await undoLast(stack);
+        } finally {
+            undoingRef.current = false;
+        }
+    };
+
+    const undoLast = async (stack: UndoEntry[]) => {
+        if (!id) return;
         const last = stack[stack.length - 1];
+        // Taken off right away so a second tap undoes the swipe before this one
+        setUndoEntries(stack.slice(0, -1));
+        gradeEpochRef.current++;
 
         // Wait for in-flight swipe writes so the restore isn't overwritten
         await pendingPersistRef.current;
@@ -418,7 +447,6 @@ export default function SwipeScreen() {
         const sessionXpBack = written?.xpGained || xpForGrade(last.grade);
         setSessionXp(x => Math.max(0, x - sessionXpBack));
 
-        setUndoStack(stack => stack.slice(0, -1));
         setSessionComplete(false);
         // Go to the card that was just undone, wherever it sits in the queue.
         // Stepping back by one only works when the swipe advanced the index —
@@ -442,7 +470,8 @@ export default function SwipeScreen() {
         setSessionDew(0);
         setSessionBoosted(false);
         setStageUp(null);
-        setUndoStack([]);
+        setUndoEntries([]);
+        gradeEpochRef.current++;
         statsBySwipeRef.current.clear();
         setSessionComplete(false);
         setIsFlipped(false);
