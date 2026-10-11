@@ -484,6 +484,22 @@ export async function createEmptyDeck(name: string, icon: string, folderId: stri
     return newDeck;
 }
 
+// Deck files are rewritten whole on every card edit, and they are what the
+// card cache is rebuilt from. Written in place, a crash or a full disk
+// mid-write left a truncated file behind. Write next to it and rename over
+// it instead: on Android the rename replaces the old file in one step.
+export async function writeDeckFile(uri: string, content: string): Promise<void> {
+    const tmp = `${uri}.tmp`;
+    await FileSystem.writeAsStringAsync(tmp, content);
+    try {
+        await FileSystem.moveAsync({ from: tmp, to: uri });
+    } catch {
+        // A platform whose move refuses an existing target
+        await FileSystem.deleteAsync(uri, { idempotent: true });
+        await FileSystem.moveAsync({ from: tmp, to: uri });
+    }
+}
+
 const escapeCsv = (text: string) => `"${text.replace(/"/g, '""')}"`;
 
 function cardsToCsv(cards: { question: string; answer: string }[]): string {
@@ -499,7 +515,7 @@ export async function createDeckWithCards(
     cards: { question: string; answer: string }[]
 ): Promise<Deck> {
     const deck = await createEmptyDeck(name, icon, folderId);
-    await FileSystem.writeAsStringAsync(deck.uri, cardsToCsv(cards));
+    await writeDeckFile(deck.uri, cardsToCsv(cards));
     await replaceCardCache(deck.id, cards);
     const db = await getDb();
     await db.runAsync('UPDATE decks SET total_cards = ? WHERE id = ?', cards.length, deck.id);
@@ -538,7 +554,7 @@ export async function importCsvToDeck(deckId: string, sourceUri: string): Promis
     }
     const combinedCards = [...existingCards, ...newCards];
 
-    await FileSystem.writeAsStringAsync(deck.uri, cardsToCsv(combinedCards));
+    await writeDeckFile(deck.uri, cardsToCsv(combinedCards));
     await replaceCardCache(deckId, combinedCards);
     await db.runAsync('UPDATE decks SET total_cards = ? WHERE id = ?', combinedCards.length, deckId);
 }
@@ -737,7 +753,7 @@ async function persistRepairedDeck(deckId: string, cards: { question: string; an
     const deck = await db.getFirstAsync<DeckRow>('SELECT * FROM decks WHERE id = ?', deckId);
     if (!deck) return;
     try {
-        await FileSystem.writeAsStringAsync(deck.uri, cardsToCsv(cards));
+        await writeDeckFile(deck.uri, cardsToCsv(cards));
     } catch (e) {
         console.warn('Could not rewrite repaired deck CSV', e);
     }
@@ -1126,7 +1142,7 @@ export async function addCardToDeck(deckId: string, question: string, answer: st
     // 1. Append to the CSV file on disk
     const newRow = `\n${escapeCsv(question)},${escapeCsv(answer)}`;
     try {
-        await FileSystem.writeAsStringAsync(deck.uri, (await FileSystem.readAsStringAsync(deck.uri)) + newRow);
+        await writeDeckFile(deck.uri, (await FileSystem.readAsStringAsync(deck.uri)) + newRow);
     } catch (e) {
         console.error('Error writing to CSV', e);
     }
@@ -1163,7 +1179,7 @@ export async function updateCardInDeck(deckId: string, cardIndex: number, update
     const cards = await getCachedData<{ question: string; answer: string }[]>(deckId);
     if (!cards) return;
     try {
-        await FileSystem.writeAsStringAsync(deck.uri, cardsToCsv(cards));
+        await writeDeckFile(deck.uri, cardsToCsv(cards));
     } catch (e) {
         console.error('Error rewriting CSV', e);
     }
@@ -1183,7 +1199,7 @@ export async function deleteCardFromDeck(deckId: string, cardIndex: number): Pro
 
     // 2. Rewrite CSV
     try {
-        await FileSystem.writeAsStringAsync(deck.uri, cardsToCsv(cards));
+        await writeDeckFile(deck.uri, cardsToCsv(cards));
     } catch (e) {
         console.error('Error rewriting CSV for delete', e);
     }
