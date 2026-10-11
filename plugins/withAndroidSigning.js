@@ -6,28 +6,59 @@ const { withAppBuildGradle } = require('@expo/config-plugins');
 // with the debug keystore, which the Play Store rejects. This plugin writes
 // the config back into the generated file every time.
 //
-// It reads the production upload keystore that `eas credentials -p android`
-// downloads into `credentials.json` at the project root (gitignored, along
-// with the .jks it points at). When that file is absent — a fresh clone, a
-// dev build — release builds fall back to the debug keystore as before, so
-// nothing breaks before the download.
+// It reads the Play upload keystore from `keystore.properties` at the project
+// root (gitignored; storeFile, storePassword, keyAlias, keyPassword). Each
+// value may come from the environment instead (ANDROID_KEYSTORE_PATH,
+// ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD), so the
+// passwords can stay in a credential store and the release workflow never
+// writes them to disk. See docs/release.md. With none of the four set — a
+// fresh clone, a dev build — release builds fall back to the debug keystore
+// with a Gradle warning, so nothing breaks before the key is set up.
 const MARKER = '[withAndroidSigning]';
 
 const KEYSTORE_LOOKUP = `
-    // ${MARKER} Production upload keystore from credentials.json (see
+    // ${MARKER} Play upload keystore from keystore.properties at the project
+    // root or the ANDROID_* environment variables (see
     // plugins/withAndroidSigning.js). Falls back to the debug keystore when
-    // the file is absent so dev builds keep working.
-    def easCredsFile = rootProject.file('../credentials.json')
-    def easKeystore = easCredsFile.exists() ? new groovy.json.JsonSlurper().parseText(easCredsFile.text).android.keystore : null
+    // neither is set so dev builds keep working.
+    def releaseKeystoreFile = rootProject.file('../keystore.properties')
+    def releaseKeystoreProps = new Properties()
+    if (releaseKeystoreFile.exists()) {
+        releaseKeystoreFile.withInputStream { releaseKeystoreProps.load(it) }
+    }
+    def releaseKeystore = [
+        storeFile: releaseKeystoreProps.getProperty('storeFile') ?: System.getenv('ANDROID_KEYSTORE_PATH'),
+        storePassword: releaseKeystoreProps.getProperty('storePassword') ?: System.getenv('ANDROID_KEYSTORE_PASSWORD'),
+        keyAlias: releaseKeystoreProps.getProperty('keyAlias') ?: System.getenv('ANDROID_KEY_ALIAS'),
+        keyPassword: releaseKeystoreProps.getProperty('keyPassword') ?: System.getenv('ANDROID_KEY_PASSWORD'),
+    ]
+    def releaseKeystoreMissing = releaseKeystore.findAll { !it.value }.keySet()
+    def buildsRelease = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
+    if (releaseKeystoreMissing.size() == releaseKeystore.size()) {
+        releaseKeystore = null
+        if (buildsRelease) {
+            logger.warn('${MARKER} No upload keystore (keystore.properties or ANDROID_* variables): the release build is signed with the debug keystore and cannot be uploaded to Google Play.')
+        }
+    } else if (releaseKeystoreMissing) {
+        // Half a configuration is a mistake, not a dev build: fail rather
+        // than quietly signing a release with the debug key.
+        if (buildsRelease) {
+            throw new GradleException("${MARKER} Upload keystore incomplete, missing \${releaseKeystoreMissing.join(', ')} (keystore.properties or ANDROID_* variables)")
+        }
+        releaseKeystore = null
+    }
 `;
 
 const RELEASE_SIGNING_CONFIG = `
-        if (easKeystore != null) {
+        if (releaseKeystore != null) {
             release {
-                storeFile rootProject.file('../' + easKeystore.keystorePath)
-                storePassword easKeystore.keystorePassword
-                keyAlias easKeystore.keyAlias
-                keyPassword easKeystore.keyPassword
+                // An absolute storeFile (CI) is used as is; a relative one
+                // is resolved against the project root.
+                def storePath = releaseKeystore.storeFile
+                storeFile(new File(storePath).isAbsolute() ? file(storePath) : rootProject.file('../' + storePath))
+                storePassword releaseKeystore.storePassword
+                keyAlias releaseKeystore.keyAlias
+                keyPassword releaseKeystore.keyPassword
             }
         }`;
 
@@ -46,7 +77,7 @@ module.exports = function withAndroidSigning(config) {
     let contents = config.modResults.contents;
     if (contents.includes(MARKER)) return config; // already applied (idempotent)
 
-    // 1. Load credentials.json just above the signingConfigs block.
+    // 1. Look up the upload keystore just above the signingConfigs block.
     contents = replaceOnce(
       contents,
       /\n(\s*)signingConfigs \{/,
@@ -66,7 +97,7 @@ module.exports = function withAndroidSigning(config) {
     contents = replaceOnce(
       contents,
       /(buildTypes \{[\s\S]*?release \{[^}]*?)signingConfig signingConfigs\.debug/,
-      '$1signingConfig easKeystore != null ? signingConfigs.release : signingConfigs.debug',
+      '$1signingConfig releaseKeystore != null ? signingConfigs.release : signingConfigs.debug',
       "the release build type's signingConfig"
     );
 

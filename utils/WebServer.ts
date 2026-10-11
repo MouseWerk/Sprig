@@ -9,7 +9,7 @@ import { saveAudioFile, saveDeck } from './Storage';
 // the phone's WiFi IP so a laptop on the same network can drop PDFs and audio
 // files into the app — no cable, no cloud.
 //
-// Transport: react-native-tcp-socket (native module — available in dev/EAS
+// Transport: react-native-tcp-socket (native module — available in dev and release
 // builds, NOT in Expo Go). We speak just enough HTTP/1.1 for one page and a
 // JSON upload endpoint.
 //

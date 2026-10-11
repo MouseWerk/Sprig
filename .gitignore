@@ -45,7 +45,7 @@ app-example
 # Google Play service account key (secret — never commit)
 play-service-account.json
 
-# build artifacts (EAS / local builds)
+# build artifacts (local and CI builds)
 *.apk
 *.aab
 *.ipa
@@ -54,6 +54,7 @@ build.json
 
 # signing keys & service credentials
 *.keystore
+keystore.properties
 google-services.json
 GoogleService-Info.plist
 
