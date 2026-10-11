@@ -14,7 +14,7 @@ import {
     buyDecoration, buyPlanter, buySunshineBoost, buyStreakFreezeWithDew,
     DECORATION_CATALOG, DEW_BURST_DAILY_CAP, DEW_COST_FREEZE, DEW_COST_SUNSHINE,
     equipDecoration, getDecks, getGroveEconomy, getUserStats, GroveEconomy,
-    MAX_STREAK_FREEZES, POT_PRICES,
+    liveStreak, MAX_STREAK_FREEZES, POT_PRICES,
 } from '@/utils/Storage';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { CalendarDays, Check, ChevronRight, Droplet, Droplets, Fence, Flower2, Footprints, Grid3x3, Lamp, Moon, Snowflake, Sprout, Stone, Sun, TreeDeciduous, X } from 'lucide-react-native';
@@ -56,7 +56,7 @@ export default function GroveScreen() {
             .then(([decks, economy, stats]) => {
                 setPlants(buildGrovePlants(decks, economy.speciesOverrides, economy.planters));
                 setEcon(economy);
-                setStreak(stats.currentStreak || 0);
+                setStreak(liveStreak(stats));
                 setFreezes(stats.streakFreezes || 0);
                 // Celebrate any plants that grew a stage since the last look
                 return detectStageUps();

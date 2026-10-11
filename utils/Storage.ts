@@ -279,7 +279,6 @@ export async function equipDecoration(decorationId: string): Promise<GroveEconom
     });
 }
 
-// Whole days between two "YYYY-MM-DD" strings (b - a)
 // Local calendar date as "YYYY-MM-DD". Deliberately not toISOString(), which
 // yields the *UTC* date: everywhere west of UTC that files an evening study
 // session under tomorrow, and everywhere east of it files after-midnight study
@@ -289,6 +288,7 @@ export function localDateKey(d: Date = new Date()): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// Whole days between two "YYYY-MM-DD" strings (b - a)
 function daysBetweenDateKeys(a: string, b: string): number {
     const da = Date.parse(a + 'T00:00:00Z');
     const db = Date.parse(b + 'T00:00:00Z');
@@ -942,6 +942,19 @@ async function updateUserStatsUnserialized(
     };
 }
 
+// The streak as it stands right now. A stored streak goes stale the moment
+// a day is missed — it is only recomputed on the next review — so screens
+// must not show it as is: it is still alive when the last study day was
+// today or yesterday, or the day before that with a banked freeze, which
+// the next review spends on the missed day (see updateUserStats).
+export function liveStreak(stats: Pick<UserStats, 'lastStudyDate' | 'currentStreak' | 'streakFreezes'>, now: Date = new Date()): number {
+    if (!stats.lastStudyDate) return 0;
+    const gap = daysBetweenDateKeys(stats.lastStudyDate.split('T')[0], localDateKey(now));
+    if (isNaN(gap)) return 0;
+    if (gap <= 1 || (gap === 2 && (stats.streakFreezes || 0) > 0)) return stats.currentStreak || 0;
+    return 0;
+}
+
 // Records a completed Pomodoro-style focus session: counts as study time,
 // keeps the streak alive, and awards XP scaled to the minutes focused.
 export async function recordFocusSession(minutes: number): Promise<StatsUpdateResult> {
@@ -1222,6 +1235,37 @@ export function calculateSM2(grade: number, prevInterval: number, prevRepetition
         easeFactor,
         nextReview: nextReview.toISOString()
     };
+}
+
+// A card falls due on the local calendar day its interval lands on, from
+// the first minute of that day — not at the clock time of its last review.
+// Comparing instants meant a card reviewed at 21:00 with a one-day interval
+// was still "not due" the next morning, so the due counts on Home, the
+// deck list, the widget and the morning session all came up short.
+export function isReviewDue(nextReview: string, now: Date = new Date()): boolean {
+    const due = new Date(nextReview);
+    if (isNaN(due.getTime())) return true; // unreadable date: better shown than lost
+    return localDateKey(due) <= localDateKey(now);
+}
+
+// Never-reviewed cards (no SRS row) count as due.
+export function isCardDue(data: SRSCardData | undefined, now: Date = new Date()): boolean {
+    return !data || isReviewDue(data.nextReview, now);
+}
+
+// Indices of a deck's due cards. Only real card positions count, so stray
+// SRS rows past the end of the deck can't inflate (or, subtracted, deflate)
+// the number.
+export function dueCardIndices(deck: Pick<Deck, 'totalCards' | 'srsData'>, now: Date = new Date()): number[] {
+    const due: number[] = [];
+    for (let i = 0; i < (deck.totalCards || 0); i++) {
+        if (isCardDue(deck.srsData?.[i], now)) due.push(i);
+    }
+    return due;
+}
+
+export function countDueCards(deck: Pick<Deck, 'totalCards' | 'srsData'>, now: Date = new Date()): number {
+    return dueCardIndices(deck, now).length;
 }
 
 async function upsertSrsRow(deckId: string, cardIndex: number, data: SRSCardData): Promise<void> {

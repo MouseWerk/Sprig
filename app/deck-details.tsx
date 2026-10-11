@@ -3,7 +3,7 @@ import { TranslationKey } from '@/constants/translations';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { FlashcardData, parseFlashcardsCsv } from '@/utils/CsvParser';
-import { ConfusionPair, Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getConfusionPairs, getDecks, importCsvToDeck, localDateKey, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckExamDate, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
+import { ConfusionPair, countDueCards, Deck, StudyDirection, addCardToDeck, deleteCardFromDeck, getCachedData, getConfusionPairs, getDecks, importCsvToDeck, localDateKey, resetDeckProgress, setCachedData, updateCardInDeck, updateDeckExamDate, updateDeckProgress, updateDeckStudyDirection } from '@/utils/Storage';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
@@ -501,9 +501,7 @@ export default function DeckDetailsScreen() {
                                 <Text style={[styles.deckTitleLarge, { color: textColor }]} numberOfLines={2}>{deck.name}</Text>
                                 {(() => {
                                     const learned = deck?.learnedIndices?.length || 0;
-                                    const dueCount = Object.values(deck?.srsData || {}).filter(data =>
-                                        new Date(data.nextReview) <= new Date()
-                                    ).length + (cards.length - Object.keys(deck?.srsData || {}).length);
+                                    const dueCount = countDueCards({ totalCards: cards.length, srsData: deck.srsData });
                                     return (
                                         <Text style={[styles.deckSubtitleSmall, { color: mutedForeground }]}>
                                             {t('deckDetailsCardsCount').replace('{n}', String(cards.length))}

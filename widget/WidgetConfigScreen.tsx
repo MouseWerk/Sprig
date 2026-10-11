@@ -2,7 +2,7 @@ import * as Icons from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { WidgetConfigurationScreenProps } from 'react-native-android-widget';
-import { Deck, getDecks } from '../utils/Storage';
+import { countDueCards, Deck, getDecks } from '../utils/Storage';
 import { setDeckIdForWidget } from '../utils/PinnedDeck';
 import { renderPinnedDeckWidget } from './PinnedDeckWidget';
 
@@ -17,17 +17,6 @@ const CARD_BG = '#f1f5f9';
 const TEXT = '#0f172a';
 const MUTED = '#64748b';
 const ACCENT = '#0f172a';
-
-function dueCountFor(deck: Deck): number {
-    const now = new Date();
-    const total = deck.totalCards || 0;
-    let due = 0;
-    for (let i = 0; i < total; i++) {
-        const data = deck.srsData?.[i];
-        if (!data || new Date(data.nextReview) <= now) due++;
-    }
-    return due;
-}
 
 export function WidgetConfigScreen({ widgetInfo, renderWidget, setResult }: WidgetConfigurationScreenProps) {
     const [decks, setDecks] = useState<Deck[] | null>(null);
@@ -72,7 +61,7 @@ export function WidgetConfigScreen({ widgetInfo, renderWidget, setResult }: Widg
                     contentContainerStyle={styles.list}
                     renderItem={({ item }) => {
                         const IconComponent = (Icons as any)[item.icon] || Icons.Book;
-                        const due = dueCountFor(item);
+                        const due = countDueCards(item);
                         return (
                             <TouchableOpacity
                                 style={styles.deckRow}

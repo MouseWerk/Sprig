@@ -1,5 +1,5 @@
 import { getPrefsSync } from './Preferences';
-import { Deck, getConfusionPairs, getDecks, getExamPlan } from './Storage';
+import { dueCardIndices, getConfusionPairs, getDecks, getExamPlan } from './Storage';
 
 // Builds the "Today" session: one cross-deck study queue that starts with
 // every due card, tops up with exam-pace fillers, and sprinkles in cards the
@@ -21,12 +21,6 @@ export interface TodayPlan {
     trickyCount: number;
 }
 
-function isDue(deck: Deck, index: number, now: Date): boolean {
-    const data = deck.srsData?.[index];
-    if (!data) return true; // never-reviewed cards count as due
-    return new Date(data.nextReview) <= now;
-}
-
 export async function buildTodayPlan(): Promise<TodayPlan> {
     const target = Math.max(5, getPrefsSync().dailyGoal);
     const now = new Date();
@@ -42,11 +36,7 @@ export async function buildTodayPlan(): Promise<TodayPlan> {
     const ranked = decks
         .map(d => {
             const plan = getExamPlan(d);
-            const due: number[] = [];
-            for (let i = 0; i < (d.totalCards || 0); i++) {
-                if (isDue(d, i, now)) due.push(i);
-            }
-            return { deck: d, plan, due };
+            return { deck: d, plan, due: dueCardIndices(d, now) };
         })
         .sort((a, b) => {
             const ax = a.plan && a.plan.daysLeft >= 0 ? a.plan.daysLeft : Infinity;

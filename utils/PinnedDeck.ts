@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Deck, getDecks } from './Storage';
+import { countDueCards, Deck, dueCardIndices, getDecks } from './Storage';
 
 // Each Android home-screen widget instance can be pinned to a different deck
 // (picked via the widget's own configuration screen when it's added — see
@@ -58,17 +58,6 @@ export async function getCachedWidgetSnapshot(widgetId: number): Promise<WidgetS
     }
 }
 
-function dueCountFor(deck: Deck): number {
-    const now = new Date();
-    const total = deck.totalCards || 0;
-    let due = 0;
-    for (let i = 0; i < total; i++) {
-        const data = deck.srsData?.[i];
-        if (!data || new Date(data.nextReview) <= now) due++;
-    }
-    return due;
-}
-
 function snapshotFromDeck(deck: Deck): WidgetSnapshot {
     const totalCards = deck.totalCards || 0;
     const learnedCount = deck.learnedIndices?.length || 0;
@@ -76,7 +65,7 @@ function snapshotFromDeck(deck: Deck): WidgetSnapshot {
         deckId: deck.id,
         deckName: deck.name,
         deckIcon: deck.icon,
-        dueCount: dueCountFor(deck),
+        dueCount: countDueCards(deck),
         totalCards,
         masteryPercent: totalCards > 0 ? Math.round((learnedCount / totalCards) * 100) : 0,
     };
@@ -181,13 +170,8 @@ export async function buildDeckStudySession(deckId: string): Promise<{ deckId: s
     const deck = decks.find(d => d.id === deckId && d.type === 'csv');
     if (!deck) return null;
 
-    const now = new Date();
     const total = deck.totalCards || 0;
-    const cardIndices: number[] = [];
-    for (let i = 0; i < total; i++) {
-        const data = deck.srsData?.[i];
-        if (!data || new Date(data.nextReview) <= now) cardIndices.push(i);
-    }
+    const cardIndices = dueCardIndices(deck);
     // Nothing due — still open the deck itself so the tap isn't a dead end.
     if (cardIndices.length === 0) {
         for (let i = 0; i < total; i++) cardIndices.push(i);

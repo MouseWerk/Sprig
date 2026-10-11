@@ -4,7 +4,7 @@
 
 import { BASE_SPECIES_COUNT, PLANT_SPECIES_COUNT, PotStyle } from '@/components/GrowingPlant';
 import { TranslationKey } from '@/constants/translations';
-import { Deck, ExamPlan, getDecks, getExamPlan, getGroveEconomy, getUserStats, GroveEconomy, saveGroveEconomy, serialized } from './Storage';
+import { Deck, ExamPlan, getDecks, getExamPlan, getGroveEconomy, getUserStats, GroveEconomy, isReviewDue, liveStreak, saveGroveEconomy, serialized } from './Storage';
 
 // A card counts as mature once its SM-2 interval reaches 21 days (Anki convention).
 export const MATURE_INTERVAL_DAYS = 21;
@@ -110,7 +110,7 @@ export function buildGrovePlants(decks: Deck[], speciesOverrides?: Record<string
                 if (!data) continue;
                 reviewed++;
                 if (data.interval >= MATURE_INTERVAL_DAYS) matureCards++;
-                if (new Date(data.nextReview) <= now) dueIndices.push(Number(key));
+                if (isReviewDue(data.nextReview, now)) dueIndices.push(Number(key));
             }
             const dueCards = dueIndices.length;
             const maturity = total > 0 ? matureCards / total : 0;
@@ -180,7 +180,7 @@ export async function collectDew(plants: GrovePlant[]): Promise<CollectResult> {
     // vice versa) when the later write lands with a stale dew balance.
     return serialized(async () => {
         const [econ, stats] = await Promise.all([getGroveEconomy(), getUserStats()]);
-        const streak = stats.currentStreak || 0;
+        const streak = liveStreak(stats);
         const collected = pendingDew(plants, econ, streak);
         if (collected > 0) {
             // Fractions under one dew stay on the clock only when nothing was

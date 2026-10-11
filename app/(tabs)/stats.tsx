@@ -5,7 +5,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { ACHIEVEMENTS, unlockedCount } from '@/utils/Achievements';
 import { toDisplayText } from '@/utils/CardText';
 import { getLevelInfo } from '@/utils/Levels';
-import { getDecks, getHardestCards, getRecentReflections, getUserStats, HardCard, localDateKey, ReflectionEntry, UserStats } from '@/utils/Storage';
+import { getDecks, getHardestCards, getRecentReflections, getUserStats, HardCard, liveStreak, localDateKey, ReflectionEntry, UserStats } from '@/utils/Storage';
 import { startTodaySession, TodayDeckEntry } from '@/utils/TodayPlan';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Award, BookOpen, Brain, ChevronRight, Clock, Database, Flame, Snowflake, TrendingUp, Zap } from 'lucide-react-native';
@@ -129,16 +129,7 @@ export default function StatsScreen() {
             : t('statsMinutes').replace('{n}', String(minutes));
     };
 
-    // A streak only counts if the last study day was today or yesterday
-    const displayStreak = (() => {
-        if (!stats?.lastStudyDate) return 0;
-        const last = stats.lastStudyDate.split('T')[0];
-        const today = localDateKey();
-        const y = new Date();
-        y.setDate(y.getDate() - 1);
-        const yesterday = localDateKey(y);
-        return (last === today || last === yesterday) ? stats.currentStreak : 0;
-    })();
+    const displayStreak = stats ? liveStreak(stats) : 0;
 
     const level = getLevelInfo(stats?.totalXp ?? 0);
     const unlocked = stats ? unlockedCount(stats) : 0;
@@ -264,7 +255,7 @@ export default function StatsScreen() {
                     <StatRow icon={Zap} label={t('statsTotalXp')} value={`${(stats?.totalXp ?? 0).toLocaleString()} XP`} />
                     <StatRow icon={BookOpen} label={t('statsCardsReviewed')} value={`${stats?.totalCardsReviewed ?? 0}`} />
                     <StatRow icon={Clock} label={t('statsStudyTime')} value={formatStudyTime(stats?.totalStudyTime ?? 0)} />
-                    <StatRow icon={Flame} label={t('statsCurrentStreak')} value={t(stats?.currentStreak === 1 ? 'statsDayOne' : 'statsDayMany').replace('{n}', String(stats?.currentStreak ?? 0))} />
+                    <StatRow icon={Flame} label={t('statsCurrentStreak')} value={t(displayStreak === 1 ? 'statsDayOne' : 'statsDayMany').replace('{n}', String(displayStreak))} />
                     <StatRow icon={TrendingUp} label={t('statsLongestStreak')} value={t(stats?.longestStreak === 1 ? 'statsDayOne' : 'statsDayMany').replace('{n}', String(stats?.longestStreak ?? 0))} />
                     <StatRow icon={Snowflake} label={t('statsStreakFreezes')} value={`${stats?.streakFreezes ?? 0}`} />
                     <StatRow icon={Database} label={t('decks')} value={`${deckCount}`} />

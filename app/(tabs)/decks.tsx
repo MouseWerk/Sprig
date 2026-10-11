@@ -20,7 +20,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { importApkg } from '../../utils/AnkiImport';
 import { parseFlashcardsText } from '../../utils/CsvParser';
 import { importSprigDeck, isSprigFileName } from '../../utils/SprigDeck';
-import { createEmptyDeck, Deck, deleteDeck, deleteFolder, Folder, getDecks, getExamPlan, getFolders, importCsvToDeck, saveFolder, updateDeck, updateFolder } from '../../utils/Storage';
+import { countDueCards, createEmptyDeck, Deck, deleteDeck, deleteFolder, Folder, getDecks, getExamPlan, getFolders, importCsvToDeck, saveFolder, updateDeck, updateFolder } from '../../utils/Storage';
 
 export default function DecksScreen() {
   const router = useRouter();
@@ -348,10 +348,8 @@ export default function DecksScreen() {
     const totalCount = item.totalCards || 0;
     const progress = totalCount > 0 ? (learnedCount / totalCount) * 100 : 0;
 
-    // SRS Due Count: Current Due + New cards
-    const dueCount = Object.values(item.srsData || {}).filter(data =>
-      new Date(data.nextReview) <= new Date()
-    ).length + (totalCount - Object.keys(item.srsData || {}).length);
+    // Due today plus never-reviewed cards
+    const dueCount = countDueCards(item);
 
     return (
       <TouchableOpacity

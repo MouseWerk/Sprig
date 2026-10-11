@@ -19,7 +19,7 @@ import { FlashcardData, parseFlashcardsCsv } from '../utils/CsvParser';
 import { xpForGrade } from '../utils/Levels';
 import { scheduleStreakReminder } from '../utils/Notifications';
 import { refreshAllPinnedWidgets } from '../utils/PinnedDeck';
-import { applySwipeResult, getCachedData, getDecks, restoreCardSRS, revertUserStats, saveReflection, setCachedData, SRSCardData, updateCardInDeck, updateDeckProgress, updateUserStats } from '../utils/Storage';
+import { applySwipeResult, calculateSM2, getCachedData, isCardDue, getDecks, restoreCardSRS, revertUserStats, saveReflection, setCachedData, SRSCardData, updateCardInDeck, updateDeckProgress, updateUserStats } from '../utils/Storage';
 import { migrateKey } from '../utils/StorageMigration';
 import { getPrefsSync, subscribePrefs } from '../utils/Preferences';
 import { nextTodayEntry, peekNextTodayEntry } from '../utils/TodayPlan';
@@ -113,6 +113,7 @@ export default function SwipeScreen() {
     // Live SRS mirror (ref, not state) so undo and repeat passes stay
     // accurate without re-filtering the session queue mid-session.
     const liveSrsRef = useRef<Record<number, SRSCardData>>({});
+    const sessionStartRef = useRef(new Date());
     const lastActionRef = useRef(Date.now());
     // Ensures we (re)schedule the streak reminder only once per study session
     const reminderScheduledRef = useRef(false);
@@ -201,18 +202,16 @@ export default function SwipeScreen() {
 
 
     // Filter cards based on study mode. srsData is only loaded once on mount
-    // and never refreshed mid-session, so this list stays stable while
-    // swiping - otherwise graded cards would drop out of the due list and
-    // shift the queue under the advancing index, skipping cards.
-    // Drill mode overrides everything: study exactly the requested cards.
+    // and never refreshed mid-session, and "due" is judged against the time
+    // the session opened, so this list stays stable while swiping - otherwise
+    // graded cards would drop out of the due list (or a card falling due at
+    // midnight would drop in) and shift the queue under the advancing index,
+    // skipping cards. Drill mode overrides everything: study exactly the
+    // requested cards.
     const filteredCards = drillSet
         ? shuffledCards.filter(c => drillSet.has(c.originalIndex))
         : studyMode === 'due'
-            ? shuffledCards.filter(c => {
-                const data = srsData[c.originalIndex];
-                if (!data) return true; // New cards are always due
-                return new Date(data.nextReview) <= new Date();
-            })
+            ? shuffledCards.filter(c => isCardDue(srsData[c.originalIndex], sessionStartRef.current))
             : shuffledCards;
 
     undoStackRef.current = undoStack;
@@ -222,6 +221,15 @@ export default function SwipeScreen() {
     const accuracy = sessionReviewed > 0 ? Math.round((sessionCorrect / sessionReviewed) * 100) : 0;
 
     // What the user actually sees: reversed cards swap the two sides
+    // The interval each grade would schedule, from the same SM-2 step the
+    // swipe applies. The hints used to be fixed guesses ("Good: 4d" for a
+    // new card that actually comes back tomorrow).
+    const intervalHint = (grade: number): string => {
+        const prev = currentCard ? (liveSrsRef.current[currentCard.originalIndex] ?? srsData[currentCard.originalIndex]) : undefined;
+        const next = calculateSM2(grade, prev?.interval ?? 0, prev?.repetition ?? 0, prev?.easeFactor ?? 2.5);
+        return t('swipeIntervalDays').replace('{n}', String(next.interval));
+    };
+
     const displayQuestion = currentCard ? (currentCard.reversed ? currentCard.answer : currentCard.question) : '';
     const displayAnswer = currentCard ? (currentCard.reversed ? currentCard.question : currentCard.answer) : '';
 
@@ -762,25 +770,21 @@ export default function SwipeScreen() {
                             <XCircle size={22} color="#ef4444" strokeWidth={2.5} />
                         </View>
                         <Text style={[styles.footerText, { color: mutedForeground }]}>{t('swipeAgain')}</Text>
-                        <Text style={styles.intervalHint}>1d</Text>
+                        <Text style={[styles.intervalHint, { color: mutedForeground }]}>{intervalHint(0)}</Text>
                     </View>
                     <View style={styles.hintItem}>
                         <View style={[styles.hintIcon, { borderColor: '#eab308' }]}>
                             <HelpCircle size={22} color="#eab308" strokeWidth={2.5} />
                         </View>
                         <Text style={[styles.footerText, { color: mutedForeground }]}>{t('swipeHard')}</Text>
-                        <Text style={styles.intervalHint}>
-                            {currentCard && srsData[currentCard.originalIndex] ? '2d' : '1d'}
-                        </Text>
+                        <Text style={[styles.intervalHint, { color: mutedForeground }]}>{intervalHint(3)}</Text>
                     </View>
                     <View style={styles.hintItem}>
                         <View style={[styles.hintIcon, { borderColor: '#22c55e' }]}>
                             <CheckCircle2 size={22} color="#22c55e" strokeWidth={2.5} />
                         </View>
                         <Text style={[styles.footerText, { color: mutedForeground }]}>{t('swipeGood')}</Text>
-                        <Text style={styles.intervalHint}>
-                            {currentCard && srsData[currentCard.originalIndex] ? `${srsData[currentCard.originalIndex].interval * 2}d` : '4d'}
-                        </Text>
+                        <Text style={[styles.intervalHint, { color: mutedForeground }]}>{intervalHint(5)}</Text>
                     </View>
                 </View>
 
@@ -1051,7 +1055,6 @@ const styles = StyleSheet.create({
     intervalHint: {
         fontSize: 10,
         fontWeight: '800',
-        color: '#8b5cf6',
         marginTop: -4,
     }
 });
