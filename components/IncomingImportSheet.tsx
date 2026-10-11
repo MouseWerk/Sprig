@@ -81,6 +81,7 @@ export function IncomingImportSheet({ detected, onCancel, onConfirm }: Props) {
                 <Text style={[styles.sectionLabel, { color: textColor }]}>{t('moveToFolder')}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.folderPickerContainer}>
                     <TouchableOpacity
+                        accessibilityRole="button"
                         style={[styles.folderChip, { backgroundColor: folderId === null ? accentColor : secondaryBg }]}
                         onPress={() => setFolderId(null)}
                     >
@@ -90,6 +91,7 @@ export function IncomingImportSheet({ detected, onCancel, onConfirm }: Props) {
                     </TouchableOpacity>
                     {folders.map((folder) => (
                         <TouchableOpacity
+                            accessibilityRole="button"
                             key={folder.id}
                             style={[styles.folderChip, { backgroundColor: folderId === folder.id ? accentColor : secondaryBg }]}
                             onPress={() => setFolderId(folder.id)}

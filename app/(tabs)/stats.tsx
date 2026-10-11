@@ -60,6 +60,9 @@ export default function StatsScreen() {
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const accentColor = useThemeColor({}, 'primary');
     const secondaryBg = useThemeColor({}, 'secondary');
+    const successColor = useThemeColor({}, 'success');
+    const warningColor = useThemeColor({}, 'warning');
+    const dangerColor = useThemeColor({}, 'danger');
 
     const router = useRouter();
     const { t } = useLanguage();
@@ -136,6 +139,7 @@ export default function StatsScreen() {
 
     const StatRow = ({ icon: Icon, label, value, onPress }: any) => (
         <TouchableOpacity
+            accessibilityRole="button"
             style={[styles.item, { backgroundColor: cardColor }]}
             onPress={onPress}
             activeOpacity={onPress ? 0.7 : 1}
@@ -180,7 +184,7 @@ export default function StatsScreen() {
                                         {t('statsCardsLast7Days')}
                                     </Text>
                                     {recap.deltaPct !== null && (
-                                        <Text style={[styles.recapDelta, { color: recap.deltaPct >= 0 ? '#22c55e' : '#ef4444' }]}>
+                                        <Text style={[styles.recapDelta, { color: recap.deltaPct >= 0 ? successColor : dangerColor }]}>
                                             {recap.deltaPct >= 0 ? '▲' : '▼'} {t('statsVsWeekBefore').replace('{n}', String(Math.abs(recap.deltaPct)))}
                                         </Text>
                                     )}
@@ -216,7 +220,7 @@ export default function StatsScreen() {
                         <View style={styles.group}>
                             {hardest.map(c => (
                                 <View key={`${c.deckId}-${c.cardIndex}`} style={[styles.item, { backgroundColor: cardColor }]}>
-                                    <View style={[styles.hardDot, { backgroundColor: c.easeFactor <= 1.5 ? '#ef4444' : c.easeFactor <= 2.0 ? '#f97316' : '#eab308' }]} />
+                                    <View style={[styles.hardDot, { backgroundColor: c.easeFactor <= 1.5 ? dangerColor : warningColor }]} />
                                     <View style={{ flex: 1 }}>
                                         <Text style={[styles.hardQuestion, { color: textColor }]} numberOfLines={1}>{toDisplayText(c.question)}</Text>
                                         <Text style={[styles.hardDeck, { color: mutedForeground }]} numberOfLines={1}>{c.deckName}</Text>

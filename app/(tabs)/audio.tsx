@@ -94,6 +94,7 @@ export default function AudioPlayerScreen() {
     const accentColor = useThemeColor({}, 'primary');
     const accentForeground = useThemeColor({}, 'primaryForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
+    const dangerColor = useThemeColor({}, 'danger');
 
     useEffect(() => {
         loadAudios();
@@ -433,10 +434,12 @@ export default function AudioPlayerScreen() {
 
         return (
             <TouchableOpacity
+                accessibilityRole="button"
                 style={[
                     styles.audioCard,
                     { backgroundColor: cardColor },
-                    selectMode && isSelected && { borderWidth: 2, borderColor: accentColor },
+                    // Selected: a quiet ink tint plus the check icon, no frame
+                    selectMode && isSelected && { backgroundColor: accentColor + '1A' },
                 ]}
                 onPress={() => {
                     if (selectMode) toggleSelected(item.id);
@@ -503,7 +506,7 @@ export default function AudioPlayerScreen() {
         <View style={[styles.container, { backgroundColor }]}>
             <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
                 <View style={styles.headerTitleContainer}>
-                    <TouchableOpacity onPress={() => setCurrentFolderId(null)} disabled={!currentFolderId}>
+                    <TouchableOpacity accessibilityRole="button" onPress={() => setCurrentFolderId(null)} disabled={!currentFolderId}>
                         <Text style={[styles.title, { color: textColor }]}>{t('audioLibrary')}</Text>
                     </TouchableOpacity>
                 </View>
@@ -542,7 +545,7 @@ export default function AudioPlayerScreen() {
 
             {currentFolderId !== null && (
                 <View style={styles.breadcrumb}>
-                    <TouchableOpacity onPress={() => setCurrentFolderId(null)}>
+                    <TouchableOpacity accessibilityRole="button" onPress={() => setCurrentFolderId(null)}>
                         <Text style={[styles.breadcrumbText, { color: mutedForeground }]}>{t('root')}</Text>
                     </TouchableOpacity>
                     <ChevronRight size={14} color={mutedForeground} />
@@ -574,7 +577,7 @@ export default function AudioPlayerScreen() {
                         </View>
                         <Text style={[styles.emptyTitle, { color: textColor }]}>{t('noAudioMessage')}</Text>
                         <Text style={[styles.emptyText, { color: mutedForeground }]}>{t('audioEmptyText')}</Text>
-                        <TouchableOpacity style={[styles.emptyButton, { backgroundColor: accentColor }]} onPress={handlePickAudio}>
+                        <TouchableOpacity accessibilityRole="button" style={[styles.emptyButton, { backgroundColor: accentColor }]} onPress={handlePickAudio}>
                             <Text style={{ color: accentForeground, fontWeight: '800', fontSize: 15 }}>{t('addAudio')}</Text>
                         </TouchableOpacity>
                     </View>
@@ -695,6 +698,7 @@ export default function AudioPlayerScreen() {
                     <Text style={[styles.sectionLabel, { color: textColor }]}>{t('moveToFolder')}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.folderPickerContainer}>
                         <TouchableOpacity
+                            accessibilityRole="button"
                             style={[styles.folderChip, { backgroundColor: editAudioFolderId === null ? accentColor : secondaryBg }]}
                             onPress={() => setEditAudioFolderId(null)}
                         >
@@ -702,6 +706,7 @@ export default function AudioPlayerScreen() {
                         </TouchableOpacity>
                         {folders.map((folder) => (
                             <TouchableOpacity
+                                accessibilityRole="button"
                                 key={folder.id}
                                 style={[styles.folderChip, { backgroundColor: editAudioFolderId === folder.id ? accentColor : secondaryBg }]}
                                 onPress={() => setEditAudioFolderId(folder.id)}
@@ -721,6 +726,7 @@ export default function AudioPlayerScreen() {
                     />
 
                     <TouchableOpacity
+                        accessibilityRole="button"
                         style={[styles.sheetAction, { backgroundColor: secondaryBg }]}
                         onPress={() => startSelectMode(editAudio?.id)}
                         activeOpacity={0.8}
@@ -730,7 +736,8 @@ export default function AudioPlayerScreen() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={[styles.sheetAction, { backgroundColor: '#ef444415' }]}
+                        accessibilityRole="button"
+                        style={[styles.sheetAction, { backgroundColor: dangerColor + '1F' }]}
                         onPress={() => {
                             const audio = editAudio;
                             setEditAudio(null);
@@ -738,8 +745,8 @@ export default function AudioPlayerScreen() {
                         }}
                         activeOpacity={0.8}
                     >
-                        <Trash2 size={18} color="#ef4444" strokeWidth={2.5} />
-                        <Text style={[styles.sheetActionText, { color: '#ef4444' }]}>{t('deleteAudio')}</Text>
+                        <Trash2 size={18} color={dangerColor} strokeWidth={2.5} />
+                        <Text style={[styles.sheetActionText, { color: dangerColor }]}>{t('deleteAudio')}</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </BottomSheet>
@@ -770,7 +777,8 @@ export default function AudioPlayerScreen() {
                     style={styles.saveButton}
                 />
                 <TouchableOpacity
-                    style={[styles.sheetAction, { backgroundColor: '#ef444415', marginTop: 12 }]}
+                    accessibilityRole="button"
+                    style={[styles.sheetAction, { backgroundColor: dangerColor + '1F', marginTop: 12 }]}
                     onPress={() => {
                         if (!editingFolder) return;
                         const { id, name } = editingFolder;
@@ -779,8 +787,8 @@ export default function AudioPlayerScreen() {
                     }}
                     activeOpacity={0.8}
                 >
-                    <Trash2 size={18} color="#ef4444" strokeWidth={2.5} />
-                    <Text style={[styles.sheetActionText, { color: '#ef4444' }]}>{t('deleteFolder')}</Text>
+                    <Trash2 size={18} color={dangerColor} strokeWidth={2.5} />
+                    <Text style={[styles.sheetActionText, { color: dangerColor }]}>{t('deleteFolder')}</Text>
                 </TouchableOpacity>
             </BottomSheet>
 
@@ -799,6 +807,7 @@ export default function AudioPlayerScreen() {
                     </TouchableOpacity>
                 </View>
                 <TouchableOpacity
+                    accessibilityRole="button"
                     style={[styles.sheetAction, { backgroundColor: secondaryBg }]}
                     onPress={() => handleMoveSelected(null)}
                     activeOpacity={0.8}
@@ -808,6 +817,7 @@ export default function AudioPlayerScreen() {
                 </TouchableOpacity>
                 {folders.map(folder => (
                     <TouchableOpacity
+                        accessibilityRole="button"
                         key={folder.id}
                         style={[styles.sheetAction, { backgroundColor: secondaryBg }]}
                         onPress={() => handleMoveSelected(folder.id)}
@@ -1133,7 +1143,6 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 22,
         marginBottom: 32,
-        opacity: 0.6,
     },
     emptyButton: {
         width: '100%',

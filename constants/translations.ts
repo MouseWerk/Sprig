@@ -901,6 +901,9 @@ const en = {
   swipeDewEarned: "+{n} dew",
   decksExamDaysLeft: "{n}d",
   exploreDocNamePlaceholder: "e.g. Science Book",
+  a11yCardItemHint: "Tap to change the status, long-press to edit.",
+  a11yEditCard: "Edit card",
+  focusPlantWitheredHint: "You left for more than 10 s. Stay in the app to keep it alive.",
 } as const;
 
 const de: Record<keyof typeof en, string> = {
@@ -1817,6 +1820,9 @@ const de: Record<keyof typeof en, string> = {
   swipeDewEarned: "+{n} Tau",
   decksExamDaysLeft: "{n} T.",
   exploreDocNamePlaceholder: "z. B. Biologie-Buch",
+  a11yCardItemHint: "Tippen ändert den Status, lange drücken zum Bearbeiten.",
+  a11yEditCard: "Karte bearbeiten",
+  focusPlantWitheredHint: "Du warst länger als 10 s weg. Bleib in der App, damit sie lebt.",
 };
 
 export const translations: Record<Language, Record<keyof typeof en, string>> = {

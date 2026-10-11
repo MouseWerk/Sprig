@@ -23,6 +23,8 @@ export function CardImagePicker({ text, onChangeText }: CardImagePickerProps) {
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
     const accentColor = useThemeColor({}, 'primary');
+    const destructiveColor = useThemeColor({}, 'destructive');
+    const destructiveForeground = useThemeColor({}, 'destructiveForeground');
     const [busy, setBusy] = useState(false);
 
     const files = extractImageFiles(text);
@@ -63,13 +65,14 @@ export function CardImagePicker({ text, onChangeText }: CardImagePickerProps) {
                         />
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={styles.removeBadge}
+                        style={[styles.removeBadge, { backgroundColor: destructiveColor }]}
                         onPress={() => onChangeText(removeImageToken(text, file))}
-                        hitSlop={6}
+                        // The badge is 18 dp; reach the 44 dp minimum touch target
+                        hitSlop={13}
                         accessibilityLabel={t('a11yRemoveImage')}
                         accessibilityRole="button"
                     >
-                        <X size={11} color="#ffffff" strokeWidth={3} />
+                        <X size={11} color={destructiveForeground} strokeWidth={3} />
                     </TouchableOpacity>
                 </View>
             ))}
@@ -123,7 +126,6 @@ const styles = StyleSheet.create({
         width: 18,
         height: 18,
         borderRadius: 9,
-        backgroundColor: '#ef4444',
         alignItems: 'center',
         justifyContent: 'center',
     },

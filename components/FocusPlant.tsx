@@ -73,6 +73,7 @@ export function FocusPlant({ active }: FocusPlantProps) {
     const secondaryBg = useThemeColor({}, 'secondary');
     const primaryColor = useThemeColor({}, 'primary');
     const primaryForeground = useThemeColor({}, 'primaryForeground');
+    const dangerColor = useThemeColor({}, 'danger');
 
     const stageIndex = stageIndexFor(focusSeconds);
     const stage = STAGES[stageIndex];
@@ -206,19 +207,20 @@ export function FocusPlant({ active }: FocusPlantProps) {
 
     if (dead) {
         return (
-            <View style={[styles.container, { backgroundColor: '#ef444415' }]}>
+            <View style={[styles.container, { backgroundColor: dangerColor + '14' }]}>
                 <View style={styles.potSlot}>
-                    <View style={[styles.pot, { width: potSize, height: potSize, backgroundColor: '#ef444420' }]}>
-                        <GrowingPlant wilted progress={1} size={plantSize} color="#a8a29e" soilColor="#ef44442A" />
+                    <View style={[styles.pot, { width: potSize, height: potSize, backgroundColor: dangerColor + '1F' }]}>
+                        <GrowingPlant wilted progress={1} size={plantSize} color="#a8a29e" soilColor={dangerColor + '2A'} />
                     </View>
                 </View>
                 <View style={styles.info}>
-                    <Text style={[styles.title, { color: '#ef4444' }]}>{t('focusPlantWithered')}</Text>
-                    <Text style={[styles.subtitle, { color: mutedForeground }]} numberOfLines={1}>
-                        You left for more than 10s. Stay in the app to keep it alive.
+                    <Text style={[styles.title, { color: dangerColor }]}>{t('focusPlantWithered')}</Text>
+                    <Text style={[styles.subtitle, { color: mutedForeground }]} numberOfLines={2}>
+                        {t('focusPlantWitheredHint')}
                     </Text>
                 </View>
                 <TouchableOpacity
+                    accessibilityRole="button"
                     style={[styles.replantBtn, { backgroundColor: primaryColor }]}
                     onPress={replant}
                     activeOpacity={0.85}
@@ -328,7 +330,6 @@ const styles = StyleSheet.create({
         borderRadius: 14,
     },
     replantText: {
-        color: '#fff',
         fontSize: 13,
         fontWeight: '800',
     },

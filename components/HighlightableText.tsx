@@ -18,6 +18,7 @@ interface HighlightableTextProps {
 export function HighlightableText({ text, fontSize = 22, align = 'center', onChange }: HighlightableTextProps) {
     const { t } = useLanguage();
     const textColor = useThemeColor({}, 'text');
+    const highlightColor = useThemeColor({}, 'highlight');
 
     const toggleWord = (wordIndex: number) => {
         const parts = text.split(/(\s+)/);
@@ -54,10 +55,11 @@ export function HighlightableText({ text, fontSize = 22, align = 'center', onCha
                 const isHighlighted = w.startsWith('==') && w.endsWith('==');
                 return (
                     <TouchableOpacity
+                        accessibilityRole="button"
                         key={i}
                         activeOpacity={0.7}
                         onPress={() => toggleWord(currentId)}
-                        style={[styles.wordChip, isHighlighted && styles.wordChipHighlighted]}
+                        style={[styles.wordChip, isHighlighted && { backgroundColor: highlightColor }]}
                     >
                         <Text style={[
                             styles.wordText,
@@ -92,9 +94,6 @@ const styles = StyleSheet.create({
         marginHorizontal: 1,
         marginVertical: 2,
         backgroundColor: 'transparent',
-    },
-    wordChipHighlighted: {
-        backgroundColor: '#facc15',
     },
     wordText: {
         fontSize: 22,

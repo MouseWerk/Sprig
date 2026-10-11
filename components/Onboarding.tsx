@@ -83,6 +83,8 @@ function StudyVignette() {
     const cardColor = useThemeColor({}, 'card');
     const secondaryBg = useThemeColor({}, 'secondary');
     const mutedForeground = useThemeColor({}, 'mutedForeground');
+    const successColor = useThemeColor({}, 'success');
+    const dangerColor = useThemeColor({}, 'danger');
 
     return (
         <View style={styles.vignette}>
@@ -95,13 +97,13 @@ function StudyVignette() {
                         <Bar width={96} color={secondaryBg} />
                     </View>
                     <View style={styles.gradeRow}>
-                        <View style={[styles.gradePill, { backgroundColor: '#ef444415' }]}>
-                            <X size={14} color="#ef4444" strokeWidth={3} />
-                            <Text style={[styles.gradeText, { color: '#ef4444' }]}>{t('onboardAgain')}</Text>
+                        <View style={[styles.gradePill, { backgroundColor: dangerColor + '1F' }]}>
+                            <X size={14} color={dangerColor} strokeWidth={3} />
+                            <Text style={[styles.gradeText, { color: dangerColor }]}>{t('onboardAgain')}</Text>
                         </View>
-                        <View style={[styles.gradePill, { backgroundColor: '#22c55e15' }]}>
-                            <Check size={14} color="#22c55e" strokeWidth={3} />
-                            <Text style={[styles.gradeText, { color: '#22c55e' }]}>{t('onboardGotIt')}</Text>
+                        <View style={[styles.gradePill, { backgroundColor: successColor + '1F' }]}>
+                            <Check size={14} color={successColor} strokeWidth={3} />
+                            <Text style={[styles.gradeText, { color: successColor }]}>{t('onboardGotIt')}</Text>
                         </View>
                     </View>
                 </View>
@@ -202,12 +204,13 @@ function ProgressVignette() {
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
     const accent = useThemeColor({}, 'primary');
+    const streakColor = useThemeColor({}, 'streak');
 
     return (
         <View style={styles.vignette}>
             <View style={[styles.mockStats, { backgroundColor: cardColor, borderColor: secondaryBg }]}>
                 <View style={styles.statRow}>
-                    <Flame size={18} color="#f97316" strokeWidth={2.5} fill="#f97316" />
+                    <Flame size={18} color={streakColor} strokeWidth={2.5} fill={streakColor} />
                     <Text style={[styles.statText, { color: textColor }]}>{t('onboardDayStreakSample')}</Text>
                     <View style={{ flex: 1 }} />
                     <Snowflake size={14} color={mutedForeground} strokeWidth={2.5} />
@@ -245,6 +248,7 @@ function DiscordVignette() {
                     <DiscordIcon size={26} color={accent} />
                 </View>
                 <TouchableOpacity
+                    accessibilityRole="button"
                     style={[styles.discordBtn, { backgroundColor: accent }]}
                     onPress={() => Linking.openURL(DISCORD_INVITE_URL).catch(() => { })}
                     activeOpacity={0.85}
@@ -337,7 +341,7 @@ export function Onboarding() {
                     <Text style={[styles.stepLabel, { color: mutedForeground }]}>
                         {index + 1} / {SLIDES.length}
                     </Text>
-                    <TouchableOpacity onPress={finish} hitSlop={12} style={{ opacity: isLast ? 0 : 1 }} disabled={isLast}>
+                    <TouchableOpacity accessibilityRole="button" onPress={finish} hitSlop={12} style={{ opacity: isLast ? 0 : 1 }} disabled={isLast}>
                         <Text style={[styles.skip, { color: mutedForeground }]}>{t('onboardSkip')}</Text>
                     </TouchableOpacity>
                 </View>
@@ -377,6 +381,7 @@ export function Onboarding() {
 
                 <View style={styles.footer}>
                     <TouchableOpacity
+                        accessibilityRole="button"
                         style={[styles.nextBtn, { backgroundColor: primaryColor }]}
                         onPress={goNext}
                         activeOpacity={0.9}

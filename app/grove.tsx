@@ -221,7 +221,7 @@ export default function GroveScreen() {
                     <View style={[styles.badge, { backgroundColor: accentColor }]}>
                         <CalendarDays size={11} color={backgroundColor} strokeWidth={2.5} />
                         <Text style={[styles.badgeText, { color: backgroundColor }]}>
-                            {item.examPlan.daysLeft === 0 ? t('groveToday') : `${item.examPlan.daysLeft}d`}
+                            {item.examPlan.daysLeft === 0 ? t('groveToday') : t('decksExamDaysLeft').replace('{n}', String(item.examPlan.daysLeft))}
                         </Text>
                     </View>
                 ) : <View />}
@@ -523,15 +523,16 @@ export default function GroveScreen() {
                                     return (
                                         <TouchableOpacity
                                             key={pot}
-                                            style={[styles.potChip, { backgroundColor: secondaryBg, opacity: affordable ? 1 : 0.5, borderColor: active ? accentColor : 'transparent' }]}
+                                            style={[styles.potChip, { backgroundColor: active ? accentColor + '1A' : secondaryBg, opacity: affordable ? 1 : 0.5, borderColor: 'transparent' }]}
                                             onPress={() => !active && handleBuyPlanter(pot)}
                                             disabled={active}
                                             activeOpacity={0.85}
                                             accessibilityLabel={active ? t('a11yCurrentPlanter').replace('{name}', potName) : price > 0 ? t('a11yBuyItem').replace('{name}', potName).replace('{n}', String(price)) : t('a11ySwitchPlanter').replace('{name}', potName)}
                                             accessibilityRole="button"
+                                            accessibilityState={{ selected: active, disabled: active }}
                                         >
                                             <GrowingPlant progress={0.5} size={44} color={accentColor} soilColor={borderColor} potStyle={pot} />
-                                            <Text style={[styles.potChipText, { color: textColor }]} numberOfLines={1}>{potName}</Text>
+                                            <Text style={[styles.potChipText, { color: textColor }, active && { fontWeight: '900' }]} numberOfLines={1}>{potName}</Text>
                                             {active ? (
                                                 <Check size={12} color={accentColor} strokeWidth={3} />
                                             ) : price > 0 ? (

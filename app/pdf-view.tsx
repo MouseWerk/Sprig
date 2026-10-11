@@ -292,6 +292,7 @@ const PDFViewScreen = () => {
                     </TouchableOpacity>
 
                     <TouchableOpacity
+                        accessibilityRole="button"
                         style={[styles.pageIndicator, { backgroundColor: backgroundColor }]}
                         onPress={() => { setJumpValue(String(currentPage)); setJumpVisible(true); }}
                         disabled={totalPages === 0}
@@ -328,7 +329,7 @@ const PDFViewScreen = () => {
                     style={{ flex: 1 }}
                 >
                     <View style={styles.modalOverlay}>
-                        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setJumpVisible(false)} />
+                        <TouchableOpacity accessibilityRole="button" style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setJumpVisible(false)} />
                         <View style={[styles.modalCard, { backgroundColor }]}>
                             <View style={styles.modalHeader}>
                                 <Text style={[styles.modalTitle, { color: textColor }]}>{t('pdfJumpToPage')}</Text>

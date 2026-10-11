@@ -317,7 +317,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 24,
-    opacity: 0.7,
   },
   emptyButton: {
     width: '100%',

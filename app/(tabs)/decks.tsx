@@ -67,6 +67,9 @@ export default function DecksScreen() {
   const secondaryBg = useThemeColor({}, 'secondary');
   const accentColor = useThemeColor({}, 'primary');
   const primaryForeground = useThemeColor({}, 'primaryForeground');
+  const successColor = useThemeColor({}, 'success');
+  const warningColor = useThemeColor({}, 'warning');
+  const dangerColor = useThemeColor({}, 'danger');
 
   // Deletion is deferred so the toast's "Undo" can still call it off; these
   // ids are in the database but must not appear in the list meanwhile.
@@ -377,6 +380,8 @@ export default function DecksScreen() {
         activeOpacity={0.8}
         onPress={() => router.push({ pathname: '/deck-details', params: { id: item.id } })}
         onLongPress={() => handleEditDeck(item)}
+        accessibilityRole="button"
+        accessibilityLabel={[item.name, plural(t, totalCount, 'cardsCountOne', 'deckDetailsCardsCount'), dueCount > 0 ? t('homeDueCount').replace('{n}', String(dueCount)) : null].filter(Boolean).join(', ')}
       >
         <View style={styles.cardHeaderAction}>
           <View style={[styles.deckIconContainer, { backgroundColor: accentColor + '10' }]}>
@@ -387,6 +392,7 @@ export default function DecksScreen() {
               style={styles.deleteButtonContainer}
               onPress={() => handleEditDeck(item)}
               activeOpacity={0.5}
+              hitSlop={6}
               accessibilityLabel={t('a11yOptionsFor').replace('{name}', item.name)}
               accessibilityRole="button"
             >
@@ -396,6 +402,7 @@ export default function DecksScreen() {
               style={styles.deleteButtonContainer}
               onPress={() => handleDelete(item.id, item.name)}
               activeOpacity={0.5}
+              hitSlop={6}
               accessibilityLabel={t('a11yDeleteItem').replace('{name}', item.name)}
               accessibilityRole="button"
             >
@@ -410,17 +417,18 @@ export default function DecksScreen() {
             <Text style={[styles.countLabel, { color: mutedForeground }]}>{t('cards')}</Text>
           </View>
           {dueCount > 0 && (
-            <View style={[styles.dueBadge, { backgroundColor: '#ef4444' }]}>
-              <Text style={styles.dueText}>{dueCount} {t('due')}</Text>
+            <View style={[styles.dueBadge, { backgroundColor: dangerColor + '1F' }]}>
+              <Text style={[styles.dueText, { color: dangerColor }]}>{t('homeDueCount').replace('{n}', String(dueCount))}</Text>
             </View>
           )}
           {(() => {
             const plan = getExamPlan(item);
             if (!plan || plan.daysLeft < 0) return null;
+            const examColor = plan.daysLeft <= 3 ? dangerColor : warningColor;
             return (
-              <View style={[styles.dueBadge, { backgroundColor: plan.daysLeft <= 3 ? '#ef4444' : '#f59e0b', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-                {plan.daysLeft > 0 && <CalendarDays size={11} color="#fff" strokeWidth={2.5} />}
-                <Text style={styles.dueText}>
+              <View style={[styles.dueBadge, { backgroundColor: examColor + '1F', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                {plan.daysLeft > 0 && <CalendarDays size={11} color={examColor} strokeWidth={2.5} />}
+                <Text style={[styles.dueText, { color: examColor }]}>
                   {plan.daysLeft === 0 ? t('decksExamToday') : t('decksExamDaysLeft').replace('{n}', String(plan.daysLeft))}
                 </Text>
               </View>
@@ -434,13 +442,7 @@ export default function DecksScreen() {
           <View style={styles.progressSection}>
             <View style={styles.progressInfo}>
               <Text style={[styles.progressLabel, { color: mutedForeground }]}>{t('mastery')}</Text>
-              <Text style={[styles.progressPercent, { 
-                color: progress === 0 ? '#ef4444' : 
-                       progress < 30 ? '#f97316' : 
-                       progress < 60 ? '#eab308' : 
-                       progress < 100 ? accentColor : 
-                       '#22c55e' 
-              }]}>
+              <Text style={[styles.progressPercent, { color: textColor }]}>
                 {Math.round(progress)}%
               </Text>
             </View>
@@ -450,11 +452,9 @@ export default function DecksScreen() {
                   styles.progressBarFill,
                   {
                     width: `${progress}%`,
-                    backgroundColor: progress === 0 ? '#ef4444' : 
-                                    progress < 30 ? '#f97316' : 
-                                    progress < 60 ? '#eab308' : 
-                                    progress < 100 ? accentColor : 
-                                    '#22c55e'
+                    // Quiet ink until everything is learned; the traffic-light
+                    // scale made a fresh deck shout "0%" in red
+                    backgroundColor: progress >= 100 ? successColor : accentColor
                   }
                 ]}
               />
@@ -498,7 +498,7 @@ export default function DecksScreen() {
     <View style={[styles.container, { backgroundColor }]}>
       <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <View style={styles.headerTitleContainer}>
-          <TouchableOpacity onPress={() => setCurrentFolderId(null)} disabled={!currentFolderId}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => setCurrentFolderId(null)} disabled={!currentFolderId}>
             <Text style={[styles.title, { color: textColor }]}>{t('myDecks')}</Text>
           </TouchableOpacity>
         </View>
@@ -544,13 +544,14 @@ export default function DecksScreen() {
 
       {!searching && folderPath.length > 0 && (
         <View style={styles.breadcrumb}>
-          <TouchableOpacity onPress={() => setCurrentFolderId(null)}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => setCurrentFolderId(null)}>
             <Text style={[styles.breadcrumbText, { color: mutedForeground }]}>{t('root')}</Text>
           </TouchableOpacity>
           {folderPath.map((f, i) => (
             <View key={f.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
               <ChevronRight size={14} color={mutedForeground} />
               <TouchableOpacity
+                accessibilityRole="button"
                 onPress={() => setCurrentFolderId(f.id)}
                 disabled={i === folderPath.length - 1}
               >
@@ -660,6 +661,7 @@ export default function DecksScreen() {
                   <IconPicker selectedIcon={selectedIcon} onSelect={setSelectedIcon} />
 
                   <TouchableOpacity
+                    accessibilityRole="button"
                     style={[styles.importZone, { borderColor: accentColor, backgroundColor: secondaryBg }]}
                     onPress={handleImportFile}
                     activeOpacity={0.8}
@@ -787,6 +789,8 @@ export default function DecksScreen() {
                   <Text style={[styles.sectionLabel, { color: textColor, marginTop: 16 }]}>{t('moveToFolder')}</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.folderPickerContainer}>
                     <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: editDeckFolderId === null }}
                       style={[
                         styles.folderChip,
                         { backgroundColor: editDeckFolderId === null ? accentColor : secondaryBg }
@@ -802,7 +806,9 @@ export default function DecksScreen() {
                     </TouchableOpacity>
                     {folders.map((folder) => (
                       <TouchableOpacity
+                        accessibilityRole="button"
                         key={folder.id}
+                        accessibilityState={{ selected: editDeckFolderId === folder.id }}
                         style={[
                           styles.folderChip,
                           { backgroundColor: editDeckFolderId === folder.id ? accentColor : secondaryBg }
@@ -855,6 +861,7 @@ export default function DecksScreen() {
                 style={{ marginTop: 24 }}
               />
               <TouchableOpacity
+                accessibilityRole="button"
                 style={styles.deleteFolderRow}
                 onPress={() => {
                   if (!editingFolder) return;
@@ -864,8 +871,8 @@ export default function DecksScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <Trash2 size={16} color="#ef4444" />
-                <Text style={styles.deleteFolderText}>{t('deleteFolder')}</Text>
+                <Trash2 size={16} color={dangerColor} />
+                <Text style={[styles.deleteFolderText, { color: dangerColor }]}>{t('deleteFolder')}</Text>
               </TouchableOpacity>
       </BottomSheet>
     </View>
@@ -992,9 +999,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   dueText: {
-    color: '#ffffff',
-    fontSize: 9,
-    fontWeight: '900',
+    fontSize: 10,
+    fontWeight: '800',
   },
   cardBottom: {
     flex: 1,
@@ -1074,7 +1080,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 32,
-    opacity: 0.6,
   },
   emptyButton: {
     width: '100%',
@@ -1129,7 +1134,6 @@ const styles = StyleSheet.create({
   },
   pickSub: {
     fontSize: 13,
-    opacity: 0.6,
   },
   pasteInput: {
     borderRadius: 16,
@@ -1280,7 +1284,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   deleteFolderText: {
-    color: '#ef4444',
     fontSize: 15,
     fontWeight: '700',
   },

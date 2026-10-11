@@ -47,6 +47,7 @@ export default function SettingsScreen() {
   const mutedForeground = useThemeColor({}, 'mutedForeground');
   const accentColor = useThemeColor({}, 'primary');
   const secondaryBg = useThemeColor({}, 'secondary');
+  const dangerColor = useThemeColor({}, 'danger');
 
   const { mode, setThemeMode, theme } = useCustomTheme();
   const { showToast } = useToast();
@@ -285,18 +286,21 @@ export default function SettingsScreen() {
       style={[styles.item, { backgroundColor: cardColor }]}
       onPress={onPress}
       activeOpacity={onPress ? 0.7 : 1}
+      disabled={!onPress}
+      accessibilityRole={toggle !== undefined ? 'switch' : onPress ? 'button' : undefined}
+      accessibilityState={toggle !== undefined ? { checked: toggle } : undefined}
     >
-      <View style={[styles.iconContainer, { backgroundColor: destructive ? '#ef444418' : secondaryBg }]}>
-        <Icon size={20} color={destructive ? '#ef4444' : accentColor} strokeWidth={2.5} />
+      <View style={[styles.iconContainer, { backgroundColor: destructive ? dangerColor + '1F' : secondaryBg }]}>
+        <Icon size={20} color={destructive ? dangerColor : accentColor} strokeWidth={2.5} />
       </View>
-      <Text style={[styles.itemLabel, { color: destructive ? '#ef4444' : textColor }]}>{label}</Text>
+      <Text style={[styles.itemLabel, { color: destructive ? dangerColor : textColor }]}>{label}</Text>
       {value && <Text style={[styles.itemValue, { color: mutedForeground }]}>{value}</Text>}
       {toggle !== undefined && (
         <Switch
           value={toggle}
           onValueChange={onPress}
-          trackColor={{ false: '#767577', true: accentColor }}
-          thumbColor="#f4f3f4"
+          trackColor={{ false: mutedForeground, true: accentColor }}
+          thumbColor={cardColor}
         />
       )}
       {rightElement}
@@ -752,6 +756,5 @@ const styles = StyleSheet.create({
   footerVersion: {
     fontSize: 11,
     fontWeight: '500',
-    opacity: 0.6,
   },
 });

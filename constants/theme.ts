@@ -9,7 +9,7 @@ export const Colors = {
     background: '#ffffff',
     tint: tintColorLight,
     icon: '#64748b', // slate-500
-    tabIconDefault: '#94a3b8', // slate-400
+    tabIconDefault: '#5b6b7f', // inactive tab icon + label: AA on white
     tabIconSelected: tintColorLight,
 
     // Shadcn-like tokens
@@ -22,21 +22,35 @@ export const Colors = {
     secondary: '#f1f5f9',
     secondaryForeground: '#0f172a',
     muted: '#f1f5f9',
-    mutedForeground: '#64748b',
+    // slate-500 darkened a step: muted text on secondary/muted surfaces
+    // (cards, chips) has to reach WCAG AA (4.5:1), which #64748b missed.
+    mutedForeground: '#5b6b7f',
     accent: '#f1f5f9',
     accentForeground: '#0f172a',
-    destructive: '#ef4444',
-    destructiveForeground: '#f8fafc',
+    // white on it reaches 4.5:1 (#ef4444 only managed 3.8:1)
+    destructive: '#dc2626',
+    destructiveForeground: '#ffffff',
     border: '#e2e8f0',
     input: '#e2e8f0',
     ring: '#0f172a',
+
+    // Status colors for icons, small text, fills and 12 % tints — never for
+    // frames around selected or current items (see design rules). Each
+    // reaches 4.5:1 on background and on secondary in its theme.
+    success: '#15803d',
+    warning: '#b45309',
+    danger: '#b91c1c',
+    streak: '#c2410c',
+    info: '#0369a1',
+    // Highlighter marker behind ==highlighted== words; text on it is black
+    highlight: '#facc15',
   },
   dark: {
     text: '#f8fafc', // slate-50
     background: '#020617', // slate-950
     tint: tintColorDark,
     icon: '#94a3b8', // slate-400
-    tabIconDefault: '#475569', // slate-600
+    tabIconDefault: '#94a3b8', // slate-400: AA on the near-black background
     tabIconSelected: tintColorDark,
 
     // Shadcn-like tokens
@@ -59,6 +73,13 @@ export const Colors = {
     border: '#1e293b',
     input: '#1e293b',
     ring: '#f8fafc',
+
+    success: '#4ade80',
+    warning: '#fbbf24',
+    danger: '#f87171',
+    streak: '#fb923c',
+    info: '#38bdf8',
+    highlight: '#facc15',
   },
 };
 

@@ -24,6 +24,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     const themeTextColor = useThemeColor({}, 'text');
     const accentColor = useThemeColor({}, 'primary');
     const codeBg = useThemeColor({}, 'secondary');
+    const highlightColor = useThemeColor({}, 'highlight');
     const textColor = color || themeTextColor;
 
     const styles = useMemo(() => ({
@@ -62,7 +63,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             fontStyle: 'italic',
         },
         s: {
-            backgroundColor: '#facc15',
+            backgroundColor: highlightColor,
             color: '#000',
             fontWeight: 'bold' as any,
             borderRadius: 4,
@@ -70,13 +71,13 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             textDecorationLine: 'none', // Remove strikethrough line
         },
         mark: {
-            backgroundColor: '#facc15',
+            backgroundColor: highlightColor,
             color: '#000',
             fontWeight: 'bold' as any,
             borderRadius: 4,
             paddingHorizontal: 2,
         },
-    }), [textColor, fontSize, codeBg, accentColor]);
+    }), [textColor, fontSize, codeBg, accentColor, highlightColor]);
 
     const rules = useMemo(() => ({
         s: (node: any, children: any, parent: any, styles: any) => (

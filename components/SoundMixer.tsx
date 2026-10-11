@@ -318,7 +318,7 @@ export function SoundMixer({ visible, onClose }: SoundMixerProps) {
     return (
         <Modal visible={mounted} animationType="none" transparent onRequestClose={onClose}>
             <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
-                <TouchableOpacity style={styles.dismiss} activeOpacity={1} onPress={onClose} />
+                <TouchableOpacity accessibilityRole="button" style={styles.dismiss} activeOpacity={1} onPress={onClose} />
                 <Animated.View style={[styles.sheet, { backgroundColor, paddingBottom: Math.max(insets.bottom, 20), transform: [{ translateY: sheetTranslateY }] }]}>
                     <View style={styles.header}>
                         <View>
@@ -342,7 +342,8 @@ export function SoundMixer({ visible, onClose }: SoundMixerProps) {
                                     key={def.id}
                                     style={[
                                         styles.tile,
-                                        { backgroundColor: secondaryBg, borderColor: entry.playing ? def.color : 'transparent' },
+                                        // Playing: a tint of the sound's color, no colored frame
+                                        { backgroundColor: entry.playing ? def.color + '1A' : secondaryBg, borderColor: 'transparent' },
                                     ]}
                                 >
                                     <TouchableOpacity
@@ -352,6 +353,7 @@ export function SoundMixer({ visible, onClose }: SoundMixerProps) {
                                         disabled={isLoading}
                                         accessibilityLabel={t(entry.playing ? 'a11yStopSound' : 'a11yPlaySound').replace('{name}', t(def.nameKey))}
                                         accessibilityRole="button"
+                                        accessibilityState={{ selected: entry.playing, busy: isLoading }}
                                     >
                                         <View style={[
                                             styles.tileIcon,

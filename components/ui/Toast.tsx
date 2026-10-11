@@ -33,6 +33,9 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
     const accentColor = useThemeColor({}, 'primary');
+    const successColor = useThemeColor({}, 'success');
+    const dangerColor = useThemeColor({}, 'danger');
+    const warningColor = useThemeColor({}, 'warning');
 
     const hideToast = useCallback(() => {
         if (hideTimer.current) {
@@ -101,9 +104,9 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const getStatusColor = () => {
         switch (toast?.type) {
-            case 'success': return '#22c55e';
-            case 'error': return '#ef4444';
-            case 'warning': return '#eab308';
+            case 'success': return successColor;
+            case 'error': return dangerColor;
+            case 'warning': return warningColor;
             default: return accentColor;
         }
     };
@@ -113,6 +116,9 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             {children}
             {toast && (
                 <Animated.View
+                    // Announced by screen readers without moving their focus
+                    accessibilityLiveRegion="polite"
+                    accessibilityRole="alert"
                     style={[
                         styles.toastContainer,
                         {
@@ -124,7 +130,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                     ]}
                 >
                     <View style={styles.content}>
-                        <View style={[styles.iconWrapper, { backgroundColor: getStatusColor() + '18' }]}>
+                        <View style={[styles.iconWrapper, { backgroundColor: getStatusColor() + '1F' }]}>
                             {getIcon()}
                         </View>
                         <Text style={[styles.message, { color: textColor }]}>{toast.message}</Text>
@@ -135,13 +141,14 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                                     hideToast();
                                 }}
                                 style={styles.actionBtn}
+                                hitSlop={10}
                                 accessibilityLabel={toast.action.label}
                                 accessibilityRole="button"
                             >
-                                <Text style={[styles.actionText, { color: getStatusColor() }]}>{toast.action.label}</Text>
+                                <Text style={[styles.actionText, { color: textColor }]}>{toast.action.label}</Text>
                             </TouchableOpacity>
                         )}
-                        <TouchableOpacity onPress={hideToast} style={styles.closeBtn} accessibilityLabel={t('a11yDismissNotification')} accessibilityRole="button">
+                        <TouchableOpacity onPress={hideToast} style={styles.closeBtn} hitSlop={12} accessibilityLabel={t('a11yDismissNotification')} accessibilityRole="button">
                             <X size={16} color={mutedForeground} />
                         </TouchableOpacity>
                     </View>

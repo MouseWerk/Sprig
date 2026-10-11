@@ -59,6 +59,7 @@ export default function FeedScreen() {
     const secondaryBg = useThemeColor({}, 'secondary');
     const primaryColor = useThemeColor({}, 'primary');
     const cardColor = useThemeColor({}, 'card');
+    const dangerColor = useThemeColor({}, 'danger');
 
     React.useEffect(() => {
         (async () => {
@@ -191,7 +192,7 @@ export default function FeedScreen() {
         return (
             <View style={[styles.container, styles.center, { backgroundColor, paddingHorizontal: 32 }]}>
                 <Stack.Screen options={headerOptions} />
-                <FileWarning size={48} color="#ef4444" strokeWidth={2} />
+                <FileWarning size={48} color={dangerColor} strokeWidth={2} />
                 <Text style={[styles.emptyTitle, { color: textColor }]}>{t('feedNoCards')}</Text>
                 <Text style={[styles.emptyText, { color: mutedForeground }]}>
                     {t('feedNoCardsText')}
@@ -205,7 +206,7 @@ export default function FeedScreen() {
         const answerHidden = hideAnswers && !revealed.has(index);
         return (
             <View style={[styles.page, { height: pageHeight, paddingBottom: insets.bottom + 16 }]}>
-                <View style={[styles.card, { backgroundColor: cardColor, borderColor: secondaryBg }, isHighlightMode && { borderColor: primaryColor + '60' }]}>
+                <View style={[styles.card, { backgroundColor: isHighlightMode ? secondaryBg : cardColor, borderColor: secondaryBg }]}>
                     <Text style={[styles.cardLabel, { color: isHighlightMode ? primaryColor : mutedForeground }]}>
                         {isHighlightMode ? t('feedTapWordsToHighlight') : t('feedCardNOf').replace('{n}', String(index + 1)).replace('{total}', String(cards.length))}
                     </Text>
@@ -233,6 +234,7 @@ export default function FeedScreen() {
 
                         {answerHidden ? (
                             <TouchableOpacity
+                                accessibilityRole="button"
                                 style={[styles.revealBtn, { backgroundColor: secondaryBg }]}
                                 onPress={() => revealCard(index)}
                                 activeOpacity={0.8}

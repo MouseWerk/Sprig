@@ -99,6 +99,7 @@ export default function LibraryScreen() {
   const accentColor = useThemeColor({}, 'primary');
   const primaryForeground = useThemeColor({}, 'primaryForeground');
   const borderColor = useThemeColor({}, 'border');
+  const dangerColor = useThemeColor({}, 'danger');
 
   const loadData = useCallback(async () => {
     const [savedDecks, savedFolders, progress] = await Promise.all([getDecks(), getFolders('pdf'), getAllPdfProgress()]);
@@ -335,9 +336,11 @@ export default function LibraryScreen() {
       <View style={[
         styles.docCard,
         { backgroundColor: secondaryBg },
-        selectMode && isSelected && { borderWidth: 2, borderColor: accentColor },
+        // Selected: a quiet ink tint plus the check icon, no frame
+        selectMode && isSelected && { backgroundColor: accentColor + '1A' },
       ]}>
         <TouchableOpacity
+          accessibilityRole="button"
           style={styles.docContent}
           activeOpacity={0.7}
           onPress={() => {
@@ -385,7 +388,7 @@ export default function LibraryScreen() {
               accessibilityLabel={t('a11yDeleteItem').replace('{name}', item.name)}
               accessibilityRole="button"
             >
-              <Trash2 size={18} color="#ef4444" />
+              <Trash2 size={18} color={dangerColor} />
             </TouchableOpacity>
           </>
         )}
@@ -437,7 +440,7 @@ export default function LibraryScreen() {
     <View style={[styles.container, { backgroundColor }]}>
       <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <View style={styles.headerTitleContainer}>
-          <TouchableOpacity onPress={() => setCurrentFolderId(null)} disabled={!currentFolderId}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => setCurrentFolderId(null)} disabled={!currentFolderId}>
             <Text style={[styles.title, { color: textColor }]}>{t('library')}</Text>
           </TouchableOpacity>
           <View style={[styles.summaryBadge, { backgroundColor: secondaryBg }]}>
@@ -471,6 +474,7 @@ export default function LibraryScreen() {
       {combinedData.length > 1 && (
         <View style={styles.sortRow}>
           <TouchableOpacity
+            accessibilityRole="button"
             style={[styles.sortButton, { backgroundColor: secondaryBg }]}
             onPress={() => setSortModalVisible(true)}
             activeOpacity={0.7}
@@ -485,13 +489,14 @@ export default function LibraryScreen() {
 
       {folderPath.length > 0 && (
         <View style={styles.breadcrumb}>
-          <TouchableOpacity onPress={() => setCurrentFolderId(null)}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => setCurrentFolderId(null)}>
             <Text style={[styles.breadcrumbText, { color: mutedForeground }]}>{t('root')}</Text>
           </TouchableOpacity>
           {folderPath.map((f, i) => (
             <View key={f.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
               <ChevronRight size={14} color={mutedForeground} />
               <TouchableOpacity
+                accessibilityRole="button"
                 onPress={() => setCurrentFolderId(f.id)}
                 disabled={i === folderPath.length - 1}
               >
@@ -572,6 +577,7 @@ export default function LibraryScreen() {
             </View>
             {SORT_OPTIONS.map(option => (
               <TouchableOpacity
+                accessibilityRole="button"
                 key={option.mode}
                 style={[
                   styles.sortOption,
@@ -637,6 +643,7 @@ export default function LibraryScreen() {
 
               {!pickedFile ? (
                 <TouchableOpacity
+                  accessibilityRole="button"
                   style={[styles.pickZone, { borderColor, backgroundColor: secondaryBg + '40' }]}
                   onPress={handlePickPDF}
                   activeOpacity={0.6}
@@ -665,8 +672,8 @@ export default function LibraryScreen() {
                       <Text style={[styles.pickedFileName, { color: textColor }]} numberOfLines={1}>
                         {pickedFile.name}
                       </Text>
-                      <TouchableOpacity onPress={() => setPickedFile(null)}>
-                        <Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 13, marginLeft: 8 }}>{t('exploreChange')}</Text>
+                      <TouchableOpacity accessibilityRole="button" onPress={() => setPickedFile(null)}>
+                        <Text style={{ color: dangerColor, fontWeight: '700', fontSize: 13, marginLeft: 8 }}>{t('exploreChange')}</Text>
                       </TouchableOpacity>
                     </View>
 
@@ -705,6 +712,7 @@ export default function LibraryScreen() {
                   <Text style={[styles.sectionLabel, { color: textColor, marginTop: 16 }]}>{t('moveToFolder')}</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.folderPickerContainer}>
                     <TouchableOpacity
+                      accessibilityRole="button"
                       style={[styles.folderChip, { backgroundColor: editDocFolderId === null ? accentColor : secondaryBg }]}
                       onPress={() => setEditDocFolderId(null)}
                     >
@@ -714,6 +722,7 @@ export default function LibraryScreen() {
                     </TouchableOpacity>
                     {folders.map((folder) => (
                       <TouchableOpacity
+                        accessibilityRole="button"
                         key={folder.id}
                         style={[styles.folderChip, { backgroundColor: editDocFolderId === folder.id ? accentColor : secondaryBg }]}
                         onPress={() => setEditDocFolderId(folder.id)}
@@ -733,6 +742,7 @@ export default function LibraryScreen() {
                   />
 
                   <TouchableOpacity
+                    accessibilityRole="button"
                     style={[styles.sheetAction, { backgroundColor: secondaryBg }]}
                     onPress={() => startSelectMode(editDoc?.id)}
                     activeOpacity={0.8}
@@ -742,7 +752,8 @@ export default function LibraryScreen() {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.sheetAction, { backgroundColor: '#ef444415' }]}
+                    accessibilityRole="button"
+                    style={[styles.sheetAction, { backgroundColor: dangerColor + '1F' }]}
                     onPress={() => {
                       const doc = editDoc;
                       setEditDoc(null);
@@ -750,8 +761,8 @@ export default function LibraryScreen() {
                     }}
                     activeOpacity={0.8}
                   >
-                    <Trash2 size={18} color="#ef4444" strokeWidth={2.5} />
-                    <Text style={[styles.sheetActionText, { color: '#ef4444' }]}>{t('exploreDeleteDocument')}</Text>
+                    <Trash2 size={18} color={dangerColor} strokeWidth={2.5} />
+                    <Text style={[styles.sheetActionText, { color: dangerColor }]}>{t('exploreDeleteDocument')}</Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -783,7 +794,8 @@ export default function LibraryScreen() {
                 style={styles.saveButton}
               />
               <TouchableOpacity
-                style={[styles.sheetAction, { backgroundColor: '#ef444415', marginTop: 12 }]}
+                accessibilityRole="button"
+                style={[styles.sheetAction, { backgroundColor: dangerColor + '1F', marginTop: 12 }]}
                 onPress={() => {
                   if (!editingFolder) return;
                   const { id, name } = editingFolder;
@@ -792,8 +804,8 @@ export default function LibraryScreen() {
                 }}
                 activeOpacity={0.8}
               >
-                <Trash2 size={18} color="#ef4444" strokeWidth={2.5} />
-                <Text style={[styles.sheetActionText, { color: '#ef4444' }]}>{t('deleteFolder')}</Text>
+                <Trash2 size={18} color={dangerColor} strokeWidth={2.5} />
+                <Text style={[styles.sheetActionText, { color: dangerColor }]}>{t('deleteFolder')}</Text>
               </TouchableOpacity>
       </BottomSheet>
 
@@ -812,6 +824,7 @@ export default function LibraryScreen() {
                 </TouchableOpacity>
               </View>
               <TouchableOpacity
+                accessibilityRole="button"
                 style={[styles.sheetAction, { backgroundColor: secondaryBg }]}
                 onPress={() => handleMoveSelected(null)}
                 activeOpacity={0.8}
@@ -821,6 +834,7 @@ export default function LibraryScreen() {
               </TouchableOpacity>
               {folders.map(folder => (
                 <TouchableOpacity
+                  accessibilityRole="button"
                   key={folder.id}
                   style={[styles.sheetAction, { backgroundColor: secondaryBg }]}
                   onPress={() => handleMoveSelected(folder.id)}
@@ -995,7 +1009,6 @@ const styles = StyleSheet.create({
   docSub: {
     fontSize: 12,
     marginTop: 2,
-    opacity: 0.6,
     fontWeight: '600',
   },
   deleteButton: {
@@ -1071,7 +1084,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 32,
-    opacity: 0.6,
   },
   emptyButton: {
     width: '100%',
@@ -1126,7 +1138,6 @@ const styles = StyleSheet.create({
   },
   pickSub: {
     fontSize: 13,
-    opacity: 0.6,
   },
   formScroll: {
     paddingBottom: 20,

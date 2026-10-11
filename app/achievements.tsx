@@ -40,7 +40,8 @@ export default function AchievementsScreen() {
                 key={a.id}
                 style={[
                     styles.card,
-                    { backgroundColor: secondaryBg, borderColor: done ? a.color + '55' : 'transparent' },
+                    // Unlocked shows in the tinted icon, not as a colored frame
+                    { backgroundColor: secondaryBg, borderColor: 'transparent' },
                 ]}
             >
                 <View style={[

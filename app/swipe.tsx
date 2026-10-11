@@ -149,6 +149,9 @@ export default function SwipeScreen() {
     const primaryColor = useThemeColor({}, 'primary');
     const secondaryBg = useThemeColor({}, 'secondary');
     const borderColor = useThemeColor({}, 'border');
+    const successColor = useThemeColor({}, 'success');
+    const warningColor = useThemeColor({}, 'warning');
+    const dangerColor = useThemeColor({}, 'danger');
 
     useEffect(() => {
         async function loadData() {
@@ -580,7 +583,7 @@ export default function SwipeScreen() {
             <View style={[styles.container, { backgroundColor, paddingHorizontal: 24 }]}>
                 <Stack.Screen options={{ title: t('error') }} />
                 <View style={[styles.errorCard, { backgroundColor: secondaryBg }]}>
-                    <FileWarning size={48} color="#ef4444" strokeWidth={2.5} />
+                    <FileWarning size={48} color={dangerColor} strokeWidth={2.5} />
                     <Text style={[styles.errorTitle, { color: textColor }]}>{t('swipeImportError')}</Text>
                     <Text style={[styles.errorSub, { color: mutedForeground }]}>{t(error)}</Text>
                     <Button
@@ -598,8 +601,8 @@ export default function SwipeScreen() {
             <View style={[styles.container, { backgroundColor, paddingBottom: insets.bottom }]}>
                 <Stack.Screen options={{ title: name || t('swipeFlashcards') }} />
                 <View style={styles.resultsContent}>
-                    <View style={[styles.trophyContainer, { backgroundColor: '#facc1520', padding: 24, borderRadius: 100 }]}>
-                        <Trophy size={64} color="#eab308" strokeWidth={1.5} />
+                    <View style={[styles.trophyContainer, { backgroundColor: warningColor + '1F', padding: 24, borderRadius: 100 }]}>
+                        <Trophy size={64} color={warningColor} strokeWidth={1.5} />
                     </View>
                     <Text style={[styles.resultTitle, { color: textColor }]}>{t('swipeSessionComplete')}</Text>
                     <View style={[styles.scoreSummary, { backgroundColor: secondaryBg }]}>
@@ -622,9 +625,9 @@ export default function SwipeScreen() {
                                 </View>
                             )}
                             {sessionBoosted && (
-                                <View style={[styles.xpBadge, { backgroundColor: '#eab30820' }]}>
-                                    <Sun size={18} color="#eab308" strokeWidth={2.5} />
-                                    <Text style={[styles.xpBadgeText, { color: '#eab308' }]}>{t('swipeSunshineBadge')}</Text>
+                                <View style={[styles.xpBadge, { backgroundColor: warningColor + '1F' }]}>
+                                    <Sun size={18} color={warningColor} strokeWidth={2.5} />
+                                    <Text style={[styles.xpBadgeText, { color: warningColor }]}>{t('swipeSunshineBadge')}</Text>
                                 </View>
                             )}
                         </View>
@@ -649,17 +652,17 @@ export default function SwipeScreen() {
                     )}
                     <View style={styles.resultBreakdown}>
                         <View style={styles.breakdownItem}>
-                            <CheckCircle2 size={20} color="#22c55e" strokeWidth={2.5} />
+                            <CheckCircle2 size={20} color={successColor} strokeWidth={2.5} />
                             <Text style={[styles.breakdownValue, { color: textColor }]}>{sessionCorrect}</Text>
                             <Text style={[styles.breakdownLabel, { color: mutedForeground }]}>{t('swipeGood')}</Text>
                         </View>
                         <View style={styles.breakdownItem}>
-                            <HelpCircle size={20} color="#eab308" strokeWidth={2.5} />
+                            <HelpCircle size={20} color={warningColor} strokeWidth={2.5} />
                             <Text style={[styles.breakdownValue, { color: textColor }]}>{sessionHard}</Text>
                             <Text style={[styles.breakdownLabel, { color: mutedForeground }]}>{t('swipeHard')}</Text>
                         </View>
                         <View style={styles.breakdownItem}>
-                            <XCircle size={20} color="#ef4444" strokeWidth={2.5} />
+                            <XCircle size={20} color={dangerColor} strokeWidth={2.5} />
                             <Text style={[styles.breakdownValue, { color: textColor }]}>{sessionAgain}</Text>
                             <Text style={[styles.breakdownLabel, { color: mutedForeground }]}>{t('swipeAgain')}</Text>
                         </View>
@@ -769,7 +772,7 @@ export default function SwipeScreen() {
             <View style={styles.swipeContainer}>
                 {filteredCards.length === 0 ? (
                     <View style={styles.emptySession}>
-                        <CheckCircle2 size={64} color="#22c55e" strokeWidth={1.5} />
+                        <CheckCircle2 size={64} color={successColor} strokeWidth={1.5} />
                         <Text style={[styles.emptyTitle, { color: textColor }]}>{t('swipeAllCaughtUp')}</Text>
                         <Text style={[styles.emptySub, { color: mutedForeground }]}>{t('swipeNoCardsDue')}</Text>
                         <Button title={t('swipeStudyAllCards')} onPress={() => setStudyMode('all')} style={{ marginTop: 20 }} />
@@ -796,22 +799,22 @@ export default function SwipeScreen() {
             <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24) }]}>
                 <View style={styles.hintContainer}>
                     <View style={styles.hintItem}>
-                        <View style={[styles.hintIcon, { borderColor: '#ef4444' }]}>
-                            <XCircle size={22} color="#ef4444" strokeWidth={2.5} />
+                        <View style={styles.hintIcon}>
+                            <XCircle size={22} color={dangerColor} strokeWidth={2.5} />
                         </View>
                         <Text style={[styles.footerText, { color: mutedForeground }]}>{t('swipeAgain')}</Text>
                         <Text style={[styles.intervalHint, { color: mutedForeground }]}>{intervalHint(0)}</Text>
                     </View>
                     <View style={styles.hintItem}>
-                        <View style={[styles.hintIcon, { borderColor: '#eab308' }]}>
-                            <HelpCircle size={22} color="#eab308" strokeWidth={2.5} />
+                        <View style={styles.hintIcon}>
+                            <HelpCircle size={22} color={warningColor} strokeWidth={2.5} />
                         </View>
                         <Text style={[styles.footerText, { color: mutedForeground }]}>{t('swipeHard')}</Text>
                         <Text style={[styles.intervalHint, { color: mutedForeground }]}>{intervalHint(3)}</Text>
                     </View>
                     <View style={styles.hintItem}>
-                        <View style={[styles.hintIcon, { borderColor: '#22c55e' }]}>
-                            <CheckCircle2 size={22} color="#22c55e" strokeWidth={2.5} />
+                        <View style={styles.hintIcon}>
+                            <CheckCircle2 size={22} color={successColor} strokeWidth={2.5} />
                         </View>
                         <Text style={[styles.footerText, { color: mutedForeground }]}>{t('swipeGood')}</Text>
                         <Text style={[styles.intervalHint, { color: mutedForeground }]}>{intervalHint(5)}</Text>
@@ -820,9 +823,9 @@ export default function SwipeScreen() {
 
                 {/* Progress Bar */}
                 <View style={[styles.progressBarContainer, { backgroundColor: secondaryBg }]}>
-                    <View style={[styles.progressSegment, { flex: Math.max(cards.length - learnedIndices.length - unsureIndices.length, 0.1), backgroundColor: '#ef4444' }]} />
-                    <View style={[styles.progressSegment, { flex: unsureIndices.length || 0, backgroundColor: '#eab308' }]} />
-                    <View style={[styles.progressSegment, { flex: learnedIndices.length || 0, backgroundColor: '#22c55e' }]} />
+                    <View style={[styles.progressSegment, { flex: Math.max(cards.length - learnedIndices.length - unsureIndices.length, 0.1), backgroundColor: dangerColor }]} />
+                    <View style={[styles.progressSegment, { flex: unsureIndices.length || 0, backgroundColor: warningColor }]} />
+                    <View style={[styles.progressSegment, { flex: learnedIndices.length || 0, backgroundColor: successColor }]} />
                 </View>
             </View>
         </View >
@@ -884,17 +887,6 @@ const styles = StyleSheet.create({
         fontSize: 9,
         fontWeight: '700',
         textTransform: 'uppercase',
-    },
-    dueBadge: {
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 8,
-        marginLeft: 8,
-    },
-    dueText: {
-        color: '#fff',
-        fontSize: 9,
-        fontWeight: '900',
     },
     footerText: {
         fontSize: 12,
@@ -1080,7 +1072,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         textAlign: 'center',
         lineHeight: 22,
-        opacity: 0.6,
     },
     intervalHint: {
         fontSize: 10,

@@ -18,6 +18,9 @@ interface LevelCardProps {
 export function LevelCard({ stats, displayStreak }: LevelCardProps) {
     const { t } = useLanguage();
     const textColor = useThemeColor({}, 'text');
+    const successColor = useThemeColor({}, 'success');
+    const streakColor = useThemeColor({}, 'streak');
+    const infoColor = useThemeColor({}, 'info');
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
     const cardColor = useThemeColor({}, 'card');
@@ -62,17 +65,17 @@ export function LevelCard({ stats, displayStreak }: LevelCardProps) {
 
             <View style={styles.statsRow}>
                 <View style={styles.statItem}>
-                    <View style={[styles.statIcon, { backgroundColor: '#f9731618' }]}>
-                        <Flame size={18} color="#f97316" strokeWidth={2.5} fill={displayStreak > 0 ? '#f97316' : 'none'} />
+                    <View style={[styles.statIcon, { backgroundColor: streakColor + '1F' }]}>
+                        <Flame size={18} color={streakColor} strokeWidth={2.5} fill={displayStreak > 0 ? streakColor : 'none'} />
                     </View>
                     <View>
                         <Text style={[styles.statValue, { color: textColor }]}>{displayStreak}</Text>
                         <View style={styles.streakLabelRow}>
                             <Text style={[styles.statLabel, { color: mutedForeground }]}>{t('levelCardDayStreak')}</Text>
                             {(stats.streakFreezes ?? 0) > 0 && (
-                                <View style={styles.freezeBadge}>
-                                    <Snowflake size={10} color="#38bdf8" strokeWidth={2.5} />
-                                    <Text style={styles.freezeCount}>{stats.streakFreezes}</Text>
+                                <View style={[styles.freezeBadge, { backgroundColor: infoColor + '1F' }]}>
+                                    <Snowflake size={10} color={infoColor} strokeWidth={2.5} />
+                                    <Text style={[styles.freezeCount, { color: infoColor }]}>{stats.streakFreezes}</Text>
                                 </View>
                             )}
                         </View>
@@ -82,8 +85,8 @@ export function LevelCard({ stats, displayStreak }: LevelCardProps) {
                 <View style={[styles.statDivider, { backgroundColor: mutedForeground + '18' }]} />
 
                 <View style={styles.statItem}>
-                    <View style={[styles.statIcon, { backgroundColor: goalMet ? '#22c55e18' : primaryColor + '18' }]}>
-                        <Target size={18} color={goalMet ? '#22c55e' : primaryColor} strokeWidth={2.5} />
+                    <View style={[styles.statIcon, { backgroundColor: goalMet ? successColor + '1F' : primaryColor + '18' }]}>
+                        <Target size={18} color={goalMet ? successColor : primaryColor} strokeWidth={2.5} />
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={[styles.statValue, { color: textColor }]}>
@@ -93,7 +96,7 @@ export function LevelCard({ stats, displayStreak }: LevelCardProps) {
                             {goalMet ? t('levelCardGoalReached') : t('levelCardDailyGoal')}
                         </Text>
                         <View style={[styles.goalTrack, { backgroundColor: secondaryBg }]}>
-                            <View style={[styles.goalFill, { width: `${Math.round(goalProgress * 100)}%`, backgroundColor: goalMet ? '#22c55e' : primaryColor }]} />
+                            <View style={[styles.goalFill, { width: `${Math.round(goalProgress * 100)}%`, backgroundColor: goalMet ? successColor : primaryColor }]} />
                         </View>
                     </View>
                 </View>
@@ -186,7 +189,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 2,
-        backgroundColor: '#38bdf822',
         paddingHorizontal: 5,
         paddingVertical: 1,
         borderRadius: 6,
@@ -194,7 +196,6 @@ const styles = StyleSheet.create({
     freezeCount: {
         fontSize: 10,
         fontWeight: '900',
-        color: '#38bdf8',
     },
     goalTrack: {
         height: 5,

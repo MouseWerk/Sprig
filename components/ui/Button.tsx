@@ -55,6 +55,8 @@ export const Button: React.FC<ButtonProps> = ({
 
     return (
         <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !!disabled }}
             onPress={onPress}
             disabled={disabled}
             activeOpacity={0.7}

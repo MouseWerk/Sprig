@@ -80,6 +80,9 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
     const mutedFg = useThemeColor({}, 'mutedForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
     const textColor = useThemeColor({}, 'text');
+    const successColor = useThemeColor({}, 'success');
+    const warningColor = useThemeColor({}, 'warning');
+    const dangerColor = useThemeColor({}, 'danger');
 
     const toggleFlip = () => {
         const nextState = !isFlipped;
@@ -182,14 +185,21 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
 
     const cardInner = (
         <Animated.View style={[{ flex: 1 }, animatedCardStyle]}>
-            <Animated.View style={[styles.overlay, styles.overlayRight, overlayRightStyle]} pointerEvents="none">
-                <Check size={48} color="#22c55e" strokeWidth={3} />
+            {/* Grade previews: a tinted disc with the status icon, no colored ring */}
+            <Animated.View style={[styles.overlay, styles.overlayRight, { backgroundColor: cardBg }, overlayRightStyle]} pointerEvents="none">
+                <View style={[styles.overlayTint, { backgroundColor: successColor + '1F' }]}>
+                    <Check size={48} color={successColor} strokeWidth={3} />
+                </View>
             </Animated.View>
-            <Animated.View style={[styles.overlay, styles.overlayLeft, overlayLeftStyle]} pointerEvents="none">
-                <X size={48} color="#ef4444" strokeWidth={3} />
+            <Animated.View style={[styles.overlay, styles.overlayLeft, { backgroundColor: cardBg }, overlayLeftStyle]} pointerEvents="none">
+                <View style={[styles.overlayTint, { backgroundColor: dangerColor + '1F' }]}>
+                    <X size={48} color={dangerColor} strokeWidth={3} />
+                </View>
             </Animated.View>
-            <Animated.View style={[styles.overlay, styles.overlayTop, overlayTopStyle]} pointerEvents="none">
-                <HelpCircle size={48} color="#eab308" strokeWidth={3} />
+            <Animated.View style={[styles.overlay, styles.overlayTop, { backgroundColor: cardBg }, overlayTopStyle]} pointerEvents="none">
+                <View style={[styles.overlayTint, { backgroundColor: warningColor + '1F' }]}>
+                    <HelpCircle size={48} color={warningColor} strokeWidth={3} />
+                </View>
             </Animated.View>
 
             {/* Front Side */}
@@ -214,6 +224,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
                         </View>
                         {highlightMode && (
                             <TouchableOpacity
+                                accessibilityRole="button"
                                 style={[styles.flipBtn, { backgroundColor: secondaryBg }]}
                                 onPress={toggleFlip}
                             >
@@ -247,6 +258,7 @@ export const FlashcardSwipe: React.FC<FlashcardSwipeProps> = ({
                         </View>
                         {highlightMode && (
                             <TouchableOpacity
+                                accessibilityRole="button"
                                 style={[styles.flipBtn, { backgroundColor: cardBg }]}
                                 onPress={toggleFlip}
                             >
@@ -345,7 +357,6 @@ const styles = StyleSheet.create({
     hint: {
         fontSize: 13,
         fontWeight: '500',
-        opacity: 0.7,
     },
     overlay: {
         position: 'absolute',
@@ -357,13 +368,18 @@ const styles = StyleSheet.create({
         borderRadius: 40,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(255,255,255,0.95)',
         shadowColor: '#000',
         elevation: 8,
+        overflow: 'hidden',
     },
-    overlayRight: { right: 32, borderColor: '#22c55e', borderWidth: 3 },
-    overlayLeft: { left: 32, borderColor: '#ef4444', borderWidth: 3 },
-    overlayTop: { top: 32, alignSelf: 'center', marginTop: 0, borderColor: '#eab308', borderWidth: 3 },
+    overlayTint: {
+        ...StyleSheet.absoluteFillObject,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    overlayRight: { right: 32 },
+    overlayLeft: { left: 32 },
+    overlayTop: { top: 32, alignSelf: 'center', marginTop: 0 },
     flipBtn: {
         position: 'absolute',
         top: 20,

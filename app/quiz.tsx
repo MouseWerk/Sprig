@@ -97,6 +97,9 @@ export default function QuizScreen() {
     const secondaryBg = useThemeColor({}, 'secondary');
     const primaryColor = useThemeColor({}, 'primary');
     const cardColor = useThemeColor({}, 'card');
+    const successColor = useThemeColor({}, 'success');
+    const warningColor = useThemeColor({}, 'warning');
+    const dangerColor = useThemeColor({}, 'danger');
 
     useEffect(() => {
         (async () => {
@@ -192,7 +195,7 @@ export default function QuizScreen() {
         return (
             <View style={[styles.container, styles.center, { backgroundColor, paddingHorizontal: 32 }]}>
                 <Stack.Screen options={{ title: t('quizTitle'), headerStyle: { backgroundColor }, headerTintColor: textColor, headerShadowVisible: false }} />
-                <FileWarning size={48} color="#ef4444" strokeWidth={2} />
+                <FileWarning size={48} color={dangerColor} strokeWidth={2} />
                 <Text style={[styles.emptyTitle, { color: textColor }]}>{t('quizNotEnoughCards')}</Text>
                 <Text style={[styles.emptyText, { color: mutedForeground }]}>
                     {t('quizNotEnoughCardsText')}
@@ -207,8 +210,8 @@ export default function QuizScreen() {
         return (
             <View style={[styles.container, styles.center, { backgroundColor, paddingBottom: insets.bottom }]}>
                 <Stack.Screen options={{ title: name || t('quizTitle'), headerStyle: { backgroundColor }, headerTintColor: textColor, headerShadowVisible: false }} />
-                <View style={[styles.trophyWrap, { backgroundColor: '#facc1520' }]}>
-                    <Trophy size={56} color="#eab308" strokeWidth={1.5} />
+                <View style={[styles.trophyWrap, { backgroundColor: warningColor + '1F' }]}>
+                    <Trophy size={56} color={warningColor} strokeWidth={1.5} />
                 </View>
                 <Text style={[styles.resultScore, { color: textColor }]}>{score} / {questions.length}</Text>
                 <Text style={[styles.resultPct, { color: primaryColor }]}>{t('quizPctCorrect').replace('{n}', String(pct))}</Text>
@@ -248,20 +251,25 @@ export default function QuizScreen() {
                     {current.options.map((option, i) => {
                         const isCorrect = option.text === current.correct;
                         const isChosen = option.text === selected;
+                        // The result shows as a tinted background plus a check or
+                        // cross; the frame stays neutral (no status-colored border)
                         let bg = cardColor;
-                        let border = secondaryBg;
                         let icon = null;
                         if (answered) {
-                            if (isCorrect) { bg = '#22c55e18'; border = '#22c55e'; icon = <Check size={18} color="#22c55e" strokeWidth={3} />; }
-                            else if (isChosen) { bg = '#ef444418'; border = '#ef4444'; icon = <X size={18} color="#ef4444" strokeWidth={3} />; }
+                            if (isCorrect) { bg = successColor + '1F'; icon = <Check size={18} color={successColor} strokeWidth={3} />; }
+                            else if (isChosen) { bg = dangerColor + '1F'; icon = <X size={18} color={dangerColor} strokeWidth={3} />; }
                         }
+                        const resultLabel = answered && isCorrect ? t('typeCorrect') : answered && isChosen ? t('typeNotQuite') : null;
                         return (
                             <TouchableOpacity
                                 key={i}
-                                style={[styles.option, { backgroundColor: bg, borderColor: border }]}
+                                style={[styles.option, { backgroundColor: bg, borderColor: secondaryBg }]}
                                 onPress={() => handleSelect(option)}
                                 activeOpacity={answered ? 1 : 0.7}
                                 disabled={answered}
+                                accessibilityRole="button"
+                                accessibilityLabel={[toDisplayText(option.text), resultLabel].filter(Boolean).join(', ')}
+                                accessibilityState={{ disabled: answered, selected: isChosen }}
                             >
                                 <View style={{ flex: 1 }}>
                                     <MarkdownRenderer content={option.text} fontSize={15 * cardTextScale} />

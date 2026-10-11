@@ -26,6 +26,8 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const secondaryBg = useThemeColor({}, 'secondary');
     const accentColor = useThemeColor({}, 'primary');
     const primaryForeground = useThemeColor({}, 'primaryForeground');
+    const destructiveColor = useThemeColor({}, 'destructive');
+    const destructiveForeground = useThemeColor({}, 'destructiveForeground');
 
     const confirm = useCallback<ConfirmFn>((opts) => {
         return new Promise<boolean>((resolve) => {
@@ -53,9 +55,9 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 statusBarTranslucent
             >
                 <View style={styles.overlay}>
-                    <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => close(false)} />
-                    <View style={[styles.dialog, { backgroundColor: cardColor }]}>
-                        <Text style={[styles.title, { color: textColor }]}>{options?.title}</Text>
+                    <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => close(false)} accessible={false} />
+                    <View style={[styles.dialog, { backgroundColor: cardColor }]} accessibilityViewIsModal>
+                        <Text style={[styles.title, { color: textColor }]} accessibilityRole="header">{options?.title}</Text>
                         {!!options?.message && (
                             <Text style={[styles.message, { color: mutedForeground }]}>{options.message}</Text>
                         )}
@@ -64,17 +66,19 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
                                 style={[styles.button, { backgroundColor: secondaryBg }]}
                                 onPress={() => close(false)}
                                 activeOpacity={0.7}
+                                accessibilityRole="button"
                             >
                                 <Text style={[styles.buttonText, { color: textColor }]}>
                                     {options?.cancelText ?? t('cancel')}
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.button, { backgroundColor: options?.destructive ? '#ef4444' : accentColor }]}
+                                style={[styles.button, { backgroundColor: options?.destructive ? destructiveColor : accentColor }]}
                                 onPress={() => close(true)}
                                 activeOpacity={0.7}
+                                accessibilityRole="button"
                             >
-                                <Text style={[styles.buttonText, { color: options?.destructive ? '#ffffff' : primaryForeground }]}>
+                                <Text style={[styles.buttonText, { color: options?.destructive ? destructiveForeground : primaryForeground }]}>
                                     {options?.confirmText ?? t('confirm')}
                                 </Text>
                             </TouchableOpacity>

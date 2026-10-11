@@ -60,6 +60,11 @@ export default function DeckDetailsScreen() {
     const accentColor = useThemeColor({}, 'primary');
     const primaryForeground = useThemeColor({}, 'primaryForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
+    const borderColor = useThemeColor({}, 'border');
+    const successColor = useThemeColor({}, 'success');
+    const warningColor = useThemeColor({}, 'warning');
+    const dangerColor = useThemeColor({}, 'danger');
+    const highlightColor = useThemeColor({}, 'highlight');
 
     useFocusEffect(
         useCallback(() => {
@@ -344,12 +349,13 @@ export default function DeckDetailsScreen() {
                     const isHighlighted = w.startsWith('==') && w.endsWith('==');
                     return (
                         <TouchableOpacity
+                            accessibilityRole="button"
                             key={i}
                             activeOpacity={0.7}
                             onPress={() => toggleWordHighlight(text, w, currentId, isFront)}
                             style={[
                                 styles.wordChip,
-                                isHighlighted && styles.wordChipHighlighted
+                                isHighlighted && { backgroundColor: highlightColor }
                             ]}
                         >
                             <Text style={[
@@ -403,7 +409,7 @@ export default function DeckDetailsScreen() {
     if (error || !deck) {
         return (
             <View style={[styles.container, { backgroundColor, padding: 24 }]}>
-                <FileWarning size={48} color="#ef4444" />
+                <FileWarning size={48} color={dangerColor} />
                 <Text style={[styles.errorText, { color: textColor }]}>{t(error ?? 'deckDetailsSomethingWrong')}</Text>
                 <Button title={t('swipeGoBack')} onPress={() => router.back()} />
             </View>
@@ -413,11 +419,9 @@ export default function DeckDetailsScreen() {
     const learnedCount = deck.learnedIndices?.length || 0;
     const progress = (cards?.length || 0) > 0 ? (learnedCount / cards.length) * 100 : 0;
     
-    const progressColor = progress === 0 ? '#ef4444' : 
-                         progress < 30 ? '#f97316' : 
-                         progress < 60 ? '#eab308' : 
-                         progress < 100 ? accentColor : 
-                         '#22c55e';
+    // Neutral ink until the deck is fully learned (a traffic-light scale put
+    // a fresh deck's "0%" in alarm red, and its yellow failed contrast)
+    const progressColor = progress >= 100 ? successColor : textColor;
 
     const filterOptions: { key: typeof filterMode; label: string }[] = [
         { key: 'all', label: t('deckDetailsFilterAll') },
@@ -449,16 +453,9 @@ export default function DeckDetailsScreen() {
                     const isLearned = deck?.learnedIndices?.includes(originalIndex);
                     const isUnsure = deck?.unsureIndices?.includes(originalIndex);
 
-                    let statusColor = '#ef4444';
-                    let statusBorder = 'rgba(239, 68, 68, 0.2)';
-
-                    if (isLearned) {
-                        statusColor = '#22c55e';
-                        statusBorder = 'rgba(34, 197, 94, 0.2)';
-                    } else if (isUnsure) {
-                        statusColor = '#eab308';
-                        statusBorder = 'rgba(234, 179, 8, 0.3)';
-                    }
+                    // Status is carried by the icon (and the screen reader label);
+                    // the card frame stays neutral — no colored strip or border.
+                    const statusLabel = t(isLearned ? 'deckDetailsFilterLearned' : isUnsure ? 'deckDetailsFilterUnsure' : 'deckDetailsFilterNew');
 
                     return (
                         <TouchableOpacity
@@ -467,19 +464,25 @@ export default function DeckDetailsScreen() {
                             onLongPress={() => openEditMenu(originalIndex, card)}
                             style={[
                                 styles.cardItem,
-                                { backgroundColor: cardColor, borderColor: statusBorder }
+                                { backgroundColor: cardColor, borderColor }
                             ]}
+                            accessibilityRole="button"
+                            accessibilityLabel={[t('deckDetailsCardHash').replace('{n}', String(originalIndex + 1)), statusLabel, toDisplayText(card.question)].join(', ')}
+                            accessibilityHint={t('a11yCardItemHint')}
+                            accessibilityActions={[{ name: 'longpress', label: t('a11yEditCard') }]}
+                            onAccessibilityAction={(e) => {
+                                if (e.nativeEvent.actionName === 'longpress') openEditMenu(originalIndex, card);
+                            }}
                         >
-                            <View style={[styles.statusStrip, { backgroundColor: statusColor }]} />
                             <View style={styles.cardMainContent}>
                                 <View style={styles.cardHeaderSmall}>
                                     <Text style={[styles.cardIndex, { color: mutedForeground }]}>{t('deckDetailsCardHash').replace('{n}', String(originalIndex + 1))}</Text>
                                     {isLearned ? (
-                                        <CheckCircle2 size={18} color="#22c55e" strokeWidth={3} />
+                                        <CheckCircle2 size={18} color={successColor} strokeWidth={3} />
                                     ) : isUnsure ? (
-                                        <HelpCircle size={18} color="#eab308" strokeWidth={3} />
+                                        <HelpCircle size={18} color={warningColor} strokeWidth={3} />
                                     ) : (
-                                        <Circle size={18} color="#ef4444" strokeWidth={3} />
+                                        <Circle size={18} color={mutedForeground} strokeWidth={3} />
                                     )}
                                 </View>
                                 <View style={styles.contentPreview}>
@@ -498,9 +501,9 @@ export default function DeckDetailsScreen() {
                 ListHeaderComponent={
                     <View style={styles.headerDashboard}>
                         <View style={[styles.mainProgressCard, { backgroundColor: cardColor }]}>
-                            <View style={[styles.progressCircleContainer, { backgroundColor: progressColor + '15', borderColor: progressColor + '30' }]}>
+                            <View style={[styles.progressCircleContainer, { backgroundColor: secondaryBg }]}>
                                 <Text style={[styles.progressPercentage, { color: progressColor }]}>{Math.round(progress)}%</Text>
-                                <Text style={[styles.progressLabel, { color: progressColor, opacity: 0.8 }]}>{t('mastery')}</Text>
+                                <Text style={[styles.progressLabel, { color: mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit>{t('mastery')}</Text>
                             </View>
                             <View style={styles.progressStatsRight}>
                                 {/* Title gets the full column width. Sharing a row
@@ -516,12 +519,12 @@ export default function DeckDetailsScreen() {
                                         <Text style={[styles.deckSubtitleSmall, { color: mutedForeground }]}>
                                             {plural(t, cards.length, 'cardsCountOne', 'deckDetailsCardsCount')}
                                             {'  ·  '}
-                                            <Text style={{ color: cards.length > 0 && learned === cards.length ? '#22c55e' : mutedForeground }}>{t('deckDetailsLearnedCount').replace('{n}', String(learned))}</Text>
+                                            <Text style={{ color: cards.length > 0 && learned === cards.length ? successColor : mutedForeground }}>{t('deckDetailsLearnedCount').replace('{n}', String(learned))}</Text>
                                             {'  ·  '}
                                             {dueCount > 0 ? (
-                                                <Text style={{ color: '#ef4444', fontWeight: '700' }}>{t('homeDueCount').replace('{n}', String(dueCount))}</Text>
+                                                <Text style={{ color: dangerColor, fontWeight: '700' }}>{t('homeDueCount').replace('{n}', String(dueCount))}</Text>
                                             ) : (
-                                                <Text style={{ color: '#22c55e', fontWeight: '700' }}>{t('deckDetailsAllClear')}</Text>
+                                                <Text style={{ color: successColor, fontWeight: '700' }}>{t('deckDetailsAllClear')}</Text>
                                             )}
                                         </Text>
                                     );
@@ -529,6 +532,7 @@ export default function DeckDetailsScreen() {
                                 <View style={styles.deckActions}>
                                     <TouchableOpacity
                                         style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
+                                        hitSlop={6}
                                         onPress={openNotebook}
                                         accessibilityLabel={t('deckDetailsNotebook')}
                                         accessibilityRole="button"
@@ -537,6 +541,7 @@ export default function DeckDetailsScreen() {
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
+                                        hitSlop={6}
                                         onPress={handleExportDeck}
                                         accessibilityLabel={t('a11yExportDeck')}
                                         accessibilityRole="button"
@@ -545,6 +550,7 @@ export default function DeckDetailsScreen() {
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
+                                        hitSlop={6}
                                         onPress={handleImportCsv}
                                         accessibilityLabel={t('a11yImportCardsCsv')}
                                         accessibilityRole="button"
@@ -553,6 +559,7 @@ export default function DeckDetailsScreen() {
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         style={[styles.miniAddBtn, { backgroundColor: secondaryBg }]}
+                                        hitSlop={6}
                                         onPress={() => setAddCardModalVisible(true)}
                                         accessibilityLabel={t('a11yAddFlashcard')}
                                         accessibilityRole="button"
@@ -674,6 +681,9 @@ export default function DeckDetailsScreen() {
                                                                 { backgroundColor: active ? accentColor : secondaryBg }
                                                             ]}
                                                             onPress={() => handleSetDirection(opt.key)}
+                                                            hitSlop={{ top: 6, bottom: 6 }}
+                                                            accessibilityRole="button"
+                                                            accessibilityState={{ selected: active }}
                                                         >
                                                             <Text style={[
                                                                 styles.filterChipText,
@@ -693,6 +703,9 @@ export default function DeckDetailsScreen() {
                                                 <TouchableOpacity
                                                     style={[styles.filterChip, { backgroundColor: examSet ? secondaryBg : accentColor }]}
                                                     onPress={clearExamDate}
+                                                    hitSlop={{ top: 6, bottom: 6 }}
+                                                    accessibilityRole="button"
+                                                    accessibilityState={{ selected: !examSet }}
                                                 >
                                                     <Text style={[styles.filterChipText, { color: examSet ? mutedForeground : primaryForeground }]}>{t('deckDetailsOff')}</Text>
                                                 </TouchableOpacity>
@@ -728,11 +741,11 @@ export default function DeckDetailsScreen() {
                         {confusions.length > 0 && (
                             <View style={styles.confusionSection}>
                                 <View style={styles.confusionHeader}>
-                                    <ArrowLeftRight size={16} color="#f59e0b" strokeWidth={2.5} />
+                                    <ArrowLeftRight size={16} color={warningColor} strokeWidth={2.5} />
                                     <Text style={[styles.confusionTitle, { color: textColor }]}>{t('deckDetailsOftenConfused')}</Text>
                                     <View style={{ flex: 1 }} />
                                     <TouchableOpacity
-                                        style={[styles.drillBtn, { backgroundColor: '#f59e0b' }]}
+                                        style={[styles.drillBtn, { backgroundColor: secondaryBg }]}
                                         onPress={() => {
                                             if (!deck?.uri) return;
                                             // Union of every card involved in a confusion pair
@@ -748,8 +761,8 @@ export default function DeckDetailsScreen() {
                                         accessibilityLabel={t('a11yDrillConfused')}
                                         accessibilityRole="button"
                                     >
-                                        <Zap size={13} color="#fff" strokeWidth={2.5} fill="#fff" />
-                                        <Text style={styles.drillBtnText}>{t('deckDetailsDrillThese')}</Text>
+                                        <Zap size={13} color={warningColor} strokeWidth={2.5} fill={warningColor} />
+                                        <Text style={[styles.drillBtnText, { color: textColor }]}>{t('deckDetailsDrillThese')}</Text>
                                     </TouchableOpacity>
                                 </View>
                                 {confusions.map(pair => {
@@ -757,7 +770,7 @@ export default function DeckDetailsScreen() {
                                     const b = cards[pair.cardB];
                                     if (!a || !b) return null;
                                     return (
-                                        <View key={`${pair.cardA}-${pair.cardB}`} style={[styles.confusionCard, { backgroundColor: cardColor }]}>
+                                        <View key={`${pair.cardA}-${pair.cardB}`} style={[styles.confusionCard, { backgroundColor: secondaryBg }]}>
                                             <View style={{ flex: 1, gap: 8 }}>
                                                 <View>
                                                     <Text style={[styles.confusionQ, { color: textColor }]} numberOfLines={2}>{toDisplayText(a.question)}</Text>
@@ -768,8 +781,8 @@ export default function DeckDetailsScreen() {
                                                     <Text style={[styles.confusionA, { color: mutedForeground }]} numberOfLines={1}>→ {toDisplayText(b.answer)}</Text>
                                                 </View>
                                             </View>
-                                            <View style={[styles.confusionBadge, { backgroundColor: '#f59e0b20' }]}>
-                                                <Text style={styles.confusionBadgeText}>{pair.count}×</Text>
+                                            <View style={[styles.confusionBadge, { backgroundColor: warningColor + '1F' }]}>
+                                                <Text style={[styles.confusionBadgeText, { color: warningColor }]}>{pair.count}×</Text>
                                             </View>
                                         </View>
                                     );
@@ -804,6 +817,9 @@ export default function DeckDetailsScreen() {
                                         { backgroundColor: filterMode === opt.key ? accentColor : cardColor }
                                     ]}
                                     onPress={() => setFilterMode(opt.key)}
+                                    hitSlop={{ top: 6, bottom: 6 }}
+                                    accessibilityRole="button"
+                                    accessibilityState={{ selected: filterMode === opt.key }}
                                 >
                                     <Text style={[
                                         styles.filterChipText,
@@ -814,7 +830,7 @@ export default function DeckDetailsScreen() {
                                 </TouchableOpacity>
                             ))}
                             <View style={{ flex: 1 }} />
-                            <TouchableOpacity onPress={handleResetProgress} hitSlop={8}>
+                            <TouchableOpacity onPress={handleResetProgress} hitSlop={12} accessibilityRole="button">
                                 <Text style={[styles.resetLink, { color: mutedForeground }]}>{t('deckDetailsReset')}</Text>
                             </TouchableOpacity>
                         </View>
@@ -897,6 +913,7 @@ export default function DeckDetailsScreen() {
 
                         <View style={styles.editControls}>
                             <TouchableOpacity
+                                accessibilityRole="button"
                                 style={[styles.toggleBtn, !isEditHighlightMode && { backgroundColor: accentColor }]}
                                 onPress={() => setIsEditHighlightMode(false)}
                             >
@@ -904,6 +921,7 @@ export default function DeckDetailsScreen() {
                                 <Text style={[styles.toggleBtnText, { color: !isEditHighlightMode ? primaryForeground : textColor }]}>{t('deckDetailsText')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
+                                accessibilityRole="button"
                                 style={[styles.toggleBtn, isEditHighlightMode && { backgroundColor: accentColor }]}
                                 onPress={() => setIsEditHighlightMode(true)}
                             >
@@ -912,12 +930,12 @@ export default function DeckDetailsScreen() {
                             </TouchableOpacity>
                             <View style={{ flex: 1 }} />
                             <TouchableOpacity
-                                style={[styles.deleteBtn, { backgroundColor: '#ef444420' }]}
+                                style={[styles.deleteBtn, { backgroundColor: dangerColor + '1F' }]}
                                 onPress={() => editingIndex !== null && handleDeleteCard(editingIndex)}
                                 accessibilityLabel={t('a11yDeleteFlashcard')}
                                 accessibilityRole="button"
                             >
-                                <Trash2 size={18} color="#ef4444" />
+                                <Trash2 size={18} color={dangerColor} />
                             </TouchableOpacity>
                         </View>
 
@@ -932,6 +950,7 @@ export default function DeckDetailsScreen() {
                                             fontSize={20}
                                         />
                                         <TouchableOpacity
+                                            accessibilityRole="button"
                                             style={[styles.miniFlipBtn, { backgroundColor: backgroundColor }]}
                                             onPress={() => setEditFlipped(!editFlipped)}
                                         >
@@ -1001,7 +1020,7 @@ const styles = StyleSheet.create({
         borderRadius: 34,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 4,
+        paddingHorizontal: 6,
     },
     progressPercentage: {
         fontSize: 22,
@@ -1138,7 +1157,6 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '700',
         textTransform: 'uppercase',
-        opacity: 0.7,
         marginTop: 2,
     },
     gridDivider: {
@@ -1160,10 +1178,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 4,
         elevation: 2,
-    },
-    statusStrip: {
-        width: 6,
-        height: '100%',
     },
     cardMainContent: {
         flex: 1,
@@ -1402,9 +1416,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 2,
         marginVertical: 1,
     },
-    wordChipHighlighted: {
-        backgroundColor: '#facc15',
-    },
     wordText: {
         fontSize: 20,
         fontWeight: '500',
@@ -1460,7 +1471,6 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     drillBtnText: {
-        color: '#fff',
         fontSize: 12,
         fontWeight: '900',
     },
@@ -1470,8 +1480,6 @@ const styles = StyleSheet.create({
         gap: 12,
         borderRadius: 18,
         padding: 14,
-        borderLeftWidth: 3,
-        borderLeftColor: '#f59e0b',
     },
     confusionQ: {
         fontSize: 14,
@@ -1490,7 +1498,6 @@ const styles = StyleSheet.create({
     confusionBadgeText: {
         fontSize: 13,
         fontWeight: '900',
-        color: '#f59e0b',
     },
     mainActionBtn: {
         height: 56,

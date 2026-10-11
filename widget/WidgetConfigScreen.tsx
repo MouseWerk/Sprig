@@ -17,7 +17,8 @@ import { renderPinnedDeckWidget } from './PinnedDeckWidget';
 const BG = '#ffffff';
 const CARD_BG = '#f1f5f9';
 const TEXT = '#0f172a';
-const MUTED = '#64748b';
+const MUTED = '#5b6b7f';
+const DUE = '#b91c1c';
 const ACCENT = '#0f172a';
 
 export function WidgetConfigScreen({ widgetInfo, renderWidget, setResult }: WidgetConfigurationScreenProps) {
@@ -157,14 +158,14 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     dueBadge: {
-        backgroundColor: '#ef4444',
+        backgroundColor: DUE + '1F',
         borderRadius: 999,
         paddingHorizontal: 10,
         paddingVertical: 4,
         marginLeft: 8,
     },
     dueText: {
-        color: '#ffffff',
+        color: DUE,
         fontSize: 12,
         fontWeight: '700',
     },

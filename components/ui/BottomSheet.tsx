@@ -60,7 +60,7 @@ export function BottomSheet({ visible, onClose, sheetStyle, children }: BottomSh
                 style={{ flex: 1 }}
             >
                 <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
-                    <TouchableOpacity style={styles.dismiss} activeOpacity={1} onPress={onClose} />
+                    <TouchableOpacity accessible={false} style={styles.dismiss} activeOpacity={1} onPress={onClose} />
                     <Animated.View style={[sheetStyle, { transform: [{ translateY: sheetTranslateY }] }]}>
                         {children}
                     </Animated.View>

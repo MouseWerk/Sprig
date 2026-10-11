@@ -57,6 +57,9 @@ export default function TypeScreen() {
     const primaryColor = useThemeColor({}, 'primary');
     const cardColor = useThemeColor({}, 'card');
     const borderColor = useThemeColor({}, 'border');
+    const successColor = useThemeColor({}, 'success');
+    const warningColor = useThemeColor({}, 'warning');
+    const dangerColor = useThemeColor({}, 'danger');
 
     useEffect(() => {
         (async () => {
@@ -193,7 +196,7 @@ export default function TypeScreen() {
         return (
             <View style={[styles.container, styles.center, { backgroundColor, paddingHorizontal: 32 }]}>
                 <Stack.Screen options={{ title: t('typeTitle'), ...screenOpts }} />
-                <FileWarning size={48} color="#ef4444" strokeWidth={2} />
+                <FileWarning size={48} color={dangerColor} strokeWidth={2} />
                 <Text style={[styles.emptyTitle, { color: textColor }]}>{t('typeNoCards')}</Text>
                 <Text style={[styles.emptyText, { color: mutedForeground }]}>{t('typeAddCardsFirst')}</Text>
                 <Button title={t('swipeGoBack')} onPress={() => router.back()} style={{ marginTop: 16, width: 200 }} />
@@ -206,8 +209,8 @@ export default function TypeScreen() {
         return (
             <View style={[styles.container, styles.center, { backgroundColor, paddingBottom: insets.bottom }]}>
                 <Stack.Screen options={{ title: name || t('typeTitle'), ...screenOpts }} />
-                <View style={[styles.trophyWrap, { backgroundColor: '#facc1520' }]}>
-                    <Trophy size={56} color="#eab308" strokeWidth={1.5} />
+                <View style={[styles.trophyWrap, { backgroundColor: warningColor + '1F' }]}>
+                    <Trophy size={56} color={warningColor} strokeWidth={1.5} />
                 </View>
                 <Text style={[styles.resultScore, { color: textColor }]}>{score} / {total}</Text>
                 <Text style={[styles.resultPct, { color: primaryColor }]}>{t('typePctCorrect').replace('{n}', String(pct))}</Text>
@@ -223,12 +226,13 @@ export default function TypeScreen() {
     }
 
     const banner = verdict === null ? null : verdict === 'exact'
-        ? { color: '#22c55e', label: t('typeCorrect') }
+        ? { correct: true, label: t('typeCorrect') }
         : verdict === 'close'
-            ? { color: '#22c55e', label: t('typeCloseEnough') }
+            ? { correct: true, label: t('typeCloseEnough') }
             : overridden
-                ? { color: '#22c55e', label: t('typeCountedCorrect') }
-                : { color: '#ef4444', label: t('typeNotQuite') };
+                ? { correct: true, label: t('typeCountedCorrect') }
+                : { correct: false, label: t('typeNotQuite') };
+    const bannerColor = banner?.correct ? successColor : dangerColor;
 
     return (
         <KeyboardAvoidingView
@@ -260,7 +264,7 @@ export default function TypeScreen() {
                     style={[styles.input, {
                         color: textColor,
                         backgroundColor: cardColor,
-                        borderColor: banner ? banner.color : borderColor,
+                        borderColor,
                     }]}
                     value={typed}
                     onChangeText={setTyped}
@@ -278,11 +282,11 @@ export default function TypeScreen() {
                 />
 
                 {banner && (
-                    <View style={[styles.banner, { backgroundColor: banner.color + '18' }]}>
-                        {banner.color === '#22c55e'
-                            ? <Check size={18} color={banner.color} strokeWidth={3} />
-                            : <X size={18} color={banner.color} strokeWidth={3} />}
-                        <Text style={[styles.bannerText, { color: banner.color }]}>{banner.label}</Text>
+                    <View style={[styles.banner, { backgroundColor: bannerColor + '1F' }]} accessibilityLiveRegion="polite">
+                        {banner.correct
+                            ? <Check size={18} color={bannerColor} strokeWidth={3} />
+                            : <X size={18} color={bannerColor} strokeWidth={3} />}
+                        <Text style={[styles.bannerText, { color: bannerColor }]}>{banner.label}</Text>
                     </View>
                 )}
 

@@ -74,6 +74,8 @@ export default function FocusScreen() {
     const secondaryBg = useThemeColor({}, 'secondary');
     const primaryColor = useThemeColor({}, 'primary');
     const primaryForeground = useThemeColor({}, 'primaryForeground');
+    const successColor = useThemeColor({}, 'success');
+    const dangerColor = useThemeColor({}, 'danger');
 
     // The screen dimming/locking mid-session would background the app and
     // wilt the plant — keep the display on while a session or break runs.
@@ -238,8 +240,10 @@ export default function FocusScreen() {
                     <View style={styles.durationRow}>
                         {DURATIONS.map(d => (
                             <TouchableOpacity
+                                accessibilityRole="button"
                                 key={d}
                                 style={[styles.durationChip, { backgroundColor: minutes === d ? primaryColor : secondaryBg }]}
+                                accessibilityState={{ selected: minutes === d }}
                                 onPress={() => {
                                     setMinutes(d);
                                     setSecondsLeft(d * 60);
@@ -254,12 +258,12 @@ export default function FocusScreen() {
                         ))}
                     </View>
 
-                    <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: primaryColor }]} onPress={() => startSession(minutes)} activeOpacity={0.9}>
+                    <TouchableOpacity accessibilityRole="button" style={[styles.primaryBtn, { backgroundColor: primaryColor }]} onPress={() => startSession(minutes)} activeOpacity={0.9}>
                         <Play size={20} color={primaryForeground} fill={primaryForeground} />
                         <Text style={[styles.primaryBtnText, { color: primaryForeground }]}>{t('focusStartFocusing')}</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.soundLink} onPress={() => setMixerVisible(true)}>
+                    <TouchableOpacity accessibilityRole="button" style={styles.soundLink} onPress={() => setMixerVisible(true)}>
                         <Music size={16} color={mutedForeground} />
                         <Text style={[styles.soundLinkText, { color: mutedForeground }]}>
                             {soundsOn ? t('focusAmbientSoundsOn') : t('focusAddAmbientSounds')}
@@ -272,11 +276,11 @@ export default function FocusScreen() {
                 <View style={styles.center}>
                     {phase === 'break' && <Text style={[styles.breakLabel, { color: primaryColor }]}>{t('focusBreakLabel')}</Text>}
                     <View style={styles.ringWrap}>
-                        <Ring size={280} progress={progress} color={phase === 'break' ? '#22c55e' : primaryColor} track={secondaryBg} />
+                        <Ring size={280} progress={progress} color={phase === 'break' ? successColor : primaryColor} track={secondaryBg} />
                         <View style={styles.ringInner}>
                             <View style={{ marginBottom: 2 }}>
                                 {phase === 'break'
-                                    ? <View style={{ height: 104, justifyContent: 'center' }}><Coffee size={56} color="#22c55e" strokeWidth={2} /></View>
+                                    ? <View style={{ height: 104, justifyContent: 'center' }}><Coffee size={56} color={successColor} strokeWidth={2} /></View>
                                     : <GrowingPlant progress={progress} size={104} color={primaryColor} soilColor={secondaryBg} sway={phase === 'running'} />}
                             </View>
                             <Text style={[styles.timer, { color: textColor }]}>{fmt(secondsLeft)}</Text>
@@ -328,10 +332,11 @@ export default function FocusScreen() {
                     <Text style={[styles.subtitle, { color: mutedForeground }]}>
                         {t('focusBloomedSubtitle').replace('{n}', String(minutes))}
                     </Text>
-                    <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: '#22c55e' }]} onPress={startBreak} activeOpacity={0.9}>
-                        <Text style={styles.primaryBtnText}>{t('focusTakeBreak').replace('{n}', String(BREAK_MINUTES))}</Text>
+                    <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: primaryColor }]} onPress={startBreak} activeOpacity={0.9} accessibilityRole="button">
+                        <Coffee size={18} color={primaryForeground} strokeWidth={2.5} />
+                        <Text style={[styles.primaryBtnText, { color: primaryForeground }]}>{t('focusTakeBreak').replace('{n}', String(BREAK_MINUTES))}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: secondaryBg }]} onPress={() => setPhase('setup')} activeOpacity={0.9}>
+                    <TouchableOpacity accessibilityRole="button" style={[styles.secondaryBtn, { backgroundColor: secondaryBg }]} onPress={() => setPhase('setup')} activeOpacity={0.9}>
                         <Text style={[styles.secondaryBtnText, { color: textColor }]}>{t('focusNewSession')}</Text>
                     </TouchableOpacity>
                 </View>
@@ -342,11 +347,11 @@ export default function FocusScreen() {
                     <View style={{ marginBottom: 12 }}>
                         <GrowingPlant progress={1} size={150} color="#a8a29e" soilColor={secondaryBg} wilted />
                     </View>
-                    <Text style={[styles.title, { color: '#ef4444' }]}>{t('focusWilted')}</Text>
+                    <Text style={[styles.title, { color: dangerColor }]}>{t('focusWilted')}</Text>
                     <Text style={[styles.subtitle, { color: mutedForeground }]}>
                         {t('focusWiltedSubtitle')}
                     </Text>
-                    <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: primaryColor }]} onPress={replant} activeOpacity={0.9}>
+                    <TouchableOpacity accessibilityRole="button" style={[styles.primaryBtn, { backgroundColor: primaryColor }]} onPress={replant} activeOpacity={0.9}>
                         <RotateCcw size={18} color={primaryForeground} strokeWidth={2.5} />
                         <Text style={[styles.primaryBtnText, { color: primaryForeground }]}>{t('focusTryAgain')}</Text>
                     </TouchableOpacity>
@@ -359,7 +364,7 @@ export default function FocusScreen() {
             />
 
             {soundsOn && !mixerVisible && (
-                <TouchableOpacity style={styles.stopSoundsBar} onPress={stopSounds}>
+                <TouchableOpacity accessibilityRole="button" style={styles.stopSoundsBar} onPress={stopSounds}>
                     <Text style={[styles.stopSoundsText, { color: mutedForeground }]}>{t('focusStopSounds')}</Text>
                 </TouchableOpacity>
             )}
@@ -380,7 +385,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
         height: 58, borderRadius: 20, paddingHorizontal: 32, minWidth: 240,
     },
-    primaryBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
+    primaryBtnText: { fontSize: 17, fontWeight: '800' },
     secondaryBtn: {
         height: 52, borderRadius: 18, paddingHorizontal: 32, alignItems: 'center', justifyContent: 'center',
         marginTop: 12, minWidth: 240,

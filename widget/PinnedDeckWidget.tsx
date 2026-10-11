@@ -17,16 +17,16 @@ import { getDeckIconSvg } from './deckIcons';
 const BG = '#f1f5f9';
 const ICON_BG = '#e2e8f0';
 const TEXT = '#0f172a';
-const MUTED = '#64748b';
-const DUE = '#ef4444';
+// Same values as the app's light theme tokens (constants/theme.ts), so the
+// widget's small texts reach the same contrast
+const MUTED = '#5b6b7f';
+const DUE = '#b91c1c';
+const DONE = '#15803d';
 const TRACK = '#e2e8f0';
 
+// Ink until the deck is fully learned, like the deck list in the app
 function masteryColorFor(percent: number): `#${string}` {
-    if (percent === 0) return DUE;
-    if (percent < 30) return '#f97316';
-    if (percent < 60) return '#eab308';
-    if (percent < 100) return TEXT;
-    return '#22c55e';
+    return percent >= 100 ? DONE : TEXT;
 }
 
 interface PinnedDeckWidgetProps {

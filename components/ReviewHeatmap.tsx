@@ -14,12 +14,13 @@ const GAP = 3;
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function intensityColor(count: number, emptyColor: string): string {
+// Activity levels as alpha steps of the theme's success color
+function intensityColor(count: number, emptyColor: string, fullColor: string): string {
     if (count <= 0) return emptyColor;
-    if (count < 3) return '#22c55e40';
-    if (count < 10) return '#22c55e80';
-    if (count < 25) return '#22c55eC0';
-    return '#22c55e';
+    if (count < 3) return fullColor + '40';
+    if (count < 10) return fullColor + '80';
+    if (count < 25) return fullColor + 'C0';
+    return fullColor;
 }
 
 // GitHub-style activity calendar: columns are weeks (Monday first),
@@ -28,6 +29,7 @@ export const ReviewHeatmap: React.FC<ReviewHeatmapProps> = ({ data = {}, weeks =
     const { t } = useLanguage();
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const emptyColor = useThemeColor({}, 'secondary');
+    const activityColor = useThemeColor({}, 'success');
 
     const { columns, monthLabels } = useMemo(() => {
         const today = new Date();
@@ -84,7 +86,7 @@ export const ReviewHeatmap: React.FC<ReviewHeatmapProps> = ({ data = {}, weeks =
                                     {
                                         backgroundColor: cell.count === null
                                             ? 'transparent'
-                                            : intensityColor(cell.count, emptyColor)
+                                            : intensityColor(cell.count, emptyColor, activityColor)
                                     }
                                 ]}
                             />
@@ -95,7 +97,7 @@ export const ReviewHeatmap: React.FC<ReviewHeatmapProps> = ({ data = {}, weeks =
             <View style={styles.legendRow}>
                 <Text style={[styles.legendText, { color: mutedForeground }]}>{t('heatmapLess')}</Text>
                 {[0, 1, 3, 10, 25].map(v => (
-                    <View key={v} style={[styles.cell, { backgroundColor: intensityColor(v, emptyColor) }]} />
+                    <View key={v} style={[styles.cell, { backgroundColor: intensityColor(v, emptyColor, activityColor) }]} />
                 ))}
                 <Text style={[styles.legendText, { color: mutedForeground }]}>{t('heatmapMore')}</Text>
             </View>

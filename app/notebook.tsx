@@ -30,6 +30,7 @@ export default function NotebookScreen() {
 
     const backgroundColor = useThemeColor({}, 'background');
     const textColor = useThemeColor({}, 'text');
+    const successColor = useThemeColor({}, 'success');
     const mutedForeground = useThemeColor({}, 'mutedForeground');
     const secondaryBg = useThemeColor({}, 'secondary');
     const accentColor = useThemeColor({}, 'primary');
@@ -129,8 +130,8 @@ export default function NotebookScreen() {
                     <Text style={[styles.hint, { color: mutedForeground }]}>{t('deckDetailsNotebookHint')}</Text>
                 ) : justSaved ? (
                     <>
-                        <CheckCircle2 size={14} color="#22c55e" strokeWidth={3} />
-                        <Text style={[styles.savedText, { color: '#22c55e' }]}>{t('deckDetailsNotebookSaved')}</Text>
+                        <CheckCircle2 size={14} color={successColor} strokeWidth={3} />
+                        <Text style={[styles.savedText, { color: successColor }]}>{t('deckDetailsNotebookSaved')}</Text>
                     </>
                 ) : null}
             </View>
