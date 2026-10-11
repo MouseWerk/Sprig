@@ -63,7 +63,10 @@ export default function SettingsScreen() {
   useEffect(() => {
     if (!webServerOn) return;
     getWebServerUrl().then(setWebServerUrl);
-    // Poll the request log so incoming connections are visible right here
+    // Show the code right away instead of after the first poll
+    setWebServerCode(getWebServerCode());
+    // Poll the request log (and the code, which changes after repeated
+    // wrong guesses) so both stay current right here
     const timer = setInterval(() => {
       setWebServerLog(getWebServerLog());
       setWebServerCode(getWebServerCode());
@@ -85,7 +88,7 @@ export default function SettingsScreen() {
     try {
       const url = await startWebServer((name) => {
         showToast({ message: t('settingsReceived').replace('{name}', name), type: 'success' });
-      });
+      }, language);
       setWebServerUrl(url);
       setWebServerOn(true);
     } catch (e: any) {

@@ -2,6 +2,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Network from 'expo-network';
 import { Buffer } from 'buffer';
 import { NativeModules } from 'react-native';
+import { Language, translations } from '../constants/translations';
 import { saveAudioFile, saveDeck } from './Storage';
 
 // Sprig's local-network upload server. Serves a small web page over HTTP on
@@ -31,6 +32,11 @@ const PAIRING_CODE_LENGTH = 4;
 // could open unlimited uploads and fill the device's storage with temp files.
 const MAX_CONCURRENT_UPLOADS = 3;
 const MAX_PENDING_BYTES = 400 * 1024 * 1024;
+// Four digits are only 10,000 guesses, which a script tries in minutes. After
+// a few wrong codes the code is replaced (Settings shows the new one) and
+// every upload is refused for a while, so guessing never gets anywhere.
+const MAX_CODE_FAILURES = 5;
+const CODE_LOCKOUT_MS = 30 * 1000;
 
 type Kind = 'pdf' | 'audio';
 
@@ -45,18 +51,58 @@ interface PendingUpload {
 }
 
 let server: { close: () => void } | null = null;
-let pairingCode: string | null = null;
-
-// The code the user must type on the computer. Regenerated every time the
-// server starts, so stopping and restarting invalidates the old one.
-export function getWebServerCode(): string | null {
-    return pairingCode;
-}
 
 function newPairingCode(): string {
     let code = '';
     for (let i = 0; i < PAIRING_CODE_LENGTH; i++) code += Math.floor(Math.random() * 10);
     return code;
+}
+
+export type CodeCheck = 'ok' | 'wrong' | 'locked';
+
+// The pairing code plus its brute-force protection. Exported for tests.
+export class PairingGuard {
+    code: string | null = null;
+    private failures = 0;
+    private lockedUntil = 0;
+
+    constructor(private readonly makeCode: () => string = newPairingCode) { }
+
+    start(): void {
+        this.code = this.makeCode();
+        this.failures = 0;
+        this.lockedUntil = 0;
+    }
+
+    stop(): void {
+        this.code = null;
+    }
+
+    check(code: unknown, now: number = Date.now()): CodeCheck {
+        if (!this.code) return 'wrong';
+        if (now < this.lockedUntil) return 'locked';
+        if (code === this.code) {
+            this.failures = 0;
+            return 'ok';
+        }
+        this.failures++;
+        if (this.failures >= MAX_CODE_FAILURES) {
+            this.failures = 0;
+            this.lockedUntil = now + CODE_LOCKOUT_MS;
+            this.code = this.makeCode();
+            logRequest('too many wrong codes: new code, uploads paused for 30 s');
+        }
+        return 'wrong';
+    }
+}
+
+const pairing = new PairingGuard();
+
+// The code the user must type on the computer. Regenerated every time the
+// server starts (and after repeated wrong guesses), so stopping and
+// restarting invalidates the old one.
+export function getWebServerCode(): string | null {
+    return pairing.code;
 }
 
 function pendingBytes(): number {
@@ -115,7 +161,7 @@ export async function getWebServerUrl(): Promise<string | null> {
     }
 }
 
-export async function startWebServer(onFileSaved?: (name: string, kind: Kind) => void): Promise<string> {
+export async function startWebServer(onFileSaved?: (name: string, kind: Kind) => void, language: Language = 'en'): Promise<string> {
     if (!isWebServerSupported()) {
         throw new Error('unsupported');
     }
@@ -130,8 +176,13 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const TcpSocket = require('react-native-tcp-socket');
 
+    const page = buildUploadPage(language);
+
     server = TcpSocket.createServer((socket: any) => {
         let buf = Buffer.alloc(0);
+        // One request per connection (every response closes it). Bytes that
+        // arrive after the request was complete must not run it a second time.
+        let handled = false;
         let headerEnd = -1;
         let contentLength = 0;
         // Depending on platform/bridge, chunks may arrive as Buffer, plain
@@ -160,6 +211,7 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
         let loggedFirstChunk = false;
 
         socket.on('data', (data: unknown) => {
+            if (handled) return;
             try {
                 if (!loggedFirstChunk) {
                     loggedFirstChunk = true;
@@ -199,6 +251,7 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
                     const m = /content-length:\s*(\d+)/i.exec(head);
                     contentLength = m ? parseInt(m[1], 10) : 0;
                     if (contentLength > MAX_BODY_BYTES) {
+                        handled = true;
                         respond(socket, 413, 'application/json', '{"error":"chunk too large"}');
                         return;
                     }
@@ -215,7 +268,8 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
                     // Not parseable as HTTP at all — serve the page rather than
                     // a 404 so a browser always lands somewhere useful.
                     logRequest(`unparseable request line: "${requestLine.slice(0, 60)}" -> serving page`);
-                    respond(socket, 200, 'text/html', UPLOAD_PAGE);
+                    handled = true;
+                    respond(socket, 200, 'text/html', page);
                     return;
                 }
 
@@ -223,13 +277,15 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
                 const path = normalizePath(rawPath);
                 logRequest(`${method} ${path}`);
 
-                handleRequest(socket, (method || '').toUpperCase(), path, body, onFileSaved).catch(e => {
+                handled = true;
+                handleRequest(socket, (method || '').toUpperCase(), path, body, page, onFileSaved).catch(e => {
                     console.error('WebServer handler error:', e);
                     respond(socket, 500, 'application/json', '{"error":"internal"}');
                 });
             } catch (e) {
                 console.error('WebServer request error:', e);
                 logRequest(`error: ${String(e).slice(0, 80)}`);
+                handled = true;
                 respond(socket, 500, 'application/json', '{"error":"internal"}');
             }
         });
@@ -239,7 +295,7 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
     (server as any).on?.('error', (e: unknown) => {
         logRequest(`server error: ${String(e).slice(0, 80)}`);
     });
-    pairingCode = newPairingCode();
+    pairing.start();
     (server as any).listen({ port: WEB_SERVER_PORT, host: '0.0.0.0' });
     logRequest(`server listening on :${WEB_SERVER_PORT}`);
 
@@ -259,7 +315,7 @@ export async function startWebServer(onFileSaved?: (name: string, kind: Kind) =>
 }
 
 export function stopWebServer(): void {
-    pairingCode = null;
+    pairing.stop();
     if (server) {
         try { server.close(); } catch { /* already closed */ }
         server = null;
@@ -306,13 +362,14 @@ async function handleRequest(
     method: string,
     path: string,
     body: string,
+    page: string,
     onFileSaved?: (name: string, kind: Kind) => void
 ) {
     // This server exists to show exactly one page — any GET that isn't the
     // upload endpoint gets it (so /index.html, odd browser probes and typos
     // all land somewhere useful).
     if (method === 'GET' && path !== '/upload') {
-        respond(socket, 200, 'text/html', UPLOAD_PAGE);
+        respond(socket, 200, 'text/html', page);
         return;
     }
 
@@ -327,9 +384,15 @@ async function handleRequest(
         const { uploadId, name, kind, index, total, data, code } = msg;
 
         // Nothing is written before the client proves it can see the phone.
-        if (!pairingCode || code !== pairingCode) {
+        const codeCheck = pairing.check(code);
+        if (codeCheck === 'locked') {
+            logRequest('rejected: uploads paused after wrong codes');
+            respond(socket, 429, 'application/json', '{"error":"too many wrong codes","code":"locked"}');
+            return;
+        }
+        if (codeCheck !== 'ok') {
             logRequest('rejected: wrong or missing code');
-            respond(socket, 401, 'application/json', '{"error":"wrong code — check the four digits shown in Sprig"}');
+            respond(socket, 401, 'application/json', '{"error":"wrong code","code":"wrong-code"}');
             return;
         }
 
@@ -440,7 +503,7 @@ async function handleRequest(
     }
     // HEAD/OPTIONS and anything else: the page is always a safe answer.
     logRequest(`method ${method} -> serving page`);
-    respond(socket, 200, 'text/html', UPLOAD_PAGE);
+    respond(socket, 200, 'text/html', page);
 }
 
 function sanitizeName(name: string): string {
@@ -451,12 +514,25 @@ function sanitizeName(name: string): string {
 // The page served at / — self-contained, styled to match Sprig's slate theme.
 // Chunk size must stay a multiple of 3 (base64 concatenation contract above).
 // ---------------------------------------------------------------------------
-const UPLOAD_PAGE = `<!DOCTYPE html>
-<html lang="en">
+function escapeHtml(text: string): string {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// A string literal that is safe inside an inline <script>
+function jsString(text: string): string {
+    return JSON.stringify(text).replace(/</g, '\\u003c');
+}
+
+// Texts come from the app's catalogs in the language the app is set to.
+export function buildUploadPage(language: Language): string {
+    const tr = translations[language] ?? translations.en;
+    const h = (key: keyof typeof tr) => escapeHtml(tr[key]);
+    return `<!DOCTYPE html>
+<html lang="${language}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sprig — Drop files</title>
+<title>${h('webPageTitle')}</title>
 <style>
   :root { --ink:#0f172a; --muted:#f1f5f9; --muted-fg:#64748b; --border:#e2e8f0; --green:#22c55e; --red:#ef4444; }
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -464,7 +540,7 @@ const UPLOAD_PAGE = `<!DOCTYPE html>
   .code { display:flex; align-items:center; gap:12px; margin:0 0 18px; padding:12px 14px; border:1px solid var(--border); border-radius:14px; }
   .code span { color:var(--muted-fg); font-size:14px; }
   .code input { margin-left:auto; width:96px; padding:8px 10px; border:1px solid var(--border); border-radius:10px; font:600 18px/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:4px; text-align:center; color:var(--ink); }
-  .code input:focus { outline:2px solid var(--ink); outline-offset:1px; }
+  .code input:focus-visible, .zone:focus-visible { outline:2px solid var(--muted-fg); outline-offset:2px; }
   .card { width:100%; max-width:520px; }
   h1 { font-size:1.6rem; letter-spacing:-.02em; margin-bottom:6px; }
   p.sub { color:var(--muted-fg); margin-bottom:28px; }
@@ -485,30 +561,37 @@ const UPLOAD_PAGE = `<!DOCTYPE html>
 </head>
 <body>
 <div class="card">
-  <h1>Drop files into Sprig</h1>
-  <p class="sub">Files land directly on your phone — nothing leaves your network.</p>
+  <h1>${h('webPageTitle')}</h1>
+  <p class="sub">${h('webPageSubtitle')}</p>
 
   <label class="code">
-    <span>Code shown in Sprig</span>
+    <span>${h('webPageCodeLabel')}</span>
     <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="0000" autocomplete="off">
   </label>
 
-  <div class="zone" id="zonePdf">
-    <strong>Add PDFs</strong>
-    <span>Click or drag PDF documents here</span>
+  <div class="zone" id="zonePdf" role="button" tabindex="0">
+    <strong>${h('webPageAddPdfs')}</strong>
+    <span>${h('webPageAddPdfsHint')}</span>
     <input type="file" id="inPdf" accept="application/pdf" multiple hidden>
   </div>
 
-  <div class="zone" id="zoneAudio">
-    <strong>Add audio</strong>
-    <span>Click or drag audio files here</span>
+  <div class="zone" id="zoneAudio" role="button" tabindex="0">
+    <strong>${h('webPageAddAudio')}</strong>
+    <span>${h('webPageAddAudioHint')}</span>
     <input type="file" id="inAudio" accept="audio/*" multiple hidden>
   </div>
 
   <div class="list" id="list"></div>
-  <footer>Sprig · local upload · keep the app open while transferring</footer>
+  <footer>${h('webPageFooter')}</footer>
 </div>
 <script>
+const TEXT = {
+  enterCode: ${jsString(tr.webPageEnterCode)},
+  saved: ${jsString(tr.webPageSaved)},
+  failed: ${jsString(tr.webPageFailed)},
+  wrongCode: ${jsString(tr.webPageWrongCode)},
+  locked: ${jsString(tr.webPageLocked)},
+};
 const CHUNK = 1050000; // ~1MB and a multiple of 3, so per-chunk base64 strings concatenate into valid base64
 const list = document.getElementById('list');
 const codeInput = document.getElementById('code');
@@ -518,6 +601,9 @@ function wire(zoneId, inputId, kind) {
   const zone = document.getElementById(zoneId);
   const input = document.getElementById(inputId);
   zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+  });
   input.addEventListener('change', () => { [...input.files].forEach(f => upload(f, kind)); input.value = ''; });
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
@@ -543,7 +629,7 @@ async function upload(file, kind) {
     codeInput.focus();
     const el = row(file.name);
     el.classList.add('error');
-    el.querySelector('.status').textContent = 'Enter the code first';
+    el.querySelector('.status').textContent = TEXT.enterCode;
     return;
   }
   const el = row(file.name);
@@ -563,7 +649,11 @@ async function upload(file, kind) {
       });
       let json = null;
       try { json = await res.json(); } catch (e) { /* non-JSON reply */ }
-      if (!res.ok) throw new Error((json && json.error) || ('HTTP ' + res.status));
+      if (!res.ok) {
+        const err = new Error((json && json.error) || ('HTTP ' + res.status));
+        err.code = json && json.code;
+        throw err;
+      }
       last = json;
       const pct = Math.round(((i + 1) / total) * 100);
       bar.style.width = pct + '%';
@@ -572,10 +662,10 @@ async function upload(file, kind) {
     // Only report success once the phone confirms it stored the file.
     if (!last || last.done !== true) throw new Error('phone did not confirm the save');
     el.classList.add('done');
-    status.textContent = 'Saved';
+    status.textContent = TEXT.saved;
   } catch (e) {
     el.classList.add('error');
-    status.textContent = 'Failed';
+    status.textContent = e.code === 'wrong-code' ? TEXT.wrongCode : e.code === 'locked' ? TEXT.locked : TEXT.failed;
     console.error(e);
   }
 }
@@ -591,3 +681,4 @@ function toBase64(blob) {
 </script>
 </body>
 </html>`;
+}
