@@ -40,8 +40,32 @@ npm install
 npx expo start
 ```
 
-Built with [Expo](https://expo.dev) SDK 54. Production builds via
-`npx eas-cli build --platform android --profile production`.
+Built with [Expo](https://expo.dev) SDK 54.
+
+## Release
+
+Releases are built on GitHub Actions without a cloud build service: bump
+`version` and `android.versionCode` in `app.json` on `master`, and
+`.github/workflows/release.yml` builds the signed APK and App Bundle and
+publishes them as the GitHub release `v<version>`.
+
+Signing uses the Play upload key from four repository secrets:
+`ANDROID_KEYSTORE` (the `.jks`, base64), `ANDROID_KEYSTORE_PASSWORD`,
+`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. Without them the build is
+debug-signed (with a notice in the run).
+
+Local release build, with the keystore in `keystore.properties` (gitignored):
+
+```bash
+npx expo prebuild --platform android --clean
+cd android && ./gradlew bundleRelease
+cd .. && node scripts/android-release.mjs --track internal
+```
+
+**Important:** the upload key used to be managed by EAS. Download it once
+(`eas credentials -p android` → "Download existing keystore") while the Expo
+account still exists, or request an upload key reset in Play Console. All
+steps: [docs/release.md](docs/release.md).
 
 ## Support
 
